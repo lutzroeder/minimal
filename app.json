@@ -1,0 +1,17 @@
+{
+  "name":        "John Smith",
+  "bio":         "I explore, I work, and I have hobbies.",
+  "description": "Detailed description of for search engines.",
+  "self":        "http://www.example.com/",
+  "feed":        "",
+  "links": [
+    { "name": "Twitter",    "symbol": "&#xe286;", "url": "http://www.twitter.com/lutzroeder" },
+    { "name": "Facebook",   "symbol": "&#xe227;", "url": "http://www.facebook.com/lutzroeder" },
+    { "name": "LinkedIn",   "symbol": "&#xe252;", "url": "https://www.linkedin.com/in/lutzroeder" },
+    { "name": "GitHub",     "symbol": "&#xe237;", "url": "http://www.github.com/lutzroeder" }
+  ],
+  "pages": [
+    { "name": "Blog",  "url": "/" },
+    { "name": "Projects",   "url": "/projects/" }
+  ]
+}
