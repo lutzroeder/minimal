@@ -1,0 +1,232 @@
+#!/bin/bash
+
+pushd $(dirname ${BASH_SOURCE[0]}) > /dev/null
+
+source ./admin.cfg
+
+service=${site}.service
+proxy="${site}.conf"
+
+server_install() {
+    server_uninstall
+
+    echo "$(tput bold)Install Node.js$(tput sgr0)"
+    sudo apt-get install --yes nodejs
+
+    echo "$(tput bold)Install NGINX$(tput sgr0)"
+    sudo apt-get install --yes nginx
+
+    echo "$(tput bold)Configure NGINX reverse proxy$(tput sgr0)"
+    sudo systemctl stop nginx.service
+cat << EOF > "${proxy}"
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${domain};
+    ssl_certificate /etc/letsencrypt/live/${domain}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-NginX-Proxy true;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_ssl_session_reuse off;
+    }
+}
+EOF
+    cat "${proxy}"
+    sudo cp "${proxy}" "/etc/nginx/sites-available/${proxy}"
+    rm "${proxy}"
+    sudo rm -f "/etc/nginx/sites-enabled/default"
+    sudo ln -f -s "/etc/nginx/sites-available/${proxy}" "/etc/nginx/sites-enabled/${proxy}"
+    sudo systemctl start nginx.service
+    sudo systemctl status nginx.service --no-pager --lines=1000 --full
+
+    echo "$(tput bold)Configure ${service}$(tput sgr0)"
+cat > "${service}" << EOF
+[Unit]
+Description=${service}
+[Service]
+WorkingDirectory=$(pwd)
+ExecStart=/usr/bin/node $(pwd)/app.js
+Environment=NODE_ENV=production
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=${service}
+User=$(whoami)
+Group=$(whoami)
+[Install]
+WantedBy=multi-user.target
+EOF
+    cat "${service}"
+    sudo cp "${service}" "/etc/systemd/system/${service}"
+    rm "${service}"
+    echo "$(tput bold)Enable ${service}$(tput sgr0)"
+    sudo systemctl enable ${service}
+}
+
+server_install() {
+    server_stop
+
+    if [ -f "/etc/systemd/system/${service}" ] && [ $(systemctl is-enabled ${service}) = "enabled" ]; then
+        echo "$(tput bold)Disable ${service}$(tput sgr0)"
+        sudo systemctl disable "${service}"
+        sudo rm "/etc/systemd/system/${service}"
+    fi
+
+    if [ -f "/etc/nginx/sites-available/${proxy}" ]; then
+        echo "$(tput bold)Configure NGINX reverse proxy$(tput sgr0)"
+        sudo systemctl stop nginx.service
+        sudo rm "/etc/nginx/sites-enabled/${proxy}"
+        sudo rm "/etc/nginx/sites-available/${proxy}"
+        sudo ln -f -s "/etc/nginx/sites-available/default" "/etc/nginx/sites-enabled/default"
+        sudo systemctl start nginx.service
+        sudo systemctl status nginx.service --no-pager --lines=1000 --full
+    fi
+}
+
+server_cert() {
+    echo "$(tput bold)Install Let's Encrypt$(tput sgr0)"
+    sudo apt-get install --yes letsencrypt # https://letsencrypt.org/getting-started
+
+    if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
+        echo "$(tput bold)Re-new Let's Encrypt certificate$(tput sgr0)"
+        sudo letsencrypt renew
+    else
+        echo "$(tput bold)Create Let's Encrypt certificate$(tput sgr0)"
+        mkdir -p .well-known/acme-challenge
+        sudo letsencrypt certonly --webroot -w $(pwd) -d ${domain} -d www.${domain} --agree-tos --email ${mail}
+        rm -R .well-known
+        rm letsencrypt.log
+    fi
+
+    echo "$(tput bold)Reload NGINX$(tput sgr0)"
+    sudo systemctl reload nginx.service
+    sudo systemctl status nginx.service --no-pager --lines=1000 --full
+}
+
+server_start() {
+    echo "$(tput bold)Start ${service}$(tput sgr0)"
+    sudo systemctl start ${service}
+    sleep 1
+    sudo systemctl status ${service}  --no-pager --lines=1000 --full
+}
+
+server_stop() {
+    if [ $(systemctl is-active "${service}") = "active" ]; then
+        echo "$(tput bold)Stop ${service}$(tput sgr0)"
+        sudo systemctl stop "${service}"
+        sudo systemctl status ${service}  --no-pager --lines=1000 --full
+    fi
+}
+
+server_status() {
+    sudo systemctl status ${service} --no-pager --lines=1000 --full
+}
+
+server_pull() {
+    echo "$(tput bold)Git fetch$(tput sgr0)"
+    git fetch -p
+    branch=origin/$(git rev-parse --abbrev-ref HEAD)
+    echo "$(tput bold)Git reset ${branch}$(tput sgr0)"
+    git reset --hard ${branch}
+}
+
+server_update() {
+    server_stop
+    server_pull
+    server_start
+}
+
+client_status() {
+    ssh -i ~/.ssh/${user}_id_rsa ${user}@${domain} -tq -o "BatchMode yes" "/var/www/${site}/admin server status"
+}
+
+client_push() {
+    echo "$(tput bold)Git add$(tput sgr0)"
+    git add -v *
+    message=$(git log --format=%B -n 1)
+    echo "$(tput bold)Git amend '${message}'$(tput sgr0)"
+    git commit --amend -m "${message}"
+    echo "$(tput bold)Git push$(tput sgr0)"
+    git push --force
+    echo "$(tput bold)SSH update$(tput sgr0)"
+    ssh -i ~/.ssh/${user}_id_rsa ${user}@${domain} -tq -o "BatchMode yes" "/var/www/${site}/admin server update" # | sed 's/^/    /'
+}
+
+client_console() {
+    ssh -i ~/.ssh/${user}_id_rsa ${user}@${domain}
+}
+
+server() {
+    case "$1" in
+        "install") server_install;;
+        "uninstall") server_uninstall;;
+        "cert") server_cert;;
+        "pull") server_pull;;
+        "start") server_start;;
+        "stop") server_stop;;
+        "update") server_update;;
+        "status") server_status;;
+        *)
+        echo "Usage: $(basename "$0") $(tput bold)server$(tput sgr0) <command>"
+        echo
+        echo "Commands:"
+        echo;
+        echo "    $(tput bold)install$(tput sgr0)    Install $(tput bold)${service}$(tput sgr0)"
+        echo "    $(tput bold)uninstall$(tput sgr0)  Uninstall service"
+        echo "    $(tput bold)cert$(tput sgr0)       Create or renew SSL certificates"
+        echo "    $(tput bold)pull$(tput sgr0)       Fetch Git repo and reset master branch"
+        echo "    $(tput bold)start$(tput sgr0)      Start service"
+        echo "    $(tput bold)stop$(tput sgr0)       Stop service"
+        echo "    $(tput bold)update$(tput sgr0)     Run stop, pull, start, status"
+        echo "    $(tput bold)status$(tput sgr0)     Print current service status"
+        echo;
+    esac
+}
+
+client() {
+    case "$1" in
+        "status") client_status;;
+        "push") client_push;;
+        "console") client_console;;
+        *)
+            echo;
+            echo "Usage: $(basename "$0") $(tput bold)client$(tput sgr0) <command>"
+            echo
+            echo "Commands:"
+            echo;
+            echo "    $(tput bold)push$(tput sgr0)       Amend last Git commit, push changes and update server"
+            echo "    $(tput bold)console$(tput sgr0)    Connect via SSH to server"
+            echo "    $(tput bold)status$(tput sgr0)     Print server log"
+            echo;
+        ;;
+
+    esac
+}
+
+case "$1" in
+    "client") client $2;;
+    "server") server $2;;
+    *)
+        echo;
+        echo "Usage: $(tput bold)$(basename "$0")$(tput sgr0) <target> <command>"
+        echo
+        echo "Targets:"
+        echo
+        echo "    $(tput bold)client$(tput sgr0)    Client commands"
+        echo "    $(tput bold)server$(tput sgr0)    Server commands"
+        echo;
+        ;;
+esac
+
+popd > /dev/null
