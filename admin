@@ -27,6 +27,16 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
     ssl_prefer_server_ciphers on;
     ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
+    return 301 \$scheme://www.${domain}$request_uri;
+}
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name www.${domain};
+    ssl_certificate /etc/letsencrypt/live/${domain}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
     location / {
         proxy_pass http://localhost:8080;
         proxy_http_version 1.1;
@@ -74,7 +84,7 @@ EOF
     sudo systemctl enable ${service}
 }
 
-server_install() {
+server_uninstall() {
     server_stop
 
     if [ -f "/etc/systemd/system/${service}" ] && [ $(systemctl is-enabled ${service}) = "enabled" ]; then
