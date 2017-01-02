@@ -130,7 +130,7 @@ router.get("/blog/atom.xml", function(request, response, next) {
         var draft = domain == "localhost" || domain == "127.0.0.1";
         var entry = loadPost("blog/" + file);
         if (entry && (entry["state"] == "post" || draft)) {
-            var url = configuration["self"] + "/blog/" + path.basename(file, ".html");;
+            var url = host + "/blog/" + path.basename(file, ".html");;
             output.push("<entry>");
             output.push("<id>" + url + "</id>");
             if (entry["author"] && entry["author"] !== configuration["name"]) {
