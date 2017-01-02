@@ -215,8 +215,6 @@ var mimeTypeMap = {
     ".gif":  "image/gif",
     ".jpg":  "image/jpeg",
     ".ico":  "image/x-icon",
-    ".xap":  "application/x-silverlight-app",
-    ".ppt":  "application/vnd.ms-powerpoint",
     ".zip":  "application/zip",
     ".json": "application/json"
 };
@@ -262,18 +260,13 @@ router.get("/*", function (request, response, next) {
         fs.stat(localPath, function (error, stats) {
             if (error) {
                 next();
-                return;
             }
-            if (stats.isDirectory() || path.extname(localPath) != ".html") {
+            else if (stats.isDirectory() || path.extname(localPath) != ".html") {
                 response.writeHead(302, { "Location": pathname + "/" });
                 response.end();
-                return;
             }
-            fs.readFile(localPath, "utf8", function (error, data) {
-                if (error) {
-                    next();
-                    return;
-                }
+            else {
+                var template = fs.readFileSync(localPath, "utf-8");
 
                 var context = Object.assign({ }, configuration);
 
@@ -281,24 +274,21 @@ router.get("/*", function (request, response, next) {
                     var domain = request.headers.host.split(":").shift();
                     return renderBlog(domain == "localhost" || domain == "127.0.0.1"); 
                 };
-
                 context["feed"] = context["feed"] ? context["feed"] : function() {
                     return (request.secure ? "https" : "http") + "://" + request.headers.host + "/blog/atom.xml";
                 };
-
                 context["social"] = function() { 
                     return configuration["links"].map(function (link) { 
                           return "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + link["symbol"] + "</span></a>";
                     }).join("\n");
                 };      
-
                 context["tabs"] = function() { 
                     return configuration["pages"].map(function (page) {
                         return "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>";
                     }).join("\n");
                 };
 
-                data = mustache(data, context, function(name) {
+                var data = mustache(template, context, function(name) {
                     return fs.readFileSync(path.join(path.dirname(localPath), name), "utf-8");
                 });
 
@@ -309,7 +299,7 @@ router.get("/*", function (request, response, next) {
                     response.write(data);
                 }
                 response.end();
-            });       
+            }
         });
     }
 });
