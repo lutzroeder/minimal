@@ -225,11 +225,11 @@ a.icon:hover
 
 .item h1 {
     font-family: "Merriweather Sans", "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Geneva, Verdana, sans-serif;
-    font-weight: 700; 
-    font-size: 25px;
+    font-weight: bold; 
+    font-size: 26px;
     font-style: normal;
-    line-height: 1.12; 
-    letter-spacing: -0.022em;
+    line-height: 1.32; 
+    letter-spacing: -0.052em;
     margin: 0px 0px 8px -1.9375px;
 }
 
@@ -238,11 +238,11 @@ a.icon:hover
     font-weight: 300;
     font-size: 16px;
     font-style: normal;
-    line-height: 27px;
+    line-height: 1.69;
     word-break: break-word;
     word-wrap: break-word;
     margin: 8px 0px 0px 0px;
-    letter-spacing: -0.004em;
+    letter-spacing: -0.009em;
 }
 
 .item p a { 
