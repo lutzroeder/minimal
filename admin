@@ -158,7 +158,7 @@ server_update() {
 }
 
 client_status() {
-    ssh -i ~/.ssh/${user}_id_rsa ${user}@${domain} -tq -o "BatchMode yes" "/var/www/${site}/admin server status"
+    ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin server status"
 }
 
 client_push() {
@@ -170,11 +170,11 @@ client_push() {
     echo "$(tput bold)Git push$(tput sgr0)"
     git push --force
     echo "$(tput bold)SSH update$(tput sgr0)"
-    ssh -i ~/.ssh/${user}_id_rsa ${user}@${domain} -tq -o "BatchMode yes" "/var/www/${site}/admin server update" # | sed 's/^/    /'
+    ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin server update" # | sed 's/^/    /'
 }
 
 client_console() {
-    ssh -i ~/.ssh/${user}_id_rsa ${user}@${domain}
+    ssh -i ~/.ssh/${user}_id_rsa ${user}@${server}
 }
 
 server() {
