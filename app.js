@@ -9,36 +9,6 @@ var url = require("url");
 console.log(process.title + " " + process.version);
 var configuration = JSON.parse(fs.readFileSync("./app.json", "utf-8"));
 
-function Route(path) {
-    this.path = path;
-    this.regexp = (path instanceof RegExp) ? path : new RegExp("^" + path.replace("/*", "/(.*)") + "$", "i");
-    this.methods = {};
-}
-
-Route.prototype.set = function(method, handler) {
-    this.methods[method] = handler;
-}
-
-Route.prototype.handle = function(request, response, next) {
-    var method = request.method.toUpperCase();
-    if (method === "HEAD" && !this.methods["HEAD"]) {
-        method = "GET";
-    }
-    var handler = this.methods[method];
-    if (handler) {
-        try {
-            handler(request, response, next);
-        }
-        catch (error) {
-            console.log(error);
-            next(error);
-        }
-    }
-    else {
-        next();
-    }
-}
-
 function Router() {
     this.routes = [];
 }
@@ -47,7 +17,11 @@ Router.prototype.route = function(path) {
     var route = this.routes.find(function (route) { return route.path === path; });
     if (!route)
     {
-        route = new Route(path);
+        route = { 
+            path: path,
+            regexp: (path instanceof RegExp) ? path : new RegExp("^" + path.replace("/*", "/(.*)") + "$", "i"),
+            handlers: {}
+        };
         this.routes.push(route);
     }
     return route;
@@ -63,7 +37,23 @@ Router.prototype.handle = function(request, response) {
         var route = routes[index++];
         if (route) {
             if (pathname.match(route.regexp) !== null) {
-                route.handle(request, response, next);
+                var method = request.method.toUpperCase();
+                if (method === "HEAD" && !route.handlers["HEAD"]) {
+                    method = "GET";
+                }
+                var handler = route.handlers[method];
+                if (handler) {
+                    try {
+                        handler(request, response, next);
+                    }
+                    catch (error) {
+                        console.log(error);
+                        next(error);
+                    }
+                }
+                else {
+                    next();
+                }
             }
             else {
                 next();
@@ -87,11 +77,11 @@ Router.prototype.updateHandler = function(handler) {
 }
 
 Router.prototype.get = function(path, handler) {
-    this.route(path).set("GET", this.updateHandler(handler));
+    this.route(path).handlers["GET"] = this.updateHandler(handler);
 }
 
 Router.prototype.head = function(path, handler) {
-    this.route(path).set("HEAD", this.updateHandler(handler));
+    this.route(path).handlers["HEAD"] = this.updateHandler(handler);
 }
 
 Router.prototype.default = function(handler) {
@@ -138,12 +128,7 @@ router.get("/blog/atom.xml", function(request, response, next) {
             }
             var date = new Date(entry["date"]).toISOString();
             output.push("<published>" + date + "</published>");
-            if (entry["updated"]) {
-                output.push("<updated>" + new Date(entry["updated"]).toISOString() + "</updated>");
-            }
-            else {
-                output.push("<updated>" + date + "</updated>");
-            }
+            output.push("<updated>" + (entry["updated"] ? (new Date(entry["updated"]).toISOString()) : date) + "</updated>");
             output.push("<title type='text'>" + entry["title"] + "</title>")
             output.push("<content type='html'>" + entry["content"].replace(/\</g, "&lt;").replace(/\>/g, "&gt;") + "</content>");
             output.push("<link rel='alternate' type='text/html' href='" + url + "' title='" + entry["title"] + "' />");
@@ -196,10 +181,11 @@ router.get("/.well-known/acme-challenge/*", function (request, response, next) {
     var pathname = url.parse(request.url, true).pathname;
     var localPath = pathname.replace(/^\/?/, "");
     if (fs.existsSync(localPath) && fs.statSync(localPath).isFile) {
-        response.writeHead(200, { "Content-Type" : "text/plain; charset=utf-8" });
-        if (request.method !== "HEAD") {
-            response.write(fs.readFileSync(localPath, "utf-8"));
-        }
+        var data = fs.readFileSync(localPath, "utf-8");
+        response.writeHead(200, { 
+            "Content-Type" : "text/plain; charset=utf-8",
+            "Content-Length" : Buffer.byteLength(data) });
+        response.write(data);
         response.end();
     } 
     else {
@@ -245,11 +231,11 @@ router.get("/*", function (request, response, next) {
                     response.writeHead(200, { 
                         "Content-Type" : contentType,
                         "Content-Length" : stats.size });
-                    if (request.method !== "HEAD") {
-                        stream.pipe(response);
+                    if (request.method === "HEAD") {
+                        response.end();
                     } 
                     else {
-                        response.end();
+                        stream.pipe(response);
                     }
                 });
             }
@@ -267,9 +253,7 @@ router.get("/*", function (request, response, next) {
             }
             else {
                 var template = fs.readFileSync(localPath, "utf-8");
-
                 var context = Object.assign({ }, configuration);
-
                 context["blog"] = function() { 
                     var domain = request.headers.host.split(":").shift();
                     return renderBlog(domain == "localhost" || domain == "127.0.0.1"); 
@@ -287,11 +271,9 @@ router.get("/*", function (request, response, next) {
                         return "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>";
                     }).join("\n");
                 };
-
                 var data = mustache(template, context, function(name) {
                     return fs.readFileSync(path.join(path.dirname(localPath), name), "utf-8");
                 });
-
                 response.writeHead(200, { 
                     "Content-Type" : "text/html",
                     "Content-Length" : Buffer.byteLength(data) });
