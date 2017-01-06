@@ -266,15 +266,14 @@ a.icon:hover
     line-height: 16px;
 }
 
-.item .screenshot { 
+.item .logo { 
     float: left; 
     margin-top: 5px;
     margin-right: 20px; 
 }
 
-.item .screenshot img {
+.item .logo img {
     width: 160px;
-    height: 160px;
     border: 1px solid #000;
 }
 
@@ -325,7 +324,7 @@ a.icon:hover
     .hide {
         display: none;
     }
-    .item .screenshot { 
+    .item .logo { 
         display: none;
     }
     .item .description {
