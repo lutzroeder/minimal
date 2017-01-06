@@ -161,6 +161,12 @@ client_status() {
     ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin server status"
 }
 
+client_update() {
+    client_push
+    echo "$(tput bold)SSH update$(tput sgr0)"
+    ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin server update" # | sed 's/^/    /'
+}
+
 client_push() {
     echo "$(tput bold)Git add$(tput sgr0)"
     git add -v *
@@ -169,8 +175,6 @@ client_push() {
     git commit --amend -m "${message}"
     echo "$(tput bold)Git push$(tput sgr0)"
     git push --force
-    echo "$(tput bold)SSH update$(tput sgr0)"
-    ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin server update" # | sed 's/^/    /'
 }
 
 client_console() {
@@ -206,21 +210,22 @@ server() {
 
 client() {
     case "$1" in
-        "status") client_status;;
-        "push") client_push;;
         "console") client_console;;
+        "status") client_status;;
+        "update") client_update;;
+        "push") client_push;;
         *)
             echo;
             echo "Usage: $(basename "$0") $(tput bold)client$(tput sgr0) <command>"
             echo
             echo "Commands:"
             echo;
-            echo "    $(tput bold)push$(tput sgr0)       Amend last Git commit, push changes and update server"
-            echo "    $(tput bold)console$(tput sgr0)    Connect via SSH to server"
+            echo "    $(tput bold)push$(tput sgr0)       Amend last Git commit and push changes"
+            echo "    $(tput bold)update$(tput sgr0)     Push and update server"
             echo "    $(tput bold)status$(tput sgr0)     Print server log"
+            echo "    $(tput bold)console$(tput sgr0)    Connect via SSH to server"
             echo;
         ;;
-
     esac
 }
 
