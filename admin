@@ -27,7 +27,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
     ssl_prefer_server_ciphers on;
     ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
-    return 301 \$scheme://www.${domain}$request_uri;
+    return 301 \$scheme://www.${domain}\$request_uri;
 }
 server {
     listen 80;
