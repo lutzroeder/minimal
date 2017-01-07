@@ -157,6 +157,10 @@ server_update() {
     server_start
 }
 
+client_start() {
+    sleep 0.5 && git web--browse http://localhost:8080 & node app.js
+}
+
 client_status() {
     ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin server status"
 }
@@ -210,16 +214,18 @@ server() {
 
 client() {
     case "$1" in
-        "console") client_console;;
-        "status") client_status;;
-        "update") client_update;;
+        "start") client_start;;
         "push") client_push;;
+        "update") client_update;;
+        "status") client_status;;
+        "console") client_console;;
         *)
             echo;
             echo "Usage: $(basename "$0") $(tput bold)client$(tput sgr0) <command>"
             echo
             echo "Commands:"
             echo;
+            echo "    $(tput bold)start$(tput sgr0)     Start node app.js locally and open web browser"
             echo "    $(tput bold)push$(tput sgr0)       Amend last Git commit and push changes"
             echo "    $(tput bold)update$(tput sgr0)     Push and update server"
             echo "    $(tput bold)status$(tput sgr0)     Print server log"
