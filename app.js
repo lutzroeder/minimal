@@ -132,7 +132,7 @@ router.get("/blog/atom.xml", function(request, response, next) {
             output.push("<published>" + date + "</published>");
             output.push("<updated>" + (entry["updated"] ? (new Date(entry["updated"]).toISOString()) : date) + "</updated>");
             output.push("<title type='text'>" + entry["title"] + "</title>")
-            output.push("<content type='html'>" + entry["content"].replace(/\</g, "&lt;").replace(/\>/g, "&gt;") + "</content>");
+            output.push("<content type='html'>" + escapeHtml(entry["content"]) + "</content>");
             output.push("<link rel='alternate' type='text/html' href='" + url + "' title='" + entry["title"] + "' />");
             output.push("</entry>")
         }
@@ -295,16 +295,40 @@ router.get("/*", function (request, response, next) {
     }
 });
 
+var entityMap = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+    '/': '&#x2F;',
+    '`': '&#x60;',
+    '=': '&#x3D;'
+};
+
+function escapeHtml(text) {
+    return text.replace(/[&<>"'`=\/]/g, function (char) {
+        return entityMap[char];
+    });
+}
+
 function mustache(template, context, partials) {
     template = template.replace(/\{\{>\s*([-_\/\.\w]+)\s*\}\}/gm, function (match, name) {
         return typeof partials === "function" ? partials(name) : partials[name];
+    });
+    template = template.replace(/\{\{\{\s*([-_\/\.\w]+)\s*\}\}\}/gm, function (match, name) {
+        var value = context[name];
+        if (typeof value === "function") {
+            value = value();
+        }
+        return value;
     });
     template = template.replace(/\{\{\s*([-_\/\.\w]+)\s*\}\}/gm, function (match, name) {
         var value = context[name];
         if (typeof value === "function") {
             value = value();
         }
-        return value;
+        return escapeHtml(value);
     });
     return template;
 }
