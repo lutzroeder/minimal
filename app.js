@@ -30,7 +30,7 @@ Router.prototype.route = function(path) {
 }
 
 Router.prototype.handle = function(request, response) {
-    var pathname = url.parse(request.url, true).pathname;
+    var pathname = path.normalize(url.parse(request.url, true).pathname);
     var routes = this.routes;
     var defaultHandler = this.defaultHandler;
     var index = 0;
@@ -118,7 +118,7 @@ router.get("/blog/atom.xml", function(request, response, next) {
     output.push("<link rel='alternate' type='text/html' href='" + host + "/' />");
     output.push("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />");
     fs.readdirSync("blog/").sort().reverse().forEach(function (file, index) {
-        var domain = request.headers.host.split(":").shift();
+        var domain = request.headers.host ? request.headers.host.split(":").shift() : "";
         var draft = domain == "localhost" || domain == "127.0.0.1";
         var entry = loadPost("blog/" + file);
         if (entry && (entry["state"] == "post" || draft)) {
@@ -150,7 +150,7 @@ router.get("/blog/atom.xml", function(request, response, next) {
 
 // Render specific HTML blog post
 router.get("/blog/*", function (request, response, next) {
-    var pathname = url.parse(request.url, true).pathname.toLowerCase();
+    var pathname = path.normalize(url.parse(request.url, true).pathname.toLowerCase());
     var localPath = pathname.replace(/^\/?/, "") + ".html";
     var entry = loadPost(localPath);
     if (entry) {
@@ -180,7 +180,7 @@ router.get("/blog/*", function (request, response, next) {
 
 // Handle "Let's Encrypt" challenge
 router.get("/.well-known/acme-challenge/*", function (request, response, next) {
-    var pathname = url.parse(request.url, true).pathname;
+    var pathname = path.normalize(url.parse(request.url, true).pathname);
     var localPath = pathname.replace(/^\/?/, "");
     if (fs.existsSync(localPath) && fs.statSync(localPath).isFile) {
         var data = fs.readFileSync(localPath, "utf-8");
@@ -208,7 +208,7 @@ var mimeTypeMap = {
 };
 
 router.get("/*", function (request, response, next) {
-    var pathname = url.parse(request.url, true).pathname.toLowerCase();
+    var pathname = path.normalize(url.parse(request.url, true).pathname.toLowerCase());
     if (pathname.endsWith("/index.html"))
     {
         response.writeHead(301, { "Location": "/" + pathname.substring(0, pathname.length - 11).replace(/^\/?/, "") });
@@ -271,8 +271,8 @@ router.get("/*", function (request, response, next) {
                     context["feed"] = context["feed"] ? context["feed"] : function() {
                         return (request.secure ? "https" : "http") + "://" + request.headers.host + "/blog/atom.xml";
                     };
-                    context["blog"] = function() { 
-                        var domain = request.headers.host.split(":").shift();
+                    context["blog"] = function() {
+                        var domain = request.headers.host ? request.headers.host.split(":").shift() : "";
                         var draft = domain == "localhost" || domain == "127.0.0.1";
                         return renderBlog(draft);
                     };
