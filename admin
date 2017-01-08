@@ -4,9 +4,6 @@ pushd $(dirname ${BASH_SOURCE[0]}) > /dev/null
 
 source ./admin.cfg
 
-service=${site}.service
-proxy="${site}.conf"
-
 server_install() {
     server_uninstall
 
@@ -18,7 +15,7 @@ server_install() {
 
     echo "$(tput bold)Configure NGINX reverse proxy$(tput sgr0)"
     sudo systemctl stop nginx.service
-cat << EOF > "${proxy}"
+cat << EOF > "${site}.conf"
 server {
     listen 80;
     listen 443 ssl;
@@ -51,18 +48,18 @@ server {
     }
 }
 EOF
-    cat "${proxy}"
-    sudo cp "${proxy}" "/etc/nginx/sites-available/${proxy}"
-    rm "${proxy}"
+    cat "${site}.conf"
+    sudo cp "${site}.conf" "/etc/nginx/sites-available/${site}.conf"
+    rm "${site}.conf"
     sudo rm -f "/etc/nginx/sites-enabled/default"
-    sudo ln -f -s "/etc/nginx/sites-available/${proxy}" "/etc/nginx/sites-enabled/${proxy}"
+    sudo ln -f -s "/etc/nginx/sites-available/${site}.conf" "/etc/nginx/sites-enabled/${site}.conf"
     sudo systemctl start nginx.service
     sudo systemctl status nginx.service --no-pager --lines=1000 --full
 
-    echo "$(tput bold)Configure ${service}$(tput sgr0)"
-cat > "${service}" << EOF
+    echo "$(tput bold)Configure ${site}.service$(tput sgr0)"
+cat > "${site}.service" << EOF
 [Unit]
-Description=${service}
+Description=${site}.service
 [Service]
 WorkingDirectory=$(pwd)
 ExecStart=/usr/bin/node $(pwd)/app.js
@@ -71,33 +68,33 @@ Restart=always
 RestartSec=10
 StandardOutput=syslog
 StandardError=syslog
-SyslogIdentifier=${service}
+SyslogIdentifier=${site}.service
 User=$(whoami)
 Group=$(whoami)
 [Install]
 WantedBy=multi-user.target
 EOF
-    cat "${service}"
-    sudo cp "${service}" "/etc/systemd/system/${service}"
-    rm "${service}"
-    echo "$(tput bold)Enable ${service}$(tput sgr0)"
-    sudo systemctl enable ${service}
+    cat "${site}.service"
+    sudo cp "${site}.service" "/etc/systemd/system/${site}.service"
+    rm "${site}.service"
+    echo "$(tput bold)Enable ${site}.service$(tput sgr0)"
+    sudo systemctl enable ${site}.service
 }
 
 server_uninstall() {
     server_stop
 
-    if [ -f "/etc/systemd/system/${service}" ] && [ $(systemctl is-enabled ${service}) = "enabled" ]; then
-        echo "$(tput bold)Disable ${service}$(tput sgr0)"
-        sudo systemctl disable "${service}"
-        sudo rm "/etc/systemd/system/${service}"
+    if [ -f "/etc/systemd/system/${site}.service" ] && [ $(systemctl is-enabled ${site}.service) = "enabled" ]; then
+        echo "$(tput bold)Disable ${site}.service$(tput sgr0)"
+        sudo systemctl disable "${site}.service"
+        sudo rm "/etc/systemd/system/${site}.service"
     fi
 
-    if [ -f "/etc/nginx/sites-available/${proxy}" ]; then
+    if [ -f "/etc/nginx/sites-available/${site}.conf" ]; then
         echo "$(tput bold)Configure NGINX reverse proxy$(tput sgr0)"
         sudo systemctl stop nginx.service
-        sudo rm "/etc/nginx/sites-enabled/${proxy}"
-        sudo rm "/etc/nginx/sites-available/${proxy}"
+        sudo rm "/etc/nginx/sites-enabled/${site}.conf"
+        sudo rm "/etc/nginx/sites-available/${site}.conf"
         sudo ln -f -s "/etc/nginx/sites-available/default" "/etc/nginx/sites-enabled/default"
         sudo systemctl start nginx.service
         sudo systemctl status nginx.service --no-pager --lines=1000 --full
@@ -125,22 +122,22 @@ server_cert() {
 }
 
 server_start() {
-    echo "$(tput bold)Start ${service}$(tput sgr0)"
-    sudo systemctl start ${service}
+    echo "$(tput bold)Start ${site}.service$(tput sgr0)"
+    sudo systemctl start ${site}.service
     sleep 1
-    sudo systemctl status ${service}  --no-pager --lines=1000 --full
+    sudo systemctl status ${site}.service  --no-pager --lines=1000 --full
 }
 
 server_stop() {
-    if [ $(systemctl is-active "${service}") = "active" ]; then
-        echo "$(tput bold)Stop ${service}$(tput sgr0)"
-        sudo systemctl stop "${service}"
-        sudo systemctl status ${service}  --no-pager --lines=1000 --full
+    if [ $(systemctl is-active "${site}.service") = "active" ]; then
+        echo "$(tput bold)Stop ${site}.service$(tput sgr0)"
+        sudo systemctl stop "${site}.service"
+        sudo systemctl status ${site}.service  --no-pager --lines=1000 --full
     fi
 }
 
 server_status() {
-    sudo systemctl status ${service} --no-pager --lines=1000 --full
+    sudo systemctl status ${site}.service --no-pager --lines=1000 --full
 }
 
 server_pull() {
@@ -182,7 +179,7 @@ client_push() {
 }
 
 client_console() {
-    ssh -i ~/.ssh/${user}_id_rsa ${user}@${server}
+    ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -t "cd /var/www/${site} && exec bash -l"
 }
 
 server() {
@@ -200,7 +197,7 @@ server() {
         echo
         echo "Commands:"
         echo;
-        echo "    $(tput bold)install$(tput sgr0)    Install $(tput bold)${service}$(tput sgr0)"
+        echo "    $(tput bold)install$(tput sgr0)    Install $(tput bold)${site}.service$(tput sgr0)"
         echo "    $(tput bold)uninstall$(tput sgr0)  Uninstall service"
         echo "    $(tput bold)cert$(tput sgr0)       Create or renew SSL certificates"
         echo "    $(tput bold)pull$(tput sgr0)       Fetch Git repo and reset master branch"
