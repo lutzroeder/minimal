@@ -159,13 +159,13 @@ client_start() {
 }
 
 client_status() {
-    ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin server status"
+    ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin status"
 }
 
 client_update() {
     client_push
     echo "$(tput bold)SSH update$(tput sgr0)"
-    ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin server update" # | sed 's/^/    /'
+    ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin update" # | sed 's/^/    /'
 }
 
 client_push() {
@@ -193,9 +193,9 @@ server() {
         "update") server_update;;
         "status") server_status;;
         *)
-        echo "Usage: $(basename "$0") $(tput bold)server$(tput sgr0) <command>"
+        echo "Usage: $(tput bold)$(basename "$0")$(tput sgr0) <command>"
         echo
-        echo "Commands:"
+        echo "$(tput bold)Server$(tput sgr0) commands:"
         echo;
         echo "    $(tput bold)install$(tput sgr0)    Install $(tput bold)${site}.service$(tput sgr0)"
         echo "    $(tput bold)uninstall$(tput sgr0)  Uninstall service"
@@ -218,11 +218,11 @@ client() {
         "console") client_console;;
         *)
             echo;
-            echo "Usage: $(basename "$0") $(tput bold)client$(tput sgr0) <command>"
+            echo "Usage: $(tput bold)$(basename "$0")$(tput sgr0) <command>"
             echo
-            echo "Commands:"
+            echo "$(tput bold)Client$(tput sgr0) commands:"
             echo;
-            echo "    $(tput bold)start$(tput sgr0)     Start node app.js locally and open web browser"
+            echo "    $(tput bold)start$(tput sgr0)      Start node app.js locally and open web browser"
             echo "    $(tput bold)push$(tput sgr0)       Amend last Git commit and push changes"
             echo "    $(tput bold)update$(tput sgr0)     Push and update server"
             echo "    $(tput bold)status$(tput sgr0)     Print server log"
@@ -232,19 +232,10 @@ client() {
     esac
 }
 
-case "$1" in
-    "client") client $2;;
-    "server") server $2;;
-    *)
-        echo;
-        echo "Usage: $(tput bold)$(basename "$0")$(tput sgr0) <target> <command>"
-        echo
-        echo "Targets:"
-        echo
-        echo "    $(tput bold)client$(tput sgr0)    Client commands"
-        echo "    $(tput bold)server$(tput sgr0)    Server commands"
-        echo;
-        ;;
-esac
+if [ -d "/var/www/${site}" ]; then 
+    server $1
+else
+    client $1
+fi
 
 popd > /dev/null
