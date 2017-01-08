@@ -11,6 +11,6 @@
   ],
   "pages": [
     { "name": "Blog",  "url": "/" },
-    { "name": "Projects",   "url": "/projects/" }
+    { "name": "Projects",   "url": "/projects" }
   ]
 }
