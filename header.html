@@ -42,12 +42,15 @@ function registerLoadEventListener(callback)
 }
 
 function navigation_load() {
-    var path = location.pathname.substring(1);
-    var link = document.body.querySelector('#tabbar').querySelector("a[href='/" + path + "']");
+    var path = location.pathname;
+    if (path !== "/" && path.endsWith("/")) {
+        path = path.substring(0, path.length - 1);
+    }
+    var link = document.body.querySelector('#tabbar').querySelector("a[href='" + path + "']");
     if (link != null) {
         link.className = link.className + ' active';
     }
-    if (path != null && path != "") {
+    if (path != null && path !== "/") {
         document.body.querySelector('#subscribe').style.visibility = 'hidden';
     }
 }
