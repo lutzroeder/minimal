@@ -141,10 +141,10 @@ server_status() {
 }
 
 server_pull() {
-    echo "$(tput bold)Git fetch$(tput sgr0)"
+    echo "$(tput bold)git fetch -p$(tput sgr0)"
     git fetch -p
     branch=origin/$(git rev-parse --abbrev-ref HEAD)
-    echo "$(tput bold)Git reset ${branch}$(tput sgr0)"
+    echo "$(tput bold)git reset --hard ${branch}$(tput sgr0)"
     git reset --hard ${branch}
 }
 
@@ -159,31 +159,52 @@ client_start() {
 }
 
 client_status() {
+    echo "$(tput bold)ssh ${user}@${server} status$(tput sgr0)"
     ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin status"
 }
 
 client_update() {
     client_push
-    echo "$(tput bold)SSH update$(tput sgr0)"
+    echo "$(tput bold)ssh ${user}@${server} update$(tput sgr0)"
     ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin update" # | sed 's/^/    /'
 }
 
 client_push() {
-    echo "$(tput bold)Git add$(tput sgr0)"
+    message=$@
+    echo "$(tput bold)git add -v *$(tput sgr0)"
     git add -v *
-    message=$(git log --format=%B -n 1)
-    echo "$(tput bold)Git amend '${message}'$(tput sgr0)"
-    git commit --amend -m "${message}"
-    echo "$(tput bold)Git push$(tput sgr0)"
-    git push --force
+    if [ -z "${message}" ]; then # if no description is provided amend last commit and push --force
+        message=$(git log --format=%B -n 1)
+        echo "$(tput bold)git commit --amend -m '${message}'$(tput sgr0)"
+        git commit --amend -m "${message}"
+        echo "$(tput bold)git push --force$(tput sgr0)"
+        git push --force
+    else # if description is provided create new commit and push
+        echo "$(tput bold)git commit -m '${message}'$(tput sgr0)"
+        git commit -m "${message}"
+        echo "$(tput bold)git push$(tput sgr0)"
+        git push
+    fi
 }
 
 client_console() {
     ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -t "cd /var/www/${site} && exec bash -l"
 }
 
+description() {
+    echo;
+    echo "  This script automates common tasks to update or run this website."
+    echo "  It can be configured via $(tput smul)admin.cfg$(tput sgr0) and provides two sets of commmands," 
+    echo "  one for local development and another for running the website"
+    echo "  on an actual Linux server. Your computer is considered a server if the"
+    echo "  repository is located or cloned under /var/www/${site}."
+    echo
+}
+
 server() {
-    case "$1" in
+    command="$1"
+    shift
+    case "${command}" in
         "install") server_install;;
         "uninstall") server_uninstall;;
         "cert") server_cert;;
@@ -193,49 +214,48 @@ server() {
         "update") server_update;;
         "status") server_status;;
         *)
-        echo "Usage: $(tput bold)$(basename "$0")$(tput sgr0) <command>"
+        description;
+        echo "Usage: $(tput bold)$(basename "$0")$(tput sgr0) <server-command>"
         echo
-        echo "$(tput bold)Server$(tput sgr0) commands:"
-        echo;
-        echo "    $(tput bold)install$(tput sgr0)    Install $(tput bold)${site}.service$(tput sgr0)"
-        echo "    $(tput bold)uninstall$(tput sgr0)  Uninstall service"
-        echo "    $(tput bold)cert$(tput sgr0)       Create or renew SSL certificates"
-        echo "    $(tput bold)pull$(tput sgr0)       Fetch Git repo and reset master branch"
+        echo "    $(tput bold)install$(tput sgr0)    Install NGINX and $(tput bold)${site}.service$(tput sgr0)"
         echo "    $(tput bold)start$(tput sgr0)      Start service"
-        echo "    $(tput bold)stop$(tput sgr0)       Stop service"
-        echo "    $(tput bold)update$(tput sgr0)     Run stop, pull, start, status"
         echo "    $(tput bold)status$(tput sgr0)     Print current service status"
+        echo "    $(tput bold)update$(tput sgr0)     Run stop, pull, start and status"
+        echo "    $(tput bold)cert$(tput sgr0)       Create or renew SSL certificate"
+        echo "    $(tput bold)pull$(tput sgr0)       Fetch Git repo and reset master branch"
+        echo "    $(tput bold)stop$(tput sgr0)       Stop service"
+        echo "    $(tput bold)uninstall$(tput sgr0)  Stop and uninstall service"
         echo;
     esac
 }
 
 client() {
-    case "$1" in
+    command="$1"
+    shift
+    case "${command}" in
         "start") client_start;;
-        "push") client_push;;
-        "update") client_update;;
+        "push") client_push $@;;
+        "update") client_update $@;;
         "status") client_status;;
         "console") client_console;;
         *)
-            echo;
-            echo "Usage: $(tput bold)$(basename "$0")$(tput sgr0) <command>"
+            description;
+            echo "Usage: $(tput bold)$(basename "$0")$(tput sgr0) <client-command>"
             echo
-            echo "$(tput bold)Client$(tput sgr0) commands:"
-            echo;
-            echo "    $(tput bold)start$(tput sgr0)      Start node app.js locally and open web browser"
-            echo "    $(tput bold)push$(tput sgr0)       Amend last Git commit and push changes"
-            echo "    $(tput bold)update$(tput sgr0)     Push and update server"
-            echo "    $(tput bold)status$(tput sgr0)     Print server log"
-            echo "    $(tput bold)console$(tput sgr0)    Connect via SSH to server"
+            echo "  $(tput bold)start$(tput sgr0)      Start $(tput smul)node app.js$(tput rmul) locally and open web browser"
+            echo "  $(tput bold)push$(tput sgr0)       Amend last commit or add new commitm, then push changes"
+            echo "  $(tput bold)update$(tput sgr0)     Run push command and update server"
+            echo "  $(tput bold)status$(tput sgr0)     Show server log"
+            echo "  $(tput bold)console$(tput sgr0)    Connect via SSH to server"
             echo;
         ;;
     esac
 }
 
 if [ -d "/var/www/${site}" ]; then 
-    server $1
+    server $@
 else
-    client $1
+    client $@
 fi
 
 popd > /dev/null
