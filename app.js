@@ -94,6 +94,7 @@ var router = new Router();
 
 router.default("/");
 
+router.get("/.git(/.*)?", "/");
 router.get("/admin", "/");
 router.get("/admin.cfg", "/");
 router.get("/app.js", "/");
