@@ -217,8 +217,7 @@ router.get("/*", function (request, response, next) {
     }
     else {
         var localPath = (pathname.endsWith("/") ? path.join(pathname, "index.html") : pathname).replace(/^\/?/, "");
-        var extension = path.extname(localPath);
-        var contentType = mimeTypeMap[extension];
+        var contentType = mimeTypeMap[path.extname(localPath)];
         if (contentType) {
             // Handle binary files
             fs.stat(localPath, function (error, stats) {
