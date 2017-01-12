@@ -1,8 +1,8 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    margin: 0 0 65px 0;
     background-color: #fafafa;
-    margin: 0px 0px 65px 0px;
 }
 
 .symbol {
@@ -50,8 +50,7 @@ a.icon:hover
 }
 
 .header .layout {
-    padding-top:45px;
-    padding-bottom:32px;
+    padding: 45px 0 32px 0;
 }
 
 .header .name {
@@ -96,7 +95,7 @@ a.icon:hover
     border-radius: 999em;
     color: #8f8f8f;
     font-size: 14px;
-    margin: 0px;
+    margin: 0;
     padding: 9px 16px 9px 16px;
     letter-spacing: normal;
     cursor: pointer;
@@ -113,9 +112,7 @@ a.icon:hover
     display: block;
     flex-direction: row;
     text-align: left;
-    padding-left: 0px;
-    padding-top: 15px;
-    padding-bottom: 17px;
+    padding: 15px 0 17px 0;
     list-style: none;
     list-style-image: none;
     font-size: 16px;
@@ -144,8 +141,7 @@ a.icon:hover
 .content {
     box-sizing: border-box;
     max-width: 640px !important;
-    padding-left: 20px;
-    padding-right: 20px;
+    padding: 0 20px 0 20px;
     margin-left: auto;
     margin-right: auto;
 }
@@ -153,31 +149,20 @@ a.icon:hover
 .summary {
     box-sizing: border-box;
     max-width: 640px !important;
-    padding-left: 20px;
-    padding-right: 20px;
-    margin-left: auto;
-    margin-right: auto;
+    padding: 20px 20px 3px 20px;
+    margin: 34px auto 20px auto;
     font-size: 16px;
     font-weight: 600;
     line-height: 15px;
-    padding-top: 20px;
-    padding-bottom: 3px;
-    margin-top: 34px;
-    margin-bottom: 20px;
     color: #333333;
 }
 
 .item {
     box-sizing: border-box;
     max-width: 640px !important;
-    padding-left: 20px;
-    padding-right: 20px;
-    margin-left: auto;
-    margin-right: auto;
+    padding: 15px 20px 30px 20px;
+    margin: 0 auto 10px auto;
     border-radius: 3px;
-    padding-top: 15px;
-    padding-bottom: 30px;
-    margin-bottom: 10px;
     background-clip: border-box;
     border: 1px solid rgba(0, 0, 0, .09);
     box-sizing: border-box;
@@ -193,7 +178,7 @@ a.icon:hover
     font-style: normal;
     line-height: 1.32; 
     letter-spacing: -0.052em;
-    margin: 0px 0px 8px -1.9375px;
+    margin: 0 0 8px -1.9375px;
 }
 
 .item p {
@@ -204,7 +189,7 @@ a.icon:hover
     line-height: 1.69;
     word-break: break-word;
     word-wrap: break-word;
-    margin: 8px 0px 0px 0px;
+    margin: 8px 0 0 0;
     letter-spacing: -0.009em;
 }
 
@@ -249,7 +234,7 @@ a.icon:hover
     color: rgba(0, 0, 0, 0.3);
     font-size: 12px;
     vertical-align: baseline;
-    margin: 9px 0px 5px 0px;
+    margin: 9px 0 5px 0;
 }
 
 @media all and (max-width: 767px) {
@@ -291,6 +276,6 @@ a.icon:hover
         display: none;
     }
     .item .description {
-        margin-left: 0px; 
+        margin-left: 0; 
     }
 }
