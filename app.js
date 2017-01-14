@@ -118,7 +118,7 @@ router.get("/blog/atom.xml", function(request, response, next) {
     output.push("<author><name>" + configuration["name"] + "</name></author>");
     output.push("<link rel='alternate' type='text/html' href='" + host + "/' />");
     output.push("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />");
-    fs.readdirSync("blog/").sort().reverse().forEach(function (file, index) {
+    fs.readdirSync("blog/").filter(function (file) { return /\.html/.test(file); }).sort().reverse().forEach(function (file, index) {
         var domain = request.headers.host ? request.headers.host.split(":").shift() : "";
         var draft = domain == "localhost" || domain == "127.0.0.1";
         var entry = loadPost("blog/" + file);
@@ -140,9 +140,7 @@ router.get("/blog/atom.xml", function(request, response, next) {
     });
     output.push("</feed>");
     var data = output.join("\n");
-    response.writeHead(200, {
-        "Content-Type" : "application/atom+xml",
-        "Content-Length" : Buffer.byteLength(data) });
+    response.writeHead(200, { "Content-Type" : "application/atom+xml", "Content-Length" : Buffer.byteLength(data) });
     if (request.method !== "HEAD") {
         response.write(data);
     }
@@ -152,30 +150,31 @@ router.get("/blog/atom.xml", function(request, response, next) {
 // Render specific HTML blog post
 router.get("/blog/*", function (request, response, next) {
     var pathname = path.normalize(url.parse(request.url, true).pathname.toLowerCase());
-    var localPath = pathname.replace(/^\/?/, "") + ".html";
-    var entry = loadPost(localPath);
+    var localPath = pathname.replace(/^\/?/, "");
+    var entry = loadPost(localPath + ".html");
     if (entry) {
         var date = new Date(entry["date"]);
         entry["date"] = date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
         entry["author"] = entry["author"] ? entry["author"] : configuration["name"];
-
         var context = Object.assign(configuration, entry);
         var template = fs.readFileSync("post.html", "utf-8");
         var data = mustache(template, context, function(name) {
             return fs.readFileSync(name, "utf-8");
         });
-
-        response.writeHead(200, { 
-            "Content-Type" : "text/html",
-            "Content-Length" : Buffer.byteLength(data) });
+        response.writeHead(200, { "Content-Type" : "text/html", "Content-Length" : Buffer.byteLength(data) });
         if (request.method !== "HEAD") {
             response.write(data);
         }
         response.end();
     }
     else {
-        response.writeHead(302, { "Location": "/" });
-        response.end();
+        if (mimeTypeMap[path.extname(localPath)]) {
+            next();
+        }
+        else {
+            response.writeHead(302, { "Location": "/" });
+            response.end();
+        }
     }
 });
 
@@ -185,9 +184,7 @@ router.get("/.well-known/acme-challenge/*", function (request, response, next) {
     var localPath = pathname.replace(/^\/?/, "");
     if (fs.existsSync(localPath) && fs.statSync(localPath).isFile) {
         var data = fs.readFileSync(localPath, "utf-8");
-        response.writeHead(200, { 
-            "Content-Type" : "text/plain; charset=utf-8",
-            "Content-Length" : Buffer.byteLength(data) });
+        response.writeHead(200, { "Content-Type" : "text/plain; charset=utf-8", "Content-Length" : Buffer.byteLength(data) });
         response.write(data);
         response.end();
     } 
@@ -236,9 +233,7 @@ router.get("/*", function (request, response, next) {
                         response.end();
                     });
                     stream.on("open", function () {
-                        response.writeHead(200, { 
-                            "Content-Type" : contentType,
-                            "Content-Length" : stats.size });
+                        response.writeHead(200, {  "Content-Type" : contentType, "Content-Length" : stats.size });
                         if (request.method === "HEAD") {
                             response.end();
                         } 
@@ -289,9 +284,7 @@ router.get("/*", function (request, response, next) {
                     var data = mustache(template, context, function(name) {
                         return fs.readFileSync(path.join(path.dirname(localPath), name), "utf-8");
                     });
-                    response.writeHead(200, { 
-                        "Content-Type" : "text/html",
-                        "Content-Length" : Buffer.byteLength(data) });
+                    response.writeHead(200, { "Content-Type" : "text/html", "Content-Length" : Buffer.byteLength(data) });
                     if (request.method !== "HEAD") {
                         response.write(data);
                     }
@@ -342,7 +335,7 @@ function mustache(template, context, partials) {
 
 function renderBlog(draft) {
     var output = [];
-    fs.readdirSync("blog/").sort().reverse().forEach(function (file, index) {
+    fs.readdirSync("blog/").filter(function (file) { return /\.html/.test(file); }).sort().reverse().forEach(function (file, index) {
         var entry = loadPost("blog/" + file);
         if (entry && (draft || entry["state"] === "post")) {
             entry["id"] = path.basename(file, ".html");
