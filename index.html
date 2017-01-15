@@ -4,11 +4,16 @@
 <title>{{name}}</title>
 <meta name='description' content='{{description}}' />
 {{>/meta.html}}
-{{>/site.html}}
+<style>
+{{>/site.css}}
+</style>
 </head>
 <body>
 {{>/header.html}}
+<div style='display: none'>
+{{>/font.html}}
 <div class='summary'>Latest</div>
 {{{blog}}}
+</div>
 </body>
 </html>

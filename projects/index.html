@@ -3,10 +3,14 @@
 <head>
 <title>{{name}}'s Projects</title>
 {{>/meta.html}}
-{{>/site.html}}
+<style>
+{{>/site.css}}
+</style>
 </head>
 <body>
 {{>/header.html}}
+<div style='display: none'>
+{{>/font.html}}
 <div class='summary'>Projects</div>
 <div class='item'>
     <div class='logo'><img src='example.png' style='border: none'></div>
@@ -16,6 +20,7 @@
         in computer programming or computer-related documentation. They have been used to name entities such as variables...
         </p>
     </div>
+</div>
 </div>
 </body>
 </html>
