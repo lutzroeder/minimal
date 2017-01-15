@@ -282,7 +282,7 @@ router.get("/*", function (request, response, next) {
                         }).join("\n");
                     };
                     var data = mustache(template, context, function(name) {
-                        return fs.readFileSync(path.join(path.dirname(localPath), name), "utf-8");
+                        return fs.readFileSync(path.join("./", name), "utf-8");
                     });
                     response.writeHead(200, { "Content-Type" : "text/html", "Content-Length" : Buffer.byteLength(data) });
                     if (request.method !== "HEAD") {
@@ -314,7 +314,7 @@ function escapeHtml(text) {
 
 function mustache(template, context, partials) {
     template = template.replace(/\{\{>\s*([-_\/\.\w]+)\s*\}\}/gm, function (match, name) {
-        return typeof partials === "function" ? partials(name) : partials[name];
+        return mustache(typeof partials === "function" ? partials(name) : partials[name], context, partials);
     });
     template = template.replace(/\{\{\{\s*([-_\/\.\w]+)\s*\}\}\}/gm, function (match, name) {
         var value = context[name];
