@@ -99,10 +99,13 @@ router.get("/admin", "/");
 router.get("/admin.cfg", "/");
 router.get("/app.js", "/");
 router.get("/app.json", "/");
+router.get("/font.html", "/");
 router.get("/header.html", "/");
 router.get("/meta.html", "/");
 router.get("/package.json", "/");
+router.get("/post.css", "/");
 router.get("/post.html", "/");
+router.get("/site.css", "/");
 router.get("/web.config", "/");
 
 // ATOM feed
