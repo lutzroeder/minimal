@@ -34,6 +34,13 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
     ssl_prefer_server_ciphers on;
     ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
+    gzip on;
+    gzip_proxied any;
+    gzip_min_length 1000;
+    gzip_http_version 1.0;
+    gzip_disable 'msie6';
+    gzip_types text/plain text/css text/html text/javascript application/json application/atom+xml application/rss+xml;
+    gzip_vary on;
     location / {
         proxy_pass http://localhost:8080;
         proxy_http_version 1.1;
