@@ -159,7 +159,7 @@ router.get("/blog/*", function (request, response, next) {
         var context = Object.assign(configuration, entry);
         var template = fs.readFileSync("post.html", "utf-8");
         var data = mustache(template, context, function(name) {
-            return fs.readFileSync(name, "utf-8");
+            return fs.readFileSync(path.join("./", name), "utf-8");
         });
         response.writeHead(200, { "Content-Type" : "text/html", "Content-Length" : Buffer.byteLength(data) });
         if (request.method !== "HEAD") {
