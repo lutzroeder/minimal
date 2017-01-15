@@ -11,37 +11,7 @@
 </div>
 </div>
 <script type='text/javascript'>
-
-registerLoadEventListener(navigation_load);
-
-function registerLoadEventListener(callback)
-{
-    function raiseLoadEventListener() {
-        if (document.addEventListener || event.type === 'load' || document.readyState === 'complete') {
-            if (document.addEventListener ) {
-                document.removeEventListener('DOMContentLoaded', raiseLoadEventListener, false);
-                window.removeEventListener('load', raiseLoadEventListener, false);
-            } else {
-                document.detachEvent('onreadystatechange', raiseLoadEventListener);
-                window.detachEvent('onload', raiseLoadEventListener);
-            }
-            callback();
-        }
-    }
-    if (document.readyState === 'complete') {
-        callback();
-    }
-    else if (document.addEventListener) {
-        document.addEventListener('DOMContentLoaded', raiseLoadEventListener, false);
-        window.addEventListener('load', raiseLoadEventListener, false);
-    }
-    else {
-        document.attachEvent('onreadystatechange', raiseLoadEventListener);
-        window.attachEvent('onload', raiseLoadEventListener);
-    }
-}
-
-function navigation_load() {
+function load() {
     var path = location.pathname;
     if (path !== "/" && path.endsWith("/")) {
         path = path.substring(0, path.length - 1);
@@ -53,5 +23,28 @@ function navigation_load() {
     if (path != null && path !== "/") {
         document.body.querySelector('#subscribe').style.visibility = 'hidden';
     }
+}
+function raiseLoadEventListener() {
+    if (document.addEventListener || event.type === 'load' || document.readyState === 'complete') {
+        if (document.addEventListener ) {
+            document.removeEventListener('DOMContentLoaded', raiseLoadEventListener, false);
+            window.removeEventListener('load', raiseLoadEventListener, false);
+        } else {
+            document.detachEvent('onreadystatechange', raiseLoadEventListener);
+            window.detachEvent('onload', raiseLoadEventListener);
+        }
+        load();
+    }
+}
+if (document.readyState === 'complete') {
+    load();
+}
+else if (document.addEventListener) {
+    document.addEventListener('DOMContentLoaded', raiseLoadEventListener, false);
+    window.addEventListener('load', raiseLoadEventListener, false);
+}
+else {
+    document.attachEvent('onreadystatechange', raiseLoadEventListener);
+    window.attachEvent('onload', raiseLoadEventListener);
 }
 </script>
