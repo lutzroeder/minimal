@@ -236,7 +236,7 @@ router.get("/*", function (request, response, next) {
                         response.end();
                     });
                     stream.on("open", function () {
-                        response.writeHead(200, {  "Content-Type" : contentType, "Content-Length" : stats.size });
+                        response.writeHead(200, {  "Content-Type": contentType, "Content-Length": stats.size, "Cache-Control": "private, max-age=0", "Expires": -1 });
                         if (request.method === "HEAD") {
                             response.end();
                         } 
