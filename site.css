@@ -289,9 +289,6 @@ a.icon:hover
 }
 
 @media all and (max-width: 550px) {
-    .hide {
-        display: none;
-    }
     .item .logo { 
         display: none;
     }
