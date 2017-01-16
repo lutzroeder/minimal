@@ -4,47 +4,24 @@
 <a href='/'><img class='portrait' src='/portrait.jpg' /></a>
 <div class='name'><a href='/'>{{name}}</a></div>
 <div class='bio'>{{{bio}}}</div>
-<div id='toolbar' class='toolbar'>{{{social}}}</div>
-<a id='subscribe' class='button' href='{{feed}}'>Subscribe</a>
+<div class='toolbar' id='toolbar'>{{{social}}}</div>
+<a class='button' id='subscribe' href='{{feed}}'>Subscribe</a>
 </div>
-<div><ul id='tabbar' class='tabbar'>{{{tabs}}}</ul></div>
-</div>
-</div>
+<div>
+<ul class='tabbar' id='tabbar'>{{{tabs}}}</ul>
 <script type='text/javascript'>
-function load() {
-    var path = location.pathname;
-    if (path !== "/" && path.endsWith("/")) {
-        path = path.substring(0, path.length - 1);
-    }
-    var link = document.body.querySelector('#tabbar').querySelector("a[href='" + path + "']");
-    if (link != null) {
-        link.className = link.className + ' active';
-    }
-    if (path != null && path !== "/") {
-        document.body.querySelector('#subscribe').style.visibility = 'hidden';
-    }
+var path = location.pathname;
+if (path !== "/" && path.endsWith("/")) {
+    path = path.substring(0, path.length - 1);
 }
-function raiseLoadEventListener() {
-    if (document.addEventListener || event.type === 'load' || document.readyState === 'complete') {
-        if (document.addEventListener ) {
-            document.removeEventListener('DOMContentLoaded', raiseLoadEventListener, false);
-            window.removeEventListener('load', raiseLoadEventListener, false);
-        } else {
-            document.detachEvent('onreadystatechange', raiseLoadEventListener);
-            window.detachEvent('onload', raiseLoadEventListener);
-        }
-        load();
-    }
+var link = document.body.querySelector('#tabbar').querySelector("a[href='" + path + "']");
+if (link != null) {
+    link.className = link.className + ' active';
 }
-if (document.readyState === 'complete') {
-    load();
-}
-else if (document.addEventListener) {
-    document.addEventListener('DOMContentLoaded', raiseLoadEventListener, false);
-    window.addEventListener('load', raiseLoadEventListener, false);
-}
-else {
-    document.attachEvent('onreadystatechange', raiseLoadEventListener);
-    window.attachEvent('onload', raiseLoadEventListener);
+if (path != null && path !== "/") {
+    document.body.querySelector('#subscribe').style.visibility = 'hidden';
 }
 </script>
+</div>
+</div>
+</div>
