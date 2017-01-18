@@ -1,10 +1,9 @@
 <script id="fontloader" type="text/javascript">
+var parent = document.getElementById("fontloader").parentNode;
 var link = document.createElement("link");
 link.rel  = 'stylesheet'
 link.type = 'text/css'
 link.href = 'https://fonts.googleapis.com/css?family=Merriweather+Sans:400,700|Merriweather:300,300i,700';
-link.onload = function(e) {
-    document.getElementById("fontloader").parentNode.style.display = "block";
-}
-document.getElementById("fontloader").parentNode.appendChild(link);
+link.onload = function(e) { parent.style.display = "block"; }
+parent.appendChild(link);
 </script>
