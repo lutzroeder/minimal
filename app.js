@@ -19,7 +19,7 @@ Router.prototype.route = function(path) {
     });
     if (!route)
     {
-        route = { 
+        route = {
             path: path,
             regexp: (path instanceof RegExp) ? path : new RegExp("^" + path.replace("/*", "/(.*)") + "$", "i"),
             handlers: {}

@@ -201,10 +201,10 @@ client_console() {
 description() {
     echo;
     echo "  This script automates common tasks to update or run this website."
-    echo "  It can be configured via $(tput smul)admin.cfg$(tput sgr0) and provides two sets of commmands," 
-    echo "  one for local development and another for running the website"
-    echo "  on an actual Linux server. Your computer is considered a server if the"
-    echo "  repository is located or cloned under /var/www/${site}."
+    echo "  It can be configured via $(tput smul)admin.cfg$(tput sgr0) and provides two sets of commmands,"
+    echo "  one for local development and another for running the website on an"
+    echo "  actual Linux server. Your conputer is considered a server if the "
+    echo "  script is located at /var/www/\${site}/."
     echo
 }
 
