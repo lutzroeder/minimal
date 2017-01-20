@@ -99,7 +99,6 @@ router.get("/admin", "/");
 router.get("/admin.cfg", "/");
 router.get("/app.js", "/");
 router.get("/app.json", "/");
-router.get("/font.html", "/");
 router.get("/header.html", "/");
 router.get("/meta.html", "/");
 router.get("/package.json", "/");
@@ -274,12 +273,12 @@ router.get("/*", function (request, response, next) {
                         var draft = domain == "localhost" || domain == "127.0.0.1";
                         return renderBlog(draft);
                     };
-                    context["social"] = function() { 
+                    context["links"] = function() {
                         return configuration["links"].map(function (link) { 
                             return "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + link["symbol"] + "</span></a>";
                         }).join("\n");
                     };
-                    context["tabs"] = function() { 
+                    context["tabs"] = function() {
                         return configuration["pages"].map(function (page) {
                             return "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>";
                         }).join("\n");
