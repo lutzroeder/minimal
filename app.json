@@ -1,7 +1,7 @@
 {
   "name":        "John Smith",
   "bio":         "I explore, I work, and I have hobbies.",
-  "description": "Detailed description of for search engines.",
+  "description": "Detailed description for search engines.",
   "feed":        "",
   "links": [
     { "name": "Twitter",    "symbol": "&#xe286;", "url": "http://www.twitter.com/lutzroeder" },
