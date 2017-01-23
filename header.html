@@ -1,13 +1,12 @@
 <div class='header'>
-<div class='content'>
-<div class='layout'>
+<div class='profile'>
 <a href='/'><img class='portrait' src='/portrait.jpg' /></a>
 <div class='name'><a href='/'>{{name}}</a></div>
 <div class='bio'>{{{bio}}}</div>
 <div class='toolbar' id='toolbar'>{{{links}}}</div>
 <a class='button' id='subscribe' href='{{feed}}'>Subscribe</a>
 </div>
-<div>
+<nav class='navigation'>
 <ul class='tabbar' id='tabbar'>{{{tabs}}}</ul>
 <script type='text/javascript'>
 var path = location.pathname;
@@ -22,6 +21,6 @@ if (path != null && path !== "/") {
     document.body.querySelector('#subscribe').style.visibility = 'hidden';
 }
 </script>
-</div>
+</nav>
 </div>
 </div>

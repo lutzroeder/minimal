@@ -20,7 +20,7 @@ body {
 
 .symbol {
     font-family: "Mono Social Icons Font";
-    font-size:20px;
+    font-size: 20px;
     text-rendering: optimizeLegibility;
 }
 
@@ -62,17 +62,21 @@ a.icon:hover
     padding-top: 65px;
 }
 
-.header .layout {
-    padding: 45px 0 32px 0;
+.profile {
+    max-width: 640px !important;
+    box-sizing: border-box;
+    padding: 45px 20px 48px 20px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
-.header .name {
+.profile .name {
     font-size: 32px;
     font-weight: bold;
     margin-left: -2px;
 }
 
-.header .bio {
+.profile .bio {
     font-size: 16px;
     color: #666666;
     line-height: 22px;
@@ -80,7 +84,7 @@ a.icon:hover
     display: block;
 }
 
-.header .portrait {
+.profile .portrait {
     border: 0;
     border-radius: 50%;
     width: 100px !important;
@@ -89,16 +93,16 @@ a.icon:hover
     margin-left: 20px;
 }
 
-.header .toolbar {
+.profile .toolbar {
     font-size: 14px;
     color: rgba(0, 0, 0, 0.44);
-    padding-top: 33px;
-    padding-bottom: 23px;
+    padding: 33px 0 23px 0;
     vertical-align: center;
     line-height: 25px;
+    height: 26px;
 }
 
-.header .button {
+.profile .button {
     font-smoothing: antialiased;
     background-color: #ffffff;
     border: #d9d9d9 solid 1px;
@@ -112,23 +116,31 @@ a.icon:hover
     outline: 0;
 }
 
-.header .button:hover {
+.profile .button:hover {
     border-color: #8f8f8f;
     color: #666666;
 }
 
-.header .tabbar {
+.navigation {
+    box-sizing: border-box;
+    max-width: 640px !important;
+    margin: 0 auto 0 auto;
+    padding: 0px 20px 0px 20px;
+}
+
+.navigation .tabbar {
     border-top: 1px solid rgba(0, 0, 0, .05)!important;
     display: block;
     flex-direction: row;
     text-align: left;
+    margin: 0;
     padding: 15px 0 17px 0;
     list-style: none;
     list-style-image: none;
     font-size: 16px;
 }
 
-.header .tab {
+.navigation .tab {
     display: table-cell;
     text-align: left;
     letter-spacing: 0;
@@ -136,24 +148,16 @@ a.icon:hover
     white-space: nowrap;
 }
 
-.header .tab a {
+.navigation .tab a {
     color: rgba(0, 0, 0, 0.44);
 }
 
-.header .tab a:hover {
+.navigation .tab a:hover {
     color: #666666;
 }
 
-.header .tab a.active {
+.navigation .tab a.active {
     color: #1a1a1a;
-}
-
-.content {
-    box-sizing: border-box;
-    max-width: 640px !important;
-    padding: 0 20px 0 20px;
-    margin-left: auto;
-    margin-right: auto;
 }
 
 .summary {
@@ -253,25 +257,24 @@ a.icon:hover
 }
 
 @media all and (max-width: 767px) {
-    .header .portrait {
+    .profile {
+        padding-top: 36px;
+        padding-bottom: 35.5px;
+    }
+    .profile .portrait {
         width: 80px !important;
         height: 80px !important;
     }
-    .header .layout {
-        padding-top: 36px;
+    .profile .toolbar {
         padding-bottom: 21.5px;
     }
-    .header .toolbar {
-        padding-bottom: 21.5px;
-    }
-    .header .button {
+    .profile .button {
         padding-top: 6.5px;
         padding-bottom: 6.5px;
     }
-    .header .tabbar {
+    .navigation .tabbar {
         font-size: 14px;
-        padding-top: 12px;
-        padding-bottom: 18px;
+        padding: 12px 0 18px 0;
     }
     .item h1 { 
         font-size: 25px;
