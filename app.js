@@ -271,7 +271,7 @@ router.get("/*", function (request, response, next) {
                     context["blog"] = function() {
                         var domain = request.headers.host ? request.headers.host.split(":").shift() : "";
                         var draft = domain == "localhost" || domain == "127.0.0.1";
-                        return renderBlog(draft);
+                        return renderBlog(draft, 0, 50);
                     };
                     context["links"] = function() {
                         return configuration["links"].map(function (link) { 
@@ -335,33 +335,39 @@ function mustache(template, context, partials) {
     return template;
 }
 
-function renderBlog(draft) {
+function renderBlog(draft, start, length) {
     var output = [];
-    fs.readdirSync("blog/").filter(function (file) { return /\.html/.test(file); }).sort().reverse().forEach(function (file, index) {
+    var index = 0;
+    var files = fs.readdirSync("blog/").filter(function (file) { return /\.html/.test(file); }).sort().reverse();
+    for (var i = 0; i < files.length && index < (start + length); i++)
+    {
+        var file = files[i];
         var entry = loadPost("blog/" + file);
         if (entry && (draft || entry["state"] === "post")) {
-            entry["id"] = path.basename(file, ".html");
-            var url = "/blog/" + entry["id"];
-            var date = new Date(entry["date"]);
-            entry["date"] = date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
-            var post = [];
-            post.push("<div class='item'>");
-            post.push("<div class='date'>" + entry["date"] + "</div>");
-            post.push("<h1><a href='" + url + "'>" + entry["title"] + "</a></h1>");
-            var content = entry["content"];
-            content = content.replace(/\s\s/g, " ");
-            var truncated = truncateHtml(content, 320);
-            post.push("<p>" + truncated + "</p>");
-            if (truncated != content) {
-                post.push("<div class='more'><a href='" + url + "'>" + "Read more&hellip;" + "</a></div>");
+            if (index >= start) {
+                entry["id"] = path.basename(file, ".html");
+                var url = "/blog/" + entry["id"];
+                var date = new Date(entry["date"]);
+                entry["date"] = date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
+                var post = [];
+                post.push("<div class='item'>");
+                post.push("<div class='date'>" + entry["date"] + "</div>\n");
+                post.push("<h1><a href='" + url + "'>" + entry["title"] + "</a></h1>\n");
+                var content = entry["content"];
+                content = content.replace(/\s\s/g, " ");
+                var truncated = truncateHtml(content, 320);
+                post.push("<p>" + truncated + "</p>\n");
+                if (truncated != content) {
+                    post.push("<div class='more'><a href='" + url + "'>" + "Read more&hellip;" + "</a></div>\n");
+                }
+                post.push("</div>");
+                output.push(post.join("") + "\n");                
             }
-            post.push("</div>");
-            output.push(post.join(""));
+            index++;
         }
-    });
+    }
     return output.join("")
 }
-
 function loadPost(file) {
     if (fs.existsSync(file) && fs.statSync(file).isFile) {
         var data = fs.readFileSync(file, "utf-8");
