@@ -17,8 +17,7 @@ Router.prototype.route = function(path) {
     var route = this.routes.find(function (route) {
         return route.path === path;
     });
-    if (!route)
-    {
+    if (!route) {
         route = {
             path: path,
             regexp: (path instanceof RegExp) ? path : new RegExp("^" + path.replace("/*", "/(.*)") + "$", "i"),
@@ -102,6 +101,7 @@ router.get("/app.json", "/");
 router.get("/header.html", "/");
 router.get("/meta.html", "/");
 router.get("/package.json", "/");
+router.get("/placeholder.html", "/");
 router.get("/post.css", "/");
 router.get("/post.html", "/");
 router.get("/site.css", "/");
@@ -121,10 +121,9 @@ router.get("/blog/atom.xml", function(request, response, next) {
     output.push("<link rel='alternate' type='text/html' href='" + host + "/' />");
     output.push("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />");
     fs.readdirSync("blog/").filter(function (file) { return /\.html/.test(file); }).sort().reverse().forEach(function (file, index) {
-        var domain = request.headers.host ? request.headers.host.split(":").shift() : "";
-        var draft = domain == "localhost" || domain == "127.0.0.1";
+        var draft = localhost(request);
         var entry = loadPost("blog/" + file);
-        if (entry && (entry["state"] == "post" || draft)) {
+        if (entry && (draft || entry["state"] == "post")) {
             var url = host + "/blog/" + path.basename(file, ".html");;
             output.push("<entry>");
             output.push("<id>" + url + "</id>");
@@ -178,6 +177,19 @@ router.get("/blog/*", function (request, response, next) {
             response.end();
         }
     }
+});
+
+router.get("/blog", function (request, response, next) {
+    var query = url.parse(request.url, true).query;
+    if (query["id"]) {
+        var data = renderBlog(localhost(request), Number(query["id"]))
+        response.writeHead(200, { "Content-Type" : "text/html", "Content-Length" : Buffer.byteLength(data) });
+        response.write(data);
+    }
+    else {
+        response.writeHead(302, { "Location": "/" });
+    }
+    response.end();
 });
 
 // Handle "Let's Encrypt" challenge
@@ -269,9 +281,7 @@ router.get("/*", function (request, response, next) {
                         return (request.secure ? "https" : "http") + "://" + request.headers.host + "/blog/atom.xml";
                     };
                     context["blog"] = function() {
-                        var domain = request.headers.host ? request.headers.host.split(":").shift() : "";
-                        var draft = domain == "localhost" || domain == "127.0.0.1";
-                        return renderBlog(draft, 0, 50);
+                        return renderBlog(localhost(request), 0);
                     };
                     context["links"] = function() {
                         return configuration["links"].map(function (link) { 
@@ -298,14 +308,7 @@ router.get("/*", function (request, response, next) {
 });
 
 var entityMap = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-    '/': '&#x2F;',
-    '`': '&#x60;',
-    '=': '&#x3D;'
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '`': '&#x60;','=': '&#x3D;'
 };
 
 function escapeHtml(text) {
@@ -335,30 +338,35 @@ function mustache(template, context, partials) {
     return template;
 }
 
-function renderBlog(draft, start, length) {
+function localhost(request) {
+    var domain = request.headers.host ? request.headers.host.split(":").shift() : "";
+    return (domain == "localhost" || domain == "127.0.0.1");
+}
+
+function renderBlog(draft, start) {
+    var length = 10;
     var output = [];
     var index = 0;
     var files = fs.readdirSync("blog/").filter(function (file) { return /\.html/.test(file); }).sort().reverse();
-    for (var i = 0; i < files.length && index < (start + length); i++)
-    {
-        var file = files[i];
+    while (files.length > 0 && index < (start + length)) {
+        var file = files.shift();
         var entry = loadPost("blog/" + file);
         if (entry && (draft || entry["state"] === "post")) {
             if (index >= start) {
                 entry["id"] = path.basename(file, ".html");
-                var url = "/blog/" + entry["id"];
+                var location = "/blog/" + entry["id"];
                 var date = new Date(entry["date"]);
                 entry["date"] = date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
                 var post = [];
                 post.push("<div class='item'>");
                 post.push("<div class='date'>" + entry["date"] + "</div>\n");
-                post.push("<h1><a href='" + url + "'>" + entry["title"] + "</a></h1>\n");
+                post.push("<h1><a href='" + location + "'>" + entry["title"] + "</a></h1>\n");
                 var content = entry["content"];
                 content = content.replace(/\s\s/g, " ");
                 var truncated = truncateHtml(content, 320);
                 post.push("<p>" + truncated + "</p>\n");
                 if (truncated != content) {
-                    post.push("<div class='more'><a href='" + url + "'>" + "Read more&hellip;" + "</a></div>\n");
+                    post.push("<div class='more'><a href='" + location + "'>" + "Read more&hellip;" + "</a></div>\n");
                 }
                 post.push("</div>");
                 output.push(post.join("") + "\n");                
@@ -366,8 +374,16 @@ function renderBlog(draft, start, length) {
             index++;
         }
     }
+    if (files.length > 0)
+    {
+        var template = fs.readFileSync("placeholder.html", "utf-8");
+        var context = { "url": "/blog?id=" + index.toString() };
+        var placeholder = mustache(template, context, null);
+        output.push(placeholder);
+    }
     return output.join("")
 }
+
 function loadPost(file) {
     if (fs.existsSync(file) && fs.statSync(file).isFile) {
         var data = fs.readFileSync(file, "utf-8");
@@ -457,7 +473,6 @@ function truncateHtml(text, length) {
             position += delta;
             index += delta;
         }
-
     }
     var output = [ text.substring(0, index) ];
     if (position == length) {
@@ -468,7 +483,9 @@ function truncateHtml(text, length) {
         keys.push(Number(key));
     }
     keys.sort();
-    keys.map(function (key) { return pendingCloseTags[key]; });
+    keys.map(function (key) { 
+        return pendingCloseTags[key];
+    });
     return output.join("");
 }
 

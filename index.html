@@ -12,5 +12,34 @@
 {{>/header.html}}
 <div class='summary'>Latest</div>
 {{{blog}}}
+<script type='text/javascript'>
+function updateStream() {
+    var element = document.getElementById("stream");
+    if (element) {
+      var rect = element.getBoundingClientRect();
+      var viewHeight = Math.max(document.documentElement.clientHeight, window.innerHeight);
+      var threshold = 0;
+      var above = rect.bottom - threshold < 0;
+      var below = rect.top - viewHeight + threshold >= 0;
+      if (!above && !below) {
+        var url = element.getAttribute("title");
+        var xmlHttp = new XMLHttpRequest();
+        xmlHttp.open("GET", url, true);
+        xmlHttp.onreadystatechange = function () {
+            if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
+                element.insertAdjacentHTML('beforebegin', xmlHttp.responseText);
+                element.parentNode.removeChild(element);
+                updateStream();
+            }
+        };
+        xmlHttp.send(null);
+      }
+    }
+}
+updateStream();
+window.addEventListener('scroll', function(e) {
+    updateStream();
+});
+</script>
 </body>
 </html>
