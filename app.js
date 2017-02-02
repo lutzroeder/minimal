@@ -26,7 +26,7 @@ Router.prototype.route = function(path) {
         this.routes.push(route);
     }
     return route;
-}
+};
 
 Router.prototype.handle = function(request, response) {
     var pathname = path.normalize(url.parse(request.url, true).pathname);
@@ -64,7 +64,7 @@ Router.prototype.handle = function(request, response) {
             defaultHandler(request, response, function (request, response, next) {});
         }
     }
-}
+};
 
 Router.prototype.updateHandler = function(handler) {
     if (typeof handler === "string") {
@@ -75,19 +75,19 @@ Router.prototype.updateHandler = function(handler) {
         };
     }
     return handler;
-}
+};
 
 Router.prototype.get = function(path, handler) {
     this.route(path).handlers["GET"] = this.updateHandler(handler);
-}
+};
 
 Router.prototype.head = function(path, handler) {
     this.route(path).handlers["HEAD"] = this.updateHandler(handler);
-}
+};
 
 Router.prototype.default = function(handler) {
     this.defaultHandler = this.updateHandler(handler);
-}
+};
 
 var router = new Router();
 
@@ -182,7 +182,7 @@ router.get("/blog/*", function (request, response, next) {
 router.get("/blog", function (request, response, next) {
     var query = url.parse(request.url, true).query;
     if (query["id"]) {
-        var data = renderBlog(localhost(request), Number(query["id"]))
+        var data = renderBlog(localhost(request), Number(query["id"]));
         response.writeHead(200, { "Content-Type" : "text/html", "Content-Length" : Buffer.byteLength(data) });
         response.write(data);
     }
@@ -250,7 +250,7 @@ router.get("/*", function (request, response, next) {
                         response.writeHead(200, {  "Content-Type": contentType, "Content-Length": stats.size, "Cache-Control": "private, max-age=0", "Expires": -1 });
                         if (request.method === "HEAD") {
                             response.end();
-                        } 
+                        }
                         else {
                             stream.pipe(response);
                         }
@@ -284,7 +284,7 @@ router.get("/*", function (request, response, next) {
                         return renderBlog(localhost(request), 0);
                     };
                     context["links"] = function() {
-                        return configuration["links"].map(function (link) { 
+                        return configuration["links"].map(function (link) {
                             return "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + link["symbol"] + "</span></a>";
                         }).join("\n");
                     };
@@ -308,7 +308,7 @@ router.get("/*", function (request, response, next) {
 });
 
 var entityMap = {
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '`': '&#x60;','=': '&#x3D;'
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;", "/": "&#x2F;", "`": "&#x60;", "=": "&#x3D;"
 };
 
 function escapeHtml(text) {
@@ -369,7 +369,7 @@ function renderBlog(draft, start) {
                     post.push("<div class='more'><a href='" + location + "'>" + "Read more&hellip;" + "</a></div>\n");
                 }
                 post.push("</div>");
-                output.push(post.join("") + "\n");                
+                output.push(post.join("") + "\n");
             }
             index++;
         }
@@ -381,7 +381,7 @@ function renderBlog(draft, start) {
         var placeholder = mustache(template, context, null);
         output.push(placeholder);
     }
-    return output.join("")
+    return output.join("");
 }
 
 function loadPost(file) {
@@ -413,7 +413,7 @@ function loadPost(file) {
                 content.append(line);
             }
             content = content.concat(lines);
-            entry["content"] = content.join('\n');
+            entry["content"] = content.join("\n");
             return entry;
         }
     }
@@ -452,7 +452,7 @@ function truncateHtml(text, length) {
                 }
             }
         }
-        else if (text[index] == '&') {
+        else if (text[index] == "&") {
             index += 1;
             match = entityEndRegEx.match(text.substring(index));
             if (match) {
@@ -462,9 +462,9 @@ function truncateHtml(text, length) {
         }
         else {
             var next = text.substring(index, length);
-            var skip = next.indexOf('<');
+            var skip = next.indexOf("<");
             if (skip == -1) {
-                skip = next.indexOf('&');
+                skip = next.indexOf("&");
             }
             if (skip == -1) {
                 skip = index + length;
@@ -476,14 +476,14 @@ function truncateHtml(text, length) {
     }
     var output = [ text.substring(0, index) ];
     if (position == length) {
-        output.push('&hellip;');
+        output.push("&hellip;");
     }
     var keys = [];
     for (var key in pendingCloseTags) {
         keys.push(Number(key));
     }
     keys.sort();
-    keys.map(function (key) { 
+    keys.map(function (key) {
         return pendingCloseTags[key];
     });
     return output.join("");
@@ -495,5 +495,5 @@ var server = http.createServer(function (request, response) {
 });
 var port = process.env.PORT || 8080;
 server.listen(port, function() {
-    console.log('http://localhost:' + port);
+    console.log("http://localhost:" + port);
 });
