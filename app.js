@@ -363,7 +363,7 @@ function renderBlog(draft, start) {
                 post.push("<h1><a href='" + location + "'>" + entry["title"] + "</a></h1>\n");
                 var content = entry["content"];
                 content = content.replace(/\s\s/g, " ");
-                var truncated = truncateHtml(content, 320);
+                var truncated = truncate(content, 320);
                 post.push("<p>" + truncated + "</p>\n");
                 if (truncated != content) {
                     post.push("<div class='more'><a href='" + location + "'>" + "Read more&hellip;" + "</a></div>\n");
@@ -420,11 +420,10 @@ function loadPost(file) {
     return null;
 }
 
-function truncateHtml(text, length) {
-    var entityEndRegEx = /(\w+;)/g;
+function truncate(text, length) {
+    var pendingCloseTags = {};
     var position = 0;
     var index = 0;
-    var pendingCloseTags = {};
     while (position < length && index < text.length) {
         if (text[index] == '<') {
             if (index in pendingCloseTags) {
@@ -442,7 +441,7 @@ function truncateHtml(text, length) {
                         break;
                     }
                     index += match[0].length;
-                    match = text.substring(index).match(new RegExp("</" + tag + "[^>]*>"));
+                    match = text.substring(index).match(new RegExp("</" + tag + ">"));
                     if (match) {
                         pendingCloseTags[index + match.index] = match[0];
                     }
@@ -453,12 +452,12 @@ function truncateHtml(text, length) {
             }
         }
         else if (text[index] == "&") {
-            index += 1;
-            match = entityEndRegEx.match(text.substring(index));
+            index++;
+            match = /(\w+;)/g.match(text.substring(index));
             if (match) {
                 index += match.end();
             }
-            position += 1;
+            position++;
         }
         else {
             var next = text.substring(index, length);
@@ -470,8 +469,8 @@ function truncateHtml(text, length) {
                 skip = index + length;
             }
             var delta = Math.min(skip, length - position, text.length - index);
-            position += delta;
             index += delta;
+            position += delta;
         }
     }
     var output = [ text.substring(0, index) ];
@@ -482,9 +481,8 @@ function truncateHtml(text, length) {
     for (var key in pendingCloseTags) {
         keys.push(Number(key));
     }
-    keys.sort();
-    keys.map(function (key) {
-        return pendingCloseTags[key];
+    keys.sort().forEach(function (key) {
+        output.push(pendingCloseTags[key]);
     });
     return output.join("");
 }
