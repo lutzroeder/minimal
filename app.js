@@ -101,10 +101,10 @@ router.get("/app.json", "/");
 router.get("/header.html", "/");
 router.get("/meta.html", "/");
 router.get("/package.json", "/");
-router.get("/placeholder.html", "/");
 router.get("/post.css", "/");
 router.get("/post.html", "/");
 router.get("/site.css", "/");
+router.get("/stream.html", "/");
 router.get("/web.config", "/");
 
 // ATOM feed
@@ -375,10 +375,10 @@ function renderBlog(draft, start) {
     }
     if (files.length > 0)
     {
-        var template = fs.readFileSync("placeholder.html", "utf-8");
+        var template = fs.readFileSync("stream.html", "utf-8");
         var context = { "url": "/blog?id=" + index.toString() };
-        var placeholder = mustache(template, context, null);
-        output.push(placeholder);
+        var data = mustache(template, context, null);
+        output.push(data);
     }
     return output.join("");
 }
