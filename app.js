@@ -113,30 +113,30 @@ router.get("/blog/atom.xml", function(request, response, next) {
     var output = [];
     output.push("<?xml version='1.0' encoding='UTF-8'?>");
     output.push("<feed xmlns='http://www.w3.org/2005/Atom'>");
-    output.push("<title>" + configuration["name"] + "</title>");
+    output.push("<title>" + configuration.name + "</title>");
     output.push("<id>" + host + "/</id>");
     output.push("<icon>" + host + "/favicon.ico</icon>");
     output.push("<updated>" + new Date().toISOString() + "</updated>");
-    output.push("<author><name>" + configuration["name"] + "</name></author>");
+    output.push("<author><name>" + configuration.name + "</name></author>");
     output.push("<link rel='alternate' type='text/html' href='" + host + "/' />");
     output.push("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />");
     fs.readdirSync("blog/").filter(function (file) { return /\.html/.test(file); }).sort().reverse().forEach(function (file, index) {
         var draft = localhost(request);
         var entry = loadPost("blog/" + file);
-        if (entry && (draft || entry["state"] == "post")) {
-            var url = host + "/blog/" + path.basename(file, ".html");;
+        if (entry && (draft || entry.state == "post")) {
+            var url = host + "/blog/" + path.basename(file, ".html");
             output.push("<entry>");
             output.push("<id>" + url + "</id>");
-            if (entry["author"] && entry["author"] !== configuration["name"]) {
-                output.push("<author><name>" + entry["author"] + "</name></author>");
+            if (entry.author && entry.author !== configuration.name) {
+                output.push("<author><name>" + entry.author + "</name></author>");
             }
-            var date = new Date(entry["date"]).toISOString();
+            var date = new Date(entry.date).toISOString();
             output.push("<published>" + date + "</published>");
-            output.push("<updated>" + (entry["updated"] ? (new Date(entry["updated"]).toISOString()) : date) + "</updated>");
-            output.push("<title type='text'>" + entry["title"] + "</title>")
-            output.push("<content type='html'>" + escapeHtml(entry["content"]) + "</content>");
-            output.push("<link rel='alternate' type='text/html' href='" + url + "' title='" + entry["title"] + "' />");
-            output.push("</entry>")
+            output.push("<updated>" + (entry.updated ? (new Date(entry.updated).toISOString()) : date) + "</updated>");
+            output.push("<title type='text'>" + entry.title + "</title>");
+            output.push("<content type='html'>" + escapeHtml(entry.content) + "</content>");
+            output.push("<link rel='alternate' type='text/html' href='" + url + "' title='" + entry.title + "' />");
+            output.push("</entry>");
         }
     });
     output.push("</feed>");
@@ -154,9 +154,9 @@ router.get("/blog/*", function (request, response, next) {
     var localPath = pathname.replace(/^\/?/, "");
     var entry = loadPost(localPath + ".html");
     if (entry) {
-        var date = new Date(entry["date"]);
-        entry["date"] = date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
-        entry["author"] = entry["author"] ? entry["author"] : configuration["name"];
+        var date = new Date(entry.date);
+        entry.date = date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
+        entry.author = entry.author ? entry.author : configuration.name;
         var context = Object.assign(configuration, entry);
         var template = fs.readFileSync("post.html", "utf-8");
         var data = mustache(template, context, function(name) {
@@ -181,8 +181,8 @@ router.get("/blog/*", function (request, response, next) {
 
 router.get("/blog", function (request, response, next) {
     var query = url.parse(request.url, true).query;
-    if (query["id"]) {
-        var data = renderBlog(localhost(request), Number(query["id"]));
+    if (query.id) {
+        var data = renderBlog(localhost(request), Number(query.id));
         response.writeHead(200, { "Content-Type" : "text/html", "Content-Length" : Buffer.byteLength(data) });
         response.write(data);
     }
@@ -277,20 +277,20 @@ router.get("/*", function (request, response, next) {
                 else {
                     var template = fs.readFileSync(localPath, "utf-8");
                     var context = Object.assign({ }, configuration);
-                    context["feed"] = context["feed"] ? context["feed"] : function() {
+                    context.feed = context.feed ? context.feed : function() {
                         return (request.secure ? "https" : "http") + "://" + request.headers.host + "/blog/atom.xml";
                     };
-                    context["blog"] = function() {
+                    context.blog = function() {
                         return renderBlog(localhost(request), 0);
                     };
-                    context["links"] = function() {
-                        return configuration["links"].map(function (link) {
-                            return "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + link["symbol"] + "</span></a>";
+                    context.links = function() {
+                        return configuration.links.map(function (link) {
+                            return "<a class='icon' target='_blank' href='" + link.url + "' title='" + link.name + "'><span class='symbol'>" + link.symbol + "</span></a>";
                         }).join("\n");
                     };
-                    context["tabs"] = function() {
-                        return configuration["pages"].map(function (page) {
-                            return "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>";
+                    context.tabs = function() {
+                        return configuration.pages.map(function (page) {
+                            return "<li class='tab'><a href='" + page.url + "'>" + page.name + "</a></li>";
                         }).join("\n");
                     };
                     var data = mustache(template, context, function(name) {
@@ -351,17 +351,16 @@ function renderBlog(draft, start) {
     while (files.length > 0 && index < (start + length)) {
         var file = files.shift();
         var entry = loadPost("blog/" + file);
-        if (entry && (draft || entry["state"] === "post")) {
+        if (entry && (draft || entry.state === "post")) {
             if (index >= start) {
-                entry["id"] = path.basename(file, ".html");
-                var location = "/blog/" + entry["id"];
-                var date = new Date(entry["date"]);
-                entry["date"] = date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
+                var location = "/blog/" + path.basename(file, ".html");
+                var date = new Date(entry.date);
+                entry.date = date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
                 var post = [];
                 post.push("<div class='item'>");
-                post.push("<div class='date'>" + entry["date"] + "</div>\n");
-                post.push("<h1><a href='" + location + "'>" + entry["title"] + "</a></h1>\n");
-                var content = entry["content"];
+                post.push("<div class='date'>" + entry.date + "</div>\n");
+                post.push("<h1><a href='" + location + "'>" + entry.title + "</a></h1>\n");
+                var content = entry.content;
                 content = content.replace(/\s\s/g, " ");
                 var truncated = truncate(content, 320);
                 post.push("<p>" + truncated + "</p>\n");
@@ -413,7 +412,7 @@ function loadPost(file) {
                 content.append(line);
             }
             content = content.concat(lines);
-            entry["content"] = content.join("\n");
+            entry.content = content.join("\n");
             return entry;
         }
     }
@@ -421,15 +420,15 @@ function loadPost(file) {
 }
 
 function truncate(text, length) {
-    var pendingCloseTags = {};
+    var closeTags = {};
     var position = 0;
     var index = 0;
     while (position < length && index < text.length) {
         if (text[index] == '<') {
-            if (index in pendingCloseTags) {
-                var skip = pendingCloseTags[index].length;
-                delete pendingCloseTags[index];
-                index += skip;
+            if (index in closeTags) {
+                var closeTagLength = closeTags[index].length;
+                delete closeTags[index];
+                index += closeTagLength;
             }
             else {
                 index++;
@@ -443,7 +442,7 @@ function truncate(text, length) {
                     index += match[0].length;
                     match = text.substring(index).match(new RegExp("</" + tag + ">"));
                     if (match) {
-                        pendingCloseTags[index + match.index] = match[0];
+                        closeTags[index + match.index] = match[0];
                     }
                 }
                 else {
@@ -453,9 +452,9 @@ function truncate(text, length) {
         }
         else if (text[index] == "&") {
             index++;
-            match = /(\w+;)/g.match(text.substring(index));
-            if (match) {
-                index += match.end();
+            var entity = /(\w+;)/g.match(text.substring(index));
+            if (entity) {
+                index += entity.end();
             }
             position++;
         }
@@ -478,11 +477,11 @@ function truncate(text, length) {
         output.push("&hellip;");
     }
     var keys = [];
-    for (var key in pendingCloseTags) {
+    for (var key in closeTags) {
         keys.push(Number(key));
     }
     keys.sort().forEach(function (key) {
-        output.push(pendingCloseTags[key]);
+        output.push(closeTags[key]);
     });
     return output.join("");
 }
