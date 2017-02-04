@@ -179,6 +179,7 @@ router.get("/blog/*", function (request, response, next) {
     }
 });
 
+// Stream blog posts
 router.get("/blog", function (request, response, next) {
     var query = url.parse(request.url, true).query;
     if (query.id) {
