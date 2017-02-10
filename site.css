@@ -169,6 +169,13 @@ a.icon:hover
     color: rgba(0, 0, 0, 0.8);
 }
 
+.placeholder {
+    box-sizing: border-box;
+    max-width: 640px !important;
+    padding: 45px 20px 30px 20px;
+    margin: 0 auto 10px auto;
+}
+
 .item {
     box-sizing: border-box;
     max-width: 640px !important;
@@ -177,7 +184,6 @@ a.icon:hover
     border-radius: 3px;
     background-clip: border-box;
     border: 1px solid rgba(0, 0, 0, .09);
-    box-sizing: border-box;
     box-shadow: 0 1px 4px 0 rgba(0, 0, 0, .04);
     color: rgba(0, 0, 0, 0.8);
     background-color: #ffffff;
@@ -289,7 +295,10 @@ a.icon:hover
         display: none;
     }
     .item .description {
-        margin-left: 0; 
+        margin-left: 0;
+    }
+    .item .date {
+        display: none;
     }
 }
 
