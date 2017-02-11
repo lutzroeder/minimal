@@ -16,11 +16,8 @@ function updateStream() {
     var element = document.getElementById("stream");
     if (element) {
       var rect = element.getBoundingClientRect();
-      var viewHeight = Math.max(document.documentElement.clientHeight, window.innerHeight);
       var threshold = 0;
-      var above = rect.bottom - threshold < 0;
-      var below = rect.top - viewHeight + threshold >= 0;
-      if (!above && !below) {
+      if (rect.bottom > threshold && (window.innerHeight - rect.top) > threshold) {
         var url = element.getAttribute("title");
         var xmlHttp = new XMLHttpRequest();
         xmlHttp.open("GET", url, true);
