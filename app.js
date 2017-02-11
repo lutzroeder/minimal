@@ -4,7 +4,6 @@
 
 var fs = require("fs");
 var http = require("http");
-var os = require("os");
 var path = require("path");
 var url = require("url");
 
@@ -27,17 +26,11 @@ function mustache(template, context, partials) {
     });
     template = template.replace(/\{\{\{\s*([-_\/\.\w]+)\s*\}\}\}/gm, function (match, name) {
         var value = context[name];
-        if (typeof value === "function") {
-            value = value();
-        }
-        return value;
+        return typeof value === "function" ? value() : value;
     });
     template = template.replace(/\{\{\s*([-_\/\.\w]+)\s*\}\}/gm, function (match, name) {
         var value = context[name];
-        if (typeof value === "function") {
-            value = value();
-        }
-        return escapeHtml(value);
+        return escapeHtml(typeof value === "function" ? value() : value);
     });
     return template;
 }
@@ -57,7 +50,7 @@ function truncate(text, length) {
                 var closeTagLength = closeTags[index].length;
                 delete closeTags[index];
                 index += closeTagLength;
-            }
+            } 
             else {
                 index++;
                 var match = text.substring(index).match(/(\w+)[^>]*>/);
@@ -230,13 +223,16 @@ Router.prototype.handle = function (request, response) {
                         console.log(error);
                         next(error);
                     }
-                } else {
+                }
+                else {
                     next();
                 }
-            } else {
+            }
+            else {
                 next();
             }
-        } else if (defaultHandler) {
+        }
+        else if (defaultHandler) {
             defaultHandler(request, response, function (request, response, next) {});
         }
     }
