@@ -20,4 +20,4 @@ Make sure you have [Node.js](https://nodejs.org/en/download) installed and run:
 
 This will start `node app.js` and navigate to `http://localhost:8080` in your browser.
 
-`./admin` is a [Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) script that can be run from Git Bash or [WLS](Windows Subsystem for Linux) on Windows.
+`./admin` is a [Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) script that can be run from Git Bash or [WLS](https://en.wikipedia.org/wiki/Windows_Subsystem_for_Linux) on Windows.
