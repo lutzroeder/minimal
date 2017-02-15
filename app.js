@@ -254,10 +254,6 @@ Router.prototype.get = function (path, handler) {
     this.route(path).handlers["GET"] = this.updateHandler(handler);
 };
 
-Router.prototype.head = function (path, handler) {
-    this.route(path).handlers["HEAD"] = this.updateHandler(handler);
-};
-
 Router.prototype.default = function (handler) {
     this.defaultHandler = this.updateHandler(handler);
 };
