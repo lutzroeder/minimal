@@ -183,101 +183,12 @@ function renderBlog(draft, start) {
     return output.join("");
 }
 
-function Router() {
-    this.routes = [];
+function rootHandler(request, response) {
+    response.writeHead(302, { "Location": "/" });
+    response.end();
 }
 
-Router.prototype.route = function (path) {
-    var route = this.routes.find(function (route) {
-        return route.path === path;
-    });
-    if (!route) {
-        route = {
-            path: path,
-            regexp: (path instanceof RegExp) ? path : new RegExp("^" + path.replace("/*", "/(.*)") + "$", "i"),
-            handlers: {}
-        };
-        this.routes.push(route);
-    }
-    return route;
-};
-
-Router.prototype.handle = function (request, response) {
-    var pathname = path.normalize(url.parse(request.url, true).pathname),
-        routes = this.routes,
-        defaultHandler = this.defaultHandler,
-        index = 0;
-    function next () {
-        var route = routes[index++];
-        if (route) {
-            if (pathname.match(route.regexp) !== null) {
-                var method = request.method.toUpperCase();
-                if (method === "HEAD" && !route.handlers["HEAD"]) {
-                    method = "GET";
-                }
-                var handler = route.handlers[method];
-                if (handler) {
-                    try {
-                        handler(request, response, next);
-                    } catch (error) {
-                        console.log(error);
-                        next(error);
-                    }
-                }
-                else {
-                    next();
-                }
-            }
-            else {
-                next();
-            }
-        }
-        else if (defaultHandler) {
-            defaultHandler(request, response, function (request, response, next) {});
-        }
-    }
-    next();
-};
-
-Router.prototype.updateHandler = function (handler) {
-    if (typeof handler === "string") {
-        var url = handler;
-        handler = function (request, response, next) {
-            response.writeHead(302, { "Location": url });
-            response.end();
-        };
-    }
-    return handler;
-};
-
-Router.prototype.get = function (path, handler) {
-    this.route(path).handlers["GET"] = this.updateHandler(handler);
-};
-
-Router.prototype.default = function (handler) {
-    this.defaultHandler = this.updateHandler(handler);
-};
-
-var router = new Router();
-
-router.default("/");
-
-router.get("/.git(/.*)?", "/");
-router.get("/admin", "/");
-router.get("/admin.cfg", "/");
-router.get("/app.js", "/");
-router.get("/app.json", "/");
-router.get("/header.html", "/");
-router.get("/meta.html", "/");
-router.get("/package.json", "/");
-router.get("/post.css", "/");
-router.get("/post.html", "/");
-router.get("/site.css", "/");
-router.get("/stream.html", "/");
-router.get("/web.config", "/");
-
-// ATOM feed
-router.get("/blog/atom.xml", function (request, response, next) {
+function atomHandler(request, response) {
     var host = (request.secure ? "https" : "http") + "://" + request.headers.host;
     var output = [];
     output.push("<?xml version='1.0' encoding='UTF-8'?>");
@@ -315,10 +226,20 @@ router.get("/blog/atom.xml", function (request, response, next) {
         response.write(data);
     }
     response.end();
-});
+}
 
-// Render specific HTML blog post
-router.get("/blog/*", function (request, response, next) {
+var mimeTypeMap = {
+    ".js":   "text/javascript",
+    ".css":  "text/css",
+    ".png":  "image/png",
+    ".gif":  "image/gif",
+    ".jpg":  "image/jpeg",
+    ".ico":  "image/x-icon",
+    ".zip":  "application/zip",
+    ".json": "application/json"
+};
+
+function postHandler(request, response) {
     var pathname = path.normalize(url.parse(request.url, true).pathname.toLowerCase());
     var localPath = pathname.replace(/^\/?/, "");
     var entry = loadPost(localPath + ".html");
@@ -339,31 +260,28 @@ router.get("/blog/*", function (request, response, next) {
     }
     else {
         if (mimeTypeMap[path.extname(localPath)]) {
-            next();
+            defaultHandler(request, response);
         }
         else {
-            response.writeHead(302, { "Location": "/" });
-            response.end();
+            rootHandler(request, response)
         }
     }
-});
+}
 
-// Stream blog posts
-router.get("/blog", function (request, response, next) {
+function blogHandler(request, response) {
     var query = url.parse(request.url, true).query;
     if (query.id) {
         var data = renderBlog(localhost(request), Number(query.id));
         response.writeHead(200, { "Content-Type" : "text/html", "Content-Length" : Buffer.byteLength(data) });
         response.write(data);
+        response.end();
     }
     else {
-        response.writeHead(302, { "Location": "/" });
+        rootHandler(request, response)
     }
-    response.end();
-});
+}
 
-// Handle "Let's Encrypt" challenge
-router.get("/.well-known/acme-challenge/*", function (request, response, next) {
+function letsEncryptHandler(request, response) {
     var pathname = path.normalize(url.parse(request.url, true).pathname);
     var localPath = pathname.replace(/^\/?/, "");
     if (fs.existsSync(localPath) && fs.statSync(localPath).isFile) {
@@ -373,23 +291,11 @@ router.get("/.well-known/acme-challenge/*", function (request, response, next) {
         response.end();
     } 
     else {
-        response.writeHead(302, { "Location": "/" });
-        response.end();
+        rootHandler(request, response)
     }
-});
+}
 
-var mimeTypeMap = {
-    ".js":   "text/javascript",
-    ".css":  "text/css",
-    ".png":  "image/png",
-    ".gif":  "image/gif",
-    ".jpg":  "image/jpeg",
-    ".ico":  "image/x-icon",
-    ".zip":  "application/zip",
-    ".json": "application/json"
-};
-
-router.get("/*", function (request, response, next) {
+function defaultHandler(request, response) {
     var pathname = path.normalize(url.parse(request.url, true).pathname.toLowerCase());
     if (pathname.endsWith("/index.html"))
     {
@@ -398,7 +304,8 @@ router.get("/*", function (request, response, next) {
     }
     else {
         var localPath = (pathname.endsWith("/") ? path.join(pathname, "index.html") : pathname).replace(/^\/?/, "");
-        var contentType = mimeTypeMap[path.extname(localPath)];
+        var extension = path.extname(localPath);
+        var contentType = mimeTypeMap[extension];
         if (contentType) {
             // Handle binary files
             fs.stat(localPath, function (error, stats) {
@@ -437,10 +344,10 @@ router.get("/*", function (request, response, next) {
                         response.end();
                     }
                     else {
-                        next();
+                        rootHandler(request, response);
                     }
                 }
-                else if (stats.isDirectory() || path.extname(localPath) != ".html") {
+                else if (stats.isDirectory() || extension != ".html") {
                     response.writeHead(302, { "Location": pathname + "/" });
                     response.end();
                 }
@@ -475,7 +382,80 @@ router.get("/*", function (request, response, next) {
             });
         }
     }
-});
+}
+
+function Router() {
+    this.routes = [];
+}
+
+Router.prototype.route = function (path) {
+    var route = this.routes.find(function (route) {
+        return route.path === path;
+    });
+    if (!route) {
+        route = {
+            path: path,
+            regexp: (path instanceof RegExp) ? path : new RegExp("^" + path.replace("/*", "/(.*)") + "$", "i"),
+            handlers: {}
+        };
+        this.routes.push(route);
+    }
+    return route;
+};
+
+Router.prototype.handle = function (request, response) {
+    var pathname = path.normalize(url.parse(request.url, true).pathname);
+    for (var i = 0; i < this.routes.length; i++) {
+        var route = this.routes[i];
+        if (route) {
+            if (pathname.match(route.regexp) !== null) {
+                var method = request.method.toUpperCase();
+                if (method === "HEAD" && !route.handlers["HEAD"]) {
+                    method = "GET";
+                }
+                var handler = route.handlers[method];
+                if (handler) {
+                    try {
+                        handler(request, response);
+                    } catch (error) {
+                        console.log(error);
+                    }
+                    return;
+                }
+            }
+        }
+    }
+    this.defaultHandler(request, response);
+};
+
+Router.prototype.get = function (path, handler) {
+    this.route(path).handlers["GET"] = handler;
+};
+
+Router.prototype.default = function (handler) {
+    this.defaultHandler = handler;
+};
+
+var router = new Router();
+router.get("/.git(/.*)?", rootHandler);
+router.get("/admin", rootHandler);
+router.get("/admin.cfg", rootHandler);
+router.get("/app.js", rootHandler);
+router.get("/app.json", rootHandler);
+router.get("/header.html", rootHandler);
+router.get("/meta.html", rootHandler);
+router.get("/package.json", rootHandler);
+router.get("/post.css", rootHandler);
+router.get("/post.html", rootHandler);
+router.get("/site.css", rootHandler);
+router.get("/stream.html", rootHandler);
+router.get("/web.config", rootHandler);
+router.get("/blog/atom.xml", atomHandler); // ATOM feed 
+router.get("/blog/*", postHandler); // Render specific HTML blog post
+router.get("/blog", blogHandler); // Stream blog posts
+router.get("/.well-known/acme-challenge/*", letsEncryptHandler); // Handle "Let's Encrypt" challenge
+router.get("/*", defaultHandler);
+router.default(rootHandler);
 
 var server = http.createServer(function (request, response) {
     console.log(request.method + " " + request.url);
