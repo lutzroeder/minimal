@@ -40,6 +40,16 @@ function localhost(request) {
     return (domain === "localhost" || domain === "127.0.0.1");
 }
 
+function scheme(request) {
+    if (request.headers["x-forwarded-proto"]) {
+        return request.headers["x-forwarded-proto"];
+    }
+    if (request.headers["x-forwarded-protocol"]) {
+        return request.headers["x-forwarded-protocol"];
+    }
+    return "http";
+}
+
 function truncate(text, length) {
     var closeTags = {};
     var position = 0;
@@ -192,7 +202,7 @@ function rootHandler(request, response) {
 }
 
 function atomHandler(request, response) {
-    var host = (request.secure ? "https" : "http") + "://" + request.headers.host;
+    var host = scheme(request) + "://" + request.headers.host;
     var output = [];
     output.push("<?xml version='1.0' encoding='UTF-8'?>");
     output.push("<feed xmlns='http://www.w3.org/2005/Atom'>");
@@ -360,7 +370,7 @@ function defaultHandler(request, response) {
                     var template = fs.readFileSync(localPath, "utf-8");
                     var context = Object.assign({ }, configuration);
                     context.feed = context.feed ? context.feed : function() {
-                        return (request.secure ? "https" : "http") + "://" + request.headers.host + "/blog/atom.xml";
+                        return scheme(request) + "://" + request.headers.host + "/blog/atom.xml";
                     };
                     context.blog = function() {
                         return renderBlog(localhost(request), 0);
