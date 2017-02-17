@@ -57,7 +57,7 @@ function truncate(text, length) {
                 if (match) {
                     index--;
                     var tag = match[1];
-                    if (tag == "pre" || tag == "code") {
+                    if (tag == "pre" || tag == "code" || tag= "img") {
                         break;
                     }
                     index += match[0].length;
@@ -107,6 +107,10 @@ function truncate(text, length) {
     return output.join("");
 }
 
+function posts() {
+    return fs.readdirSync("blog/").filter(function (file) { return path.extname(file) === ".html"; }).sort().reverse();
+}
+
 function loadPost(file) {
     if (fs.existsSync(file) && fs.statSync(file).isFile) {
         var data = fs.readFileSync(file, "utf-8");
@@ -147,7 +151,7 @@ function renderBlog(draft, start) {
     var length = 10;
     var output = [];
     var index = 0;
-    var files = fs.readdirSync("blog/").filter(function (file) { return /\.html/.test(file); }).sort().reverse();
+    var files = posts();
     while (files.length > 0 && index < (start + length)) {
         var file = files.shift();
         var entry = loadPost("blog/" + file);
@@ -173,8 +177,7 @@ function renderBlog(draft, start) {
             index++;
         }
     }
-    if (files.length > 0)
-    {
+    if (files.length > 0) {
         var template = fs.readFileSync("stream.html", "utf-8");
         var context = { "url": "/blog?id=" + index.toString() };
         var data = mustache(template, context, null);
@@ -200,7 +203,7 @@ function atomHandler(request, response) {
     output.push("<author><name>" + configuration.name + "</name></author>");
     output.push("<link rel='alternate' type='text/html' href='" + host + "/' />");
     output.push("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />");
-    fs.readdirSync("blog/").filter(function (file) { return /\.html/.test(file); }).sort().reverse().forEach(function (file) {
+    posts().forEach(function (file) {
         var draft = localhost(request);
         var entry = loadPost("blog/" + file);
         if (entry && (draft || entry.state === "post")) {
@@ -259,7 +262,9 @@ function postHandler(request, response) {
         response.end();
     }
     else {
-        if (mimeTypeMap[path.extname(localPath)]) {
+        var extension = path.extname(localPath)
+        var contentType = mimeTypeMap[extension] 
+        if (contentType) {
             defaultHandler(request, response);
         }
         else {
