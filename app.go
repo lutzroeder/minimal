@@ -454,6 +454,7 @@ func main() {
 	http.HandleFunc("/.git", rootHandler)
 	http.HandleFunc("/admin", rootHandler)
 	http.HandleFunc("/admin.cfg", rootHandler)
+	http.HandleFunc("/app.go", rootHandler)
 	http.HandleFunc("/app.js", rootHandler)
 	http.HandleFunc("/app.json", rootHandler)
 	http.HandleFunc("/header.html", rootHandler)

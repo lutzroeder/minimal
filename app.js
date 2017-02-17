@@ -57,7 +57,7 @@ function truncate(text, length) {
                 if (match) {
                     index--;
                     var tag = match[1];
-                    if (tag == "pre" || tag == "code" || tag= "img") {
+                    if (tag == "pre" || tag == "code" || tag == "img") {
                         break;
                     }
                     index += match[0].length;
@@ -445,6 +445,7 @@ var router = new Router();
 router.get("/.git(/.*)?", rootHandler);
 router.get("/admin", rootHandler);
 router.get("/admin.cfg", rootHandler);
+router.get("/app.go", rootHandler);
 router.get("/app.js", rootHandler);
 router.get("/app.json", rootHandler);
 router.get("/header.html", rootHandler);
