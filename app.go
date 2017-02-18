@@ -4,14 +4,12 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"html"
 	"io"
 	"io/ioutil"
 	"mime"
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
@@ -22,8 +20,19 @@ import (
 
 var configuration map[string]interface{}
 
+var entityMap = strings.NewReplacer(
+	`&`, "&amp;", `<`, "&lt;", `>`, "&gt;", `"`, "&quot;", `'`, "&#39;", `/`, "&#x2F;", "`", "&#x60;", `=`, "&#x3D;",
+)
+
+func escapeHtml(text string) string {
+	return entityMap.Replace(text)
+}
+
+var partialRegex = regexp.MustCompile(`\{\{>\s*([-_\/\.\w]+)\s*\}\}`)
+var replaceRegex = regexp.MustCompile(`\{\{\{\s*([-_\/\.\w]+)\s*\}\}\}`)
+var escapeRegex = regexp.MustCompile(`\{\{\s*([-_\/\.\w]+)\s*\}\}`)
+
 func mustache(template string, context map[string]interface{}, partials interface{}) string {
-	partialRegex := regexp.MustCompile(`\{\{>\s*([-_\/\.\w]+)\s*\}\}`)
 	template = partialRegex.ReplaceAllStringFunc(template, func(match string) string {
 		name := partialRegex.FindStringSubmatch(match)[1]
 		value := match
@@ -32,7 +41,6 @@ func mustache(template string, context map[string]interface{}, partials interfac
 		}
 		return value
 	})
-	replaceRegex := regexp.MustCompile(`\{\{\{\s*([-_\/\.\w]+)\s*\}\}\}`)
 	template = replaceRegex.ReplaceAllStringFunc(template, func(match string) string {
 		name := replaceRegex.FindStringSubmatch(match)[1]
 		value := match
@@ -46,7 +54,6 @@ func mustache(template string, context map[string]interface{}, partials interfac
 		}
 		return value
 	})
-	escapeRegex := regexp.MustCompile(`\{\{\s*([-_\/\.\w]+)\s*\}\}`)
 	template = escapeRegex.ReplaceAllStringFunc(template, func(match string) string {
 		name := escapeRegex.FindStringSubmatch(match)[1]
 		value := match
@@ -58,7 +65,7 @@ func mustache(template string, context map[string]interface{}, partials interfac
 				value = v
 			}
 		}
-		return html.EscapeString(value)
+		return escapeHtml(value)
 	})
 	return template
 }
@@ -76,6 +83,19 @@ func localhost(request *http.Request) bool {
 	return domain == "localhost" || domain == "127.0.0.1"
 }
 
+func scheme(request *http.Request) string {
+	if scheme := request.Header.Get("x-forwarded-proto"); len(scheme) > 0 {
+		return scheme
+	}
+	if scheme := request.Header.Get("x-forwarded-protocol"); len(scheme) > 0 {
+		return scheme
+	}
+	return "http"
+}
+
+var tagRegexp = regexp.MustCompile(`(\w+)[^>]*>`)
+var entityRegexp = regexp.MustCompile(`(#?[A-Za-z0-9]+;)`)
+
 func truncate(text string, length int) string {
 	closeTags := make(map[int]string)
 	position := 0
@@ -87,7 +107,7 @@ func truncate(text string, length int) string {
 				index += len(closeTag)
 			} else {
 				index++
-				match := regexp.MustCompile(`(\w+)[^>]*>`).FindStringSubmatch(text[index:])
+				match := tagRegexp.FindStringSubmatch(text[index:])
 				if len(match) > 0 {
 					index--
 					tag := match[1]
@@ -106,8 +126,7 @@ func truncate(text string, length int) string {
 			}
 		} else if text[index] == '&' {
 			index++
-			entityRegex := regexp.MustCompile(`(#?[A-Za-z0-9]+;)`)
-			if entity := entityRegex.FindString(text[index:]); len(entity) > 0 {
+			if entity := entityRegexp.FindString(text[index:]); len(entity) > 0 {
 				index += len(entity)
 			}
 			position++
@@ -130,12 +149,12 @@ func truncate(text string, length int) string {
 			position += skip
 		}
 	}
-	var output []string
+	output := []string{}
 	output = append(output, text[0:index])
 	if position == length {
 		output = append(output, "&hellip;")
 	}
-	var keys []int
+	keys := []int{}
 	for key := range closeTags {
 		keys = append(keys, key)
 	}
@@ -149,8 +168,8 @@ func truncate(text string, length int) string {
 }
 
 func posts() []string {
+	files := []string{}
 	fileInfos, _ := ioutil.ReadDir("blog/")
-	var files []string
 	for i := len(fileInfos) - 1; i >= 0; i-- {
 		file := fileInfos[i].Name()
 		if path.Ext(file) == ".html" {
@@ -167,7 +186,7 @@ func loadPost(path string) map[string]string {
 			panic(e)
 		}
 		entry := make(map[string]string)
-		var content []string
+		content := []string{}
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			line := scanner.Text()
@@ -202,7 +221,7 @@ func loadPost(path string) map[string]string {
 }
 
 func renderBlog(draft bool, start int) string {
-	var output []string
+	output := []string{}
 	length := 10
 	index := 0
 	files := posts()
@@ -215,7 +234,7 @@ func renderBlog(draft bool, start int) string {
 				location := "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
 				date, _ := time.Parse("2006-01-02 15:04:05 MST", entry["date"])
 				entry["date"] = date.Format("Jan 2, 2006")
-				var post []string
+				post := []string{}
 				post = append(post, "<div class='item'>")
 				post = append(post, "<div class='date'>"+entry["date"]+"</div>\n")
 				post = append(post, "<h1><a href='"+location+"'>"+entry["title"]+"</a></h1>\n")
@@ -248,8 +267,8 @@ func rootHandler(response http.ResponseWriter, request *http.Request) {
 }
 
 func atomHandler(response http.ResponseWriter, request *http.Request) {
-	host := "http" + "://" + request.Host // TODO http vs. https
-	var output []string
+	host := scheme(request) + "://" + request.Host
+	output := []string{}
 	output = append(output, "<?xml version='1.0' encoding='UTF-8'?>")
 	output = append(output, "<feed xmlns='http://www.w3.org/2005/Atom'>")
 	output = append(output, "<title>"+configuration["name"].(string)+"</title>")
@@ -271,20 +290,20 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 				output = append(output, "<author><name>"+author+"</name></author>")
 			}
 			date, _ := time.Parse("2006-01-02 15:04:05 MST", entry["date"])
-			output = append(output, "<published>"+date.Format("2006-01-02T15:04:05.999Z07:00")+"</published>")
+			output = append(output, "<published>"+date.UTC().Format("2006-01-02T15:04:05.999Z07:00")+"</published>")
 			updated := date
 			if u, ok := entry["updated"]; ok {
 				updated, _ = time.Parse("2006-01-02 15:04:05 MST", u)
 			}
-			output = append(output, "<updated>"+updated.Format("2006-01-02T15:04:05.999Z07:00")+"</updated>")
+			output = append(output, "<updated>"+updated.UTC().Format("2006-01-02T15:04:05.999Z07:00")+"</updated>")
 			output = append(output, "<title type='text'>"+entry["title"]+"</title>")
-			output = append(output, "<content type='html'>"+html.EscapeString(entry["content"])+"</content>")
+			output = append(output, "<content type='html'>"+escapeHtml(entry["content"])+"</content>")
 			output = append(output, "<link rel='alternate' type='text/html' href='"+url+"' title='"+entry["title"]+"' />")
 			output = append(output, "</entry>")
 		}
 	}
 	output = append(output, "</feed>")
-	var data = strings.Join(output, "\n")
+	data := strings.Join(output, "\n")
 	response.Header().Set("Content-Type", "application/atom+xml")
 	if request.Method != "HEAD" {
 		length, _ := io.WriteString(response, data)
@@ -293,9 +312,9 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 }
 
 func postHandler(response http.ResponseWriter, request *http.Request) {
-	pathname := strings.ToLower(request.URL.Path) // TODO normalize path
-	localPath := strings.TrimPrefix(pathname, "/")
-	entry := loadPost(localPath + ".html")
+	file := strings.ToLower(path.Clean(request.URL.Path))
+	file = strings.TrimPrefix(file, "/")
+	entry := loadPost(file + ".html")
 	if entry != nil {
 		date, _ := time.Parse("2006-01-02 15:04:05 MST", entry["date"])
 		entry["date"] = date.Format("Jan 2, 2006")
@@ -319,7 +338,7 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 			response.Header().Set("Content-Length", strconv.Itoa(length))
 		}
 	} else {
-		extension := path.Ext(localPath)
+		extension := path.Ext(file)
 		contentType := mime.TypeByExtension(extension)
 		if len(contentType) > 0 {
 			defaultHandler(response, request)
@@ -342,24 +361,28 @@ func blogHandler(response http.ResponseWriter, request *http.Request) {
 }
 
 func defaultHandler(response http.ResponseWriter, request *http.Request) {
-	pathname := strings.ToLower(request.URL.Path) // TODO normalize path
+	url := request.URL.Path
+	pathname := strings.ToLower(path.Clean(request.URL.Path))
+	if pathname != "/" && strings.HasSuffix(url, "/") {
+		pathname += "/"
+	}
 	if strings.HasSuffix(pathname, "/index.html") {
 		http.Redirect(response, request, "/"+strings.TrimLeft(pathname[0:len(pathname)-11], "/"), http.StatusMovedPermanently)
 	} else {
-		localPath := pathname
+		file := pathname
 		if strings.HasSuffix(pathname, "/") {
-			localPath = path.Join(pathname, "index.html")
+			file = path.Join(pathname, "index.html")
 		}
-		localPath = strings.TrimLeft(localPath, "/")
-		extension := filepath.Ext(localPath)
+		file = strings.TrimLeft(file, "/")
+		extension := path.Ext(file)
 		contentType := mime.TypeByExtension(extension)
 		if len(contentType) > 0 && extension != ".html" {
-			if stat, e := os.Stat(localPath); os.IsNotExist(e) {
+			if stat, e := os.Stat(file); os.IsNotExist(e) {
 				response.WriteHeader(http.StatusNotFound)
 			} else if stat.IsDir() {
 				http.Redirect(response, request, "/", http.StatusFound)
 			} else {
-				data := mustReadFile("./" + localPath)
+				data := mustReadFile("./" + file)
 				if request.Method != "HEAD" {
 					response.Write(data)
 				}
@@ -369,8 +392,8 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 				response.Header().Set("Expires", "-1")
 			}
 		} else {
-			if stat, e := os.Stat(localPath); os.IsNotExist(e) {
-				if localPath != "index.html" {
+			if stat, e := os.Stat(file); e != nil || os.IsNotExist(e) {
+				if file != "index.html" {
 					http.Redirect(response, request, path.Dir(pathname), http.StatusFound)
 				} else {
 					rootHandler(response, request)
@@ -378,18 +401,18 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 			} else if stat.IsDir() || extension != ".html" {
 				http.Redirect(response, request, pathname+"/", http.StatusFound)
 			} else {
-				template := mustReadFile(path.Join("./", localPath))
+				template := mustReadFile(path.Join("./", file))
 				context := make(map[string]interface{})
 				for key, value := range configuration {
 					context[key] = value
 				}
 				if feed, ok := context["feed"]; !ok || len(feed.(string)) == 0 {
 					context["feed"] = func() string {
-						return "http" + "://" + request.Host + "/blog/atom.xml" // TODO http vs. https
+						return scheme(request) + "://" + request.Host + "/blog/atom.xml"
 					}
 				}
 				context["links"] = func() string {
-					var list []string
+					list := []string{}
 					for _, link := range configuration["links"].([]interface{}) {
 						name := link.(map[string]interface{})["name"].(string)
 						symbol := link.(map[string]interface{})["symbol"].(string)
@@ -399,7 +422,7 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 					return strings.Join(list, "\n")
 				}
 				context["tabs"] = func() string {
-					var list []string
+					list := []string{}
 					for _, link := range configuration["pages"].([]interface{}) {
 						name := link.(map[string]interface{})["name"].(string)
 						url := link.(map[string]interface{})["url"].(string)
@@ -424,10 +447,10 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 }
 
 func letsEncryptHandler(response http.ResponseWriter, request *http.Request) {
-	pathname := request.URL.Path // TODO normalize path
-	localPath := strings.TrimLeft(pathname, "/")
-	if stat, e := os.Stat(localPath); !os.IsNotExist(e) && !stat.IsDir() {
-		data := mustReadFile(localPath)
+	file := path.Clean(request.URL.Path)
+	file = strings.TrimLeft(file, "/")
+	if stat, e := os.Stat(file); !os.IsNotExist(e) && !stat.IsDir() {
+		data := mustReadFile(file)
 		response.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		response.Header().Set("Content-Length", strconv.Itoa(len(data)))
 		response.Write(data)

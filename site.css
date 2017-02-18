@@ -26,7 +26,7 @@ a.icon:hover { color: #333333; text-decoration: none; }
 .profile .bio { font-size: 16px; color: #666666; line-height: 22px; margin-top: 4px; display: block; }
 .profile .portrait { border: 0; border-radius: 50%; width: 100px !important; height: 100px !important; float: right; margin-left: 20px; }
 .profile .toolbar { font-size: 14px; color: rgba(0, 0, 0, 0.44); padding: 33px 0 23px 0; vertical-align: center; line-height: 25px; height: 26px; }
-.profile .button { font-smoothing: antialiased; background-color: #ffffff; border: #d9d9d9 solid 1px; border-radius: 999em; color: #8f8f8f; font-size: 14px; margin: 0; padding: 9px 16px 9px 16px; letter-spacing: normal; cursor: pointer; outline: 0; }
+.profile .button { background-color: #ffffff; border: #d9d9d9 solid 1px; border-radius: 999em; color: #8f8f8f; font-size: 14px; margin: 0; padding: 9px 16px 9px 16px; letter-spacing: normal; cursor: pointer; outline: 0; }
 .profile .button:hover { border-color: #8f8f8f; color: #666666; }
 .navigation { box-sizing: border-box; max-width: 640px !important; margin: 0 auto 0 auto; padding: 0px 20px 0px 20px; }
 .navigation .tabbar { border-top: 1px solid rgba(0, 0, 0, .05)!important; display: block; flex-direction: row; text-align: left; margin: 0; padding: 15px 0 17px 0; list-style: none; list-style-image: none; font-size: 16px; }

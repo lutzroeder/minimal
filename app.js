@@ -254,8 +254,8 @@ var mimeTypeMap = {
 
 function postHandler(request, response) {
     var pathname = path.normalize(url.parse(request.url, true).pathname.toLowerCase());
-    var localPath = pathname.replace(/^\/?/, "");
-    var entry = loadPost(localPath + ".html");
+    var file = pathname.replace(/^\/?/, "");
+    var entry = loadPost(file + ".html");
     if (entry) {
         var date = new Date(entry.date);
         entry.date = date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
@@ -272,7 +272,7 @@ function postHandler(request, response) {
         response.end();
     }
     else {
-        var extension = path.extname(localPath)
+        var extension = path.extname(file)
         var contentType = mimeTypeMap[extension] 
         if (contentType) {
             defaultHandler(request, response);
@@ -298,9 +298,9 @@ function blogHandler(request, response) {
 
 function letsEncryptHandler(request, response) {
     var pathname = path.normalize(url.parse(request.url, true).pathname);
-    var localPath = pathname.replace(/^\/?/, "");
-    if (fs.existsSync(localPath) && fs.statSync(localPath).isFile) {
-        var data = fs.readFileSync(localPath, "utf-8");
+    var file = pathname.replace(/^\/?/, "");
+    if (fs.existsSync(file) && fs.statSync(file).isFile) {
+        var data = fs.readFileSync(file, "utf-8");
         response.writeHead(200, { "Content-Type" : "text/plain; charset=utf-8", "Content-Length" : Buffer.byteLength(data) });
         response.write(data);
         response.end();
@@ -318,12 +318,12 @@ function defaultHandler(request, response) {
         response.end();
     }
     else {
-        var localPath = (pathname.endsWith("/") ? path.join(pathname, "index.html") : pathname).replace(/^\/?/, "");
-        var extension = path.extname(localPath);
+        var file = (pathname.endsWith("/") ? path.join(pathname, "index.html") : pathname).replace(/^\/?/, "");
+        var extension = path.extname(file);
         var contentType = mimeTypeMap[extension];
         if (contentType) {
             // Handle binary files
-            fs.stat(localPath, function (error, stats) {
+            fs.stat(file, function (error, stats) {
                 if (error) {
                     response.writeHead(404, { "Content-Type": contentType });
                     response.end();
@@ -333,7 +333,7 @@ function defaultHandler(request, response) {
                     response.end();
                 }
                 else {
-                    var stream = fs.createReadStream(localPath);
+                    var stream = fs.createReadStream(file);
                     stream.on("error", function () {
                         response.writeHead(404, { "Content-Type": contentType });
                         response.end();
@@ -352,9 +352,9 @@ function defaultHandler(request, response) {
         }
         else {
             // Handle HTML files
-            fs.stat(localPath, function (error, stats) {
+            fs.stat(file, function (error, stats) {
                 if (error) {
-                    if (localPath !== "index.html") {
+                    if (file !== "index.html") {
                         response.writeHead(302, { "Location": path.dirname(pathname) });
                         response.end();
                     }
@@ -367,7 +367,7 @@ function defaultHandler(request, response) {
                     response.end();
                 }
                 else {
-                    var template = fs.readFileSync(localPath, "utf-8");
+                    var template = fs.readFileSync(file, "utf-8");
                     var context = Object.assign({ }, configuration);
                     context.feed = context.feed ? context.feed : function() {
                         return scheme(request) + "://" + request.headers.host + "/blog/atom.xml";
