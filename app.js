@@ -52,9 +52,10 @@ function scheme(request) {
 
 function truncate(text, length) {
     var closeTags = {};
-    var position = 0;
+    var ellipsis = ""
+    var count = 0;
     var index = 0;
-    while (position < length && index < text.length) {
+    while (count < length && index < text.length) {
         if (text[index] == '<') {
             if (index in closeTags) {
                 var closeTagLength = closeTags[index].length;
@@ -62,22 +63,22 @@ function truncate(text, length) {
                 index += closeTagLength;
             } 
             else {
-                index++;
                 var match = text.substring(index).match(/(\w+)[^>]*>/);
                 if (match) {
-                    index--;
                     var tag = match[1];
                     if (tag == "pre" || tag == "code" || tag == "img") {
                         break;
                     }
-                    index += match[0].length;
-                    match = text.substring(index).match(new RegExp("</" + tag + ">"));
-                    if (match) {
-                        closeTags[index + match.index] = match[0];
+                    index += 1 + match[0].length;
+                    var closeTag = "</" + tag + ">";
+                    var end = text.indexOf(closeTag, index);
+                    if (end != -1) {
+                        closeTags[end] = closeTag;
                     }
                 }
                 else {
-                    position++;
+                    index++;
+                    count++;
                 }
             }
         }
@@ -87,25 +88,31 @@ function truncate(text, length) {
             if (entity) {
                 index += entity.end();
             }
-            position++;
+            count++;
         }
         else {
-            var next = text.substring(index, text.length);
-            var skip = next.indexOf("<");
-            if (skip == -1) {
-                skip = next.indexOf("&");
+            if (text[index] == " ") {
+                index++;
+                count++;
             }
-            if (skip == -1) {
-                skip = index + length;
+            var i = index;
+            while (text[i] != ' ' && text[i] != '<' && text[i] != '&' && i < text.length) {
+                i++;
             }
-            var delta = Math.min(skip, length - position, text.length - index);
-            index += delta;
-            position += delta;
+            var skip = i - index;
+            if (count + skip > length) {
+                ellipsis = "&hellip;"
+            }
+            if (count + skip - 15 > length) {
+                skip = length - count;
+            }
+            index += skip;
+            count += skip;
         }
     }
     var output = [ text.substring(0, index) ];
-    if (position == length) {
-        output.push("&hellip;");
+    if (ellipsis !== "") {
+        output.push(ellipsis);
     }
     var keys = [];
     for (var key in closeTags) {

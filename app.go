@@ -98,30 +98,30 @@ var entityRegexp = regexp.MustCompile(`(#?[A-Za-z0-9]+;)`)
 
 func truncate(text string, length int) string {
 	closeTags := make(map[int]string)
-	position := 0
+	ellipsis := ""
+	count := 0
 	index := 0
-	for position < length && index < len(text) {
+	for count < length && index < len(text) {
 		if text[index] == '<' {
 			if closeTag, ok := closeTags[index]; ok {
 				delete(closeTags, index)
 				index += len(closeTag)
 			} else {
-				index++
 				match := tagRegexp.FindStringSubmatch(text[index:])
 				if len(match) > 0 {
-					index--
 					tag := match[1]
 					if tag == "pre" || tag == "code" || tag == "img" {
 						break
 					}
-					index += len(match[0])
+					index += 1 + len(match[0])
 					closeTag := "</" + tag + ">"
-					closeIndex := strings.Index(text[index:], closeTag)
-					if closeIndex >= 0 {
-						closeTags[index+closeIndex] = closeTag
+					end := strings.Index(text[index:], closeTag)
+					if end != 1 {
+						closeTags[index+end] = closeTag
 					}
 				} else {
-					position++
+					index++
+					count++
 				}
 			}
 		} else if text[index] == '&' {
@@ -129,30 +129,30 @@ func truncate(text string, length int) string {
 			if entity := entityRegexp.FindString(text[index:]); len(entity) > 0 {
 				index += len(entity)
 			}
-			position++
+			count++
 		} else {
-			next := text[index:]
-			skip := strings.Index(next, "<")
+			if text[index] == ' ' {
+				index++
+				count++
+			}
+			skip := strings.IndexAny(text[index:], " <&")
 			if skip == -1 {
-				skip = strings.Index(next, "&")
-			}
-			if skip == -1 {
-				skip = index + length
-			}
-			if skip > length-position {
-				skip = length - position
-			}
-			if skip > len(text)-index {
 				skip = len(text) - index
 			}
+			if count+skip > length {
+				ellipsis = "&hellip;"
+			}
+			if count+skip-15 > length {
+				skip = length - count
+			}
 			index += skip
-			position += skip
+			count += skip
 		}
 	}
 	output := []string{}
 	output = append(output, text[0:index])
-	if position == length {
-		output = append(output, "&hellip;")
+	if len(ellipsis) > 0 {
+		output = append(output, ellipsis)
 	}
 	keys := []int{}
 	for key := range closeTags {
@@ -241,7 +241,7 @@ func renderBlog(draft bool, start int) string {
 				content := entry["content"]
 				content = regexp.MustCompile(`\s\s`).ReplaceAllString(content, " ")
 				truncated := truncate(content, 250)
-				post = append(post, truncated + "\n")
+				post = append(post, truncated+"\n")
 				if truncated != content {
 					post = append(post, "<div class='more'><a href='"+location+"'>"+"Read more&hellip;"+"</a></div>\n")
 				}
