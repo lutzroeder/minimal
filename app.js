@@ -181,10 +181,12 @@ function renderBlog(draft, start) {
                 post.push("<div class='item'>");
                 post.push("<div class='date'>" + entry.date + "</div>\n");
                 post.push("<h1><a href='" + location + "'>" + entry.title + "</a></h1>\n");
+   				post.push("<div class='content'>")
                 var content = entry.content;
                 content = content.replace(/\s\s/g, " ");
                 var truncated = truncate(content, 250);
                 post.push(truncated + "\n");
+                post.push("</div>");
                 if (truncated != content) {
                     post.push("<div class='more'><a href='" + location + "'>" + "Read more&hellip;" + "</a></div>\n");
                 }

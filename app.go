@@ -24,7 +24,7 @@ var entityMap = strings.NewReplacer(
 	`&`, "&amp;", `<`, "&lt;", `>`, "&gt;", `"`, "&quot;", `'`, "&#39;", `/`, "&#x2F;", "`", "&#x60;", `=`, "&#x3D;",
 )
 
-func escapeHtml(text string) string {
+func escapeHTML(text string) string {
 	return entityMap.Replace(text)
 }
 
@@ -65,7 +65,7 @@ func mustache(template string, context map[string]interface{}, partials interfac
 				value = v
 			}
 		}
-		return escapeHtml(value)
+		return escapeHTML(value)
 	})
 	return template
 }
@@ -159,7 +159,7 @@ func truncate(text string, length int) string {
 		keys = append(keys, key)
 	}
 	sort.Sort(sort.IntSlice(keys))
-	for key := range keys {
+	for _, key := range keys {
 		if closeTag, ok := closeTags[key]; ok {
 			output = append(output, closeTag)
 		}
@@ -238,10 +238,12 @@ func renderBlog(draft bool, start int) string {
 				post = append(post, "<div class='item'>")
 				post = append(post, "<div class='date'>"+entry["date"]+"</div>\n")
 				post = append(post, "<h1><a href='"+location+"'>"+entry["title"]+"</a></h1>\n")
+				post = append(post, "<div class='content'>")
 				content := entry["content"]
 				content = regexp.MustCompile(`\s\s`).ReplaceAllString(content, " ")
 				truncated := truncate(content, 250)
 				post = append(post, truncated+"\n")
+				post = append(post, "</div>")
 				if truncated != content {
 					post = append(post, "<div class='more'><a href='"+location+"'>"+"Read more&hellip;"+"</a></div>\n")
 				}
@@ -297,7 +299,7 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 			}
 			output = append(output, "<updated>"+updated.UTC().Format("2006-01-02T15:04:05.999Z07:00")+"</updated>")
 			output = append(output, "<title type='text'>"+entry["title"]+"</title>")
-			output = append(output, "<content type='html'>"+escapeHtml(entry["content"])+"</content>")
+			output = append(output, "<content type='html'>"+escapeHTML(entry["content"])+"</content>")
 			output = append(output, "<link rel='alternate' type='text/html' href='"+url+"' title='"+entry["title"]+"' />")
 			output = append(output, "</entry>")
 		}
