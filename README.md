@@ -1,6 +1,6 @@
 # Minimal
 
-Minimal is a personal website and blog template for Node.js. It doesn't have **any** external dependencies and runs with less than 500 lines of JavaScript. Everything is minimal, easy to take appart, rewrite or port.
+Minimal is a personal website and blog template. Both the Node.js and Go runtime are supported. Minimal does not have external dependencies and less than 500 lines of code. Everything is minimal, easy to take appart, rewrite or port.
 
 ## Getting Started
 

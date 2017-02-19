@@ -25,25 +25,25 @@ a.icon:hover { color: #333333; text-decoration: none; }
 .profile .name { font-size: 32px; font-weight: bold; margin-left: -2px; }
 .profile .bio { font-size: 16px; color: #666666; line-height: 22px; margin-top: 4px; display: block; }
 .profile .portrait { border: 0; border-radius: 50%; width: 100px !important; height: 100px !important; float: right; margin-left: 20px; }
-.profile .toolbar { font-size: 14px; color: rgba(0, 0, 0, 0.44); padding: 33px 0 23px 0; vertical-align: center; line-height: 25px; height: 26px; }
+.profile .toolbar { font-size: 14px; color: #8f8f8f; padding: 33px 0 23px 0; vertical-align: center; line-height: 25px; height: 26px; }
 .profile .button { background-color: #ffffff; border: #d9d9d9 solid 1px; border-radius: 999em; color: #8f8f8f; font-size: 14px; margin: 0; padding: 9px 16px 9px 16px; letter-spacing: normal; cursor: pointer; outline: 0; }
 .profile .button:hover { border-color: #8f8f8f; color: #666666; }
 .navigation { box-sizing: border-box; max-width: 640px !important; margin: 0 auto 0 auto; padding: 0px 20px 0px 20px; }
 .navigation .tabbar { border-top: 1px solid rgba(0, 0, 0, .05)!important; display: block; flex-direction: row; text-align: left; margin: 0; padding: 15px 0 17px 0; list-style: none; list-style-image: none; font-size: 16px; }
 .navigation .tab { display: table-cell; text-align: left; letter-spacing: 0; padding-right: 20px; white-space: nowrap; }
-.navigation .tab a { color: rgba(0, 0, 0, 0.44); }
+.navigation .tab a { color: #8f8f8f; }
 .navigation .tab a:hover { color: #666666; }
 .navigation .tab a.active { color: #1a1a1a; }
 .summary { box-sizing: border-box; max-width: 640px !important; padding: 54px 20px 23px 20px; margin: 0 auto 0 auto; font-size: 16px; font-weight: 600; line-height: 15px; color: #333333; }
 .placeholder { box-sizing: border-box; max-width: 640px !important; padding: 45px 20px 30px 20px; margin: 0 auto 10px auto; }
-.item { box-sizing: border-box; max-width: 640px !important; padding: 15px 20px 30px 20px; margin: 0 auto 10px auto; border-radius: 3px; background-clip: border-box; border: 1px solid rgba(0, 0, 0, .09); box-shadow: 0 1px 4px 0 rgba(0, 0, 0, .04); color: #333333; background-color: #ffffff; }
-.item h1 { font-family: "Merriweather Sans", "Open Sans", "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Geneva, Verdana, sans-serif; font-weight: bold; font-size: 26px; line-height: 1.32; letter-spacing: -0.052em; margin: 0 0 8px -1.9375px; }
-.item p { font-family: "Merriweather", Georgia, Cambria, "Times New Roman", Times, serif; font-weight: 300; font-size: 16px; line-height: 1.69; word-break: break-word; word-wrap: break-word; margin: 8px 0 0 0; letter-spacing: -0.009em; }
+.item { box-sizing: border-box; max-width: 640px !important; padding: 15px 20px 22px 20px; margin: 0 auto 10px auto; border-radius: 3px; background-clip: border-box; border: 1px solid rgba(0, 0, 0, .09); box-shadow: 0 1px 4px 0 rgba(0, 0, 0, .04); color: #333333; background-color: #ffffff; }
+.item h1 { font-family: "Merriweather Sans", "Open Sans", "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Geneva, Verdana, sans-serif; font-weight: bold; font-size: 26px; line-height: 1.32; letter-spacing: -0.06em; margin: 0 0 8px -1.9375px; }
+.item p { font-family: "Merriweather", Georgia, Cambria, "Times New Roman", Times, serif; font-weight: 300; font-size: 16px; line-height: 1.69; word-break: break-word; word-wrap: break-word; margin: 8px 0 8px 0; letter-spacing: -0.009em; }
 .item p a {  background-size: 2px 2px; background-position: 0 19px; background-repeat: repeat-x; background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.6) 50%); }
 @media only screen and (min-device-pixel-ratio:2), only screen and (min-resolution:2dppx), only screen and (-webkit-min-device-pixel-ratio:2) {
 .item p a {  background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 25%, rgba(0, 0, 0, 0) 25%); }
 }
-.item .date { color: rgba(0, 0, 0, 0.44); float: right; margin-left: 10px; font-size: 12px; line-height: 16px; }
+.item .date { color: #8f8f8f; float: right; margin-left: 10px; font-size: 12px; line-height: 16px; }
 .item .logo { float: left; margin-top: 5px; margin-right: 20px; }
 .item .logo img { width: 160px; border-radius: 3px; background-clip: border-box; box-sizing: border-box; }
 .item .border img { border: 1px solid rgba(0, 0, 0, .09); box-shadow: 0 1px 4px 0 rgba(0, 0, 0, .04); }

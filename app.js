@@ -90,7 +90,7 @@ function truncate(text, length) {
             position++;
         }
         else {
-            var next = text.substring(index, length);
+            var next = text.substring(index, text.length);
             var skip = next.indexOf("<");
             if (skip == -1) {
                 skip = next.indexOf("&");
@@ -176,8 +176,8 @@ function renderBlog(draft, start) {
                 post.push("<h1><a href='" + location + "'>" + entry.title + "</a></h1>\n");
                 var content = entry.content;
                 content = content.replace(/\s\s/g, " ");
-                var truncated = truncate(content, 320);
-                post.push("<p>" + truncated + "</p>\n");
+                var truncated = truncate(content, 250);
+                post.push(truncated + "\n");
                 if (truncated != content) {
                     post.push("<div class='more'><a href='" + location + "'>" + "Read more&hellip;" + "</a></div>\n");
                 }

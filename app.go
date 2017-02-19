@@ -240,8 +240,8 @@ func renderBlog(draft bool, start int) string {
 				post = append(post, "<h1><a href='"+location+"'>"+entry["title"]+"</a></h1>\n")
 				content := entry["content"]
 				content = regexp.MustCompile(`\s\s`).ReplaceAllString(content, " ")
-				truncated := truncate(content, 320)
-				post = append(post, "<p>"+truncated+"</p>\n")
+				truncated := truncate(content, 250)
+				post = append(post, truncated + "\n")
 				if truncated != content {
 					post = append(post, "<div class='more'><a href='"+location+"'>"+"Read more&hellip;"+"</a></div>\n")
 				}

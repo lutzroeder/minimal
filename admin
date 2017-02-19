@@ -7,13 +7,18 @@ source ./admin.cfg
 server_install() {
     server_uninstall
 
-    echo "$(tput bold)Install Node.js$(tput sgr0)"
-    sudo apt-get install --yes nodejs
+    if [ ${runtime} = "go" ]; then 
+        echo "$(tput bold)apt-get install golang$(tput sgr0)"
+        sudo apt-get install --yes golang
+    else 
+        echo "$(tput bold)apt-get install nodejs$(tput sgr0)"
+        sudo apt-get install --yes nodejs
+    fi
 
-    echo "$(tput bold)Install NGINX$(tput sgr0)"
+    echo "$(tput bold)apt-get install nginx$(tput sgr0)"
     sudo apt-get install --yes nginx
 
-    echo "$(tput bold)Configure NGINX reverse proxy$(tput sgr0)"
+    echo "$(tput bold)configure reverse proxy$(tput sgr0)"
     sudo systemctl stop nginx.service
 cat << EOF > "${site}.conf"
 server {
@@ -64,13 +69,18 @@ EOF
     sudo systemctl start nginx.service
     sudo systemctl status nginx.service --no-pager --lines=1000 --full
 
-    echo "$(tput bold)Configure ${site}.service$(tput sgr0)"
+    echo "$(tput bold)configure ${site}.service$(tput sgr0)"
+    if [ ${runtime} = "go" ]; then 
+        command="$(which go) run $(pwd)/app.go"
+    else 
+        command="$(which node) $(pwd)/app.js"
+    fi
 cat > "${site}.service" << EOF
 [Unit]
 Description=${site}.service
 [Service]
 WorkingDirectory=$(pwd)
-ExecStart=/usr/bin/node $(pwd)/app.js
+ExecStart=${command}
 Environment=NODE_ENV=production
 Restart=always
 RestartSec=10
@@ -85,7 +95,7 @@ EOF
     cat "${site}.service"
     sudo cp "${site}.service" "/etc/systemd/system/${site}.service"
     rm "${site}.service"
-    echo "$(tput bold)Enable ${site}.service$(tput sgr0)"
+    echo "$(tput bold)enable ${site}.service$(tput sgr0)"
     sudo systemctl enable ${site}.service
 }
 
@@ -93,13 +103,13 @@ server_uninstall() {
     server_stop
 
     if [ -f "/etc/systemd/system/${site}.service" ] && [ $(systemctl is-enabled ${site}.service) = "enabled" ]; then
-        echo "$(tput bold)Disable ${site}.service$(tput sgr0)"
+        echo "$(tput bold)disable ${site}.service$(tput sgr0)"
         sudo systemctl disable "${site}.service"
         sudo rm "/etc/systemd/system/${site}.service"
     fi
 
     if [ -f "/etc/nginx/sites-available/${site}.conf" ]; then
-        echo "$(tput bold)Configure NGINX reverse proxy$(tput sgr0)"
+        echo "$(tput bold)configure reverse proxy$(tput sgr0)"
         sudo systemctl stop nginx.service
         sudo rm "/etc/nginx/sites-enabled/${site}.conf"
         sudo rm "/etc/nginx/sites-available/${site}.conf"
@@ -110,35 +120,35 @@ server_uninstall() {
 }
 
 server_cert() {
-    echo "$(tput bold)Install Let's Encrypt$(tput sgr0)"
+    echo "$(tput bold)apt-get install letsencrypt$(tput sgr0)"
     sudo apt-get install --yes letsencrypt # https://letsencrypt.org/getting-started
 
     if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
-        echo "$(tput bold)Re-new Let's Encrypt certificate$(tput sgr0)"
+        echo "$(tput bold)renew certificate$(tput sgr0)"
         sudo letsencrypt renew
     else
-        echo "$(tput bold)Create Let's Encrypt certificate$(tput sgr0)"
+        echo "$(tput bold)create certificate$(tput sgr0)"
         mkdir -p .well-known/acme-challenge
         sudo letsencrypt certonly --webroot -w $(pwd) -d ${domain} -d www.${domain} --agree-tos --email ${mail}
         rm -R .well-known
         rm letsencrypt.log
     fi
 
-    echo "$(tput bold)Reload NGINX$(tput sgr0)"
+    echo "$(tput bold)reload nginx.service$(tput sgr0)"
     sudo systemctl reload nginx.service
     sudo systemctl status nginx.service --no-pager --lines=1000 --full
 }
 
 server_start() {
-    echo "$(tput bold)Start ${site}.service$(tput sgr0)"
+    echo "$(tput bold)start ${site}.service$(tput sgr0)"
     sudo systemctl start ${site}.service
-    sleep 1
+    sleep 2
     sudo systemctl status ${site}.service  --no-pager --lines=1000 --full
 }
 
 server_stop() {
     if [ $(systemctl is-active "${site}.service") = "active" ]; then
-        echo "$(tput bold)Stop ${site}.service$(tput sgr0)"
+        echo "$(tput bold)stop ${site}.service$(tput sgr0)"
         sudo systemctl stop "${site}.service"
         sudo systemctl status ${site}.service  --no-pager --lines=1000 --full
     fi
@@ -158,12 +168,19 @@ server_pull() {
 
 server_update() {
     server_stop
+    server_unistall
     server_pull
+    source ./admin.cfg
+    server_install
     server_start
 }
 
 client_start() {
-    sleep 0.5 && git web--browse http://localhost:8080 & node app.js
+    if [ ${runtime} = "go" ]; then 
+        sleep 1 && git web--browse http://localhost:8080 & go run app.go
+    else 
+        sleep 0.5 && git web--browse http://localhost:8080 & node app.js
+    fi
 }
 
 client_status() {
