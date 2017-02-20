@@ -35,8 +35,8 @@ function mustache(template, context, partials) {
     return template;
 }
 
-function localhost(request) {
-    var domain = request.headers.host ? request.headers.host.split(":").shift() : "";
+function localhost(host) {
+    var domain = host ? host.split(":").shift() : "";
     return (domain === "localhost" || domain === "127.0.0.1");
 }
 
@@ -223,7 +223,7 @@ function atomHandler(request, response) {
     output.push("<link rel='alternate' type='text/html' href='" + host + "/' />");
     output.push("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />");
     posts().forEach(function (file) {
-        var draft = localhost(request);
+        var draft = localhost(request.headers.host);
         var entry = loadPost("blog/" + file);
         if (entry && (draft || entry.state === "post")) {
             var url = host + "/blog/" + path.basename(file, ".html");
@@ -295,7 +295,7 @@ function postHandler(request, response) {
 function blogHandler(request, response) {
     var query = url.parse(request.url, true).query;
     if (query.id) {
-        var data = renderBlog(localhost(request), Number(query.id));
+        var data = renderBlog(localhost(request.headers.host), Number(query.id));
         response.writeHead(200, { "Content-Type" : "text/html", "Content-Length" : Buffer.byteLength(data) });
         response.write(data);
         response.end();
@@ -382,7 +382,7 @@ function defaultHandler(request, response) {
                         return scheme(request) + "://" + request.headers.host + "/blog/atom.xml";
                     };
                     context.blog = function() {
-                        return renderBlog(localhost(request), 0);
+                        return renderBlog(localhost(request.headers.host), 0);
                     };
                     context.links = function() {
                         return configuration.links.map(function (link) {

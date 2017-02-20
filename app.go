@@ -78,8 +78,8 @@ func mustReadFile(path string) []byte {
 	return file
 }
 
-func localhost(request *http.Request) bool {
-	domain := strings.Split(request.Host, ":")[0]
+func localhost(host string) bool {
+	domain := strings.Split(host, ":")[0]
 	return domain == "localhost" || domain == "127.0.0.1"
 }
 
@@ -282,7 +282,7 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 	output = append(output, "<link rel='self' type='application/atom+xml' href='"+host+"/blog/atom.xml' />")
 	files := posts()
 	for _, file := range files {
-		draft := localhost(request)
+		draft := localhost(request.Host)
 		entry := loadPost("blog/" + file)
 		if entry != nil && (draft || entry["state"] == "post") {
 			url := host + "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
@@ -353,7 +353,7 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 func blogHandler(response http.ResponseWriter, request *http.Request) {
 	id := request.URL.Query().Get("id")
 	if start, e := strconv.Atoi(id); e == nil {
-		data := renderBlog(localhost(request), start)
+		data := renderBlog(localhost(request.Host), start)
 		response.Header().Set("Content-Type", "text/html")
 		length, _ := io.WriteString(response, data)
 		response.Header().Set("Content-Length", strconv.Itoa(length))
@@ -433,7 +433,7 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 					return strings.Join(list, "\n")
 				}
 				context["blog"] = func() string {
-					return renderBlog(localhost(request), 0)
+					return renderBlog(localhost(request.Host), 0)
 				}
 				data := mustache(string(template), context, func(name string) string {
 					return string(mustReadFile(path.Join("./", name)))
