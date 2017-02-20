@@ -84,9 +84,9 @@ function truncate(text, length) {
         }
         else if (text[index] == "&") {
             index++;
-            var entity = /(\w+;)/g.match(text.substring(index));
+            var entity = text.substring(index).match(/(#?[A-Za-z0-9]+;)/);
             if (entity) {
-                index += entity.end();
+                index += match[0].length;
             }
             count++;
         }
