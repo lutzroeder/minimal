@@ -217,7 +217,7 @@ client_console() {
 
 description() {
     echo;
-    echo "  This script automates common tasks to update or run this website."
+    echo "  This script automates common tasks to run this website."
     echo "  It can be configured via $(tput smul)admin.cfg$(tput sgr0) and provides two sets of commmands,"
     echo "  one for local development and another for running the website on an"
     echo "  actual Linux server. Your computer is considered a server if the "
@@ -266,7 +266,7 @@ client() {
             description;
             echo "Usage: $(tput bold)$(basename "$0")$(tput sgr0) <client-command>"
             echo
-            echo "  $(tput bold)start$(tput sgr0)      Start $(tput smul)node app.js$(tput rmul) locally and open web browser"
+            echo "  $(tput bold)start$(tput sgr0)      Start web server locally and open web browser"
             echo "  $(tput bold)push$(tput sgr0)       Amend last commit or add new commit, then push changes"
             echo "  $(tput bold)update$(tput sgr0)     Run push command and update server"
             echo "  $(tput bold)status$(tput sgr0)     Show server log"
