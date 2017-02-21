@@ -241,7 +241,7 @@ function rootHandler(request, response) {
 
 function atomHandler(request, response) {
     var host = scheme(request) + "://" + request.headers.host;
-    var data = cache(request.headers.host, host + "/blog/atom.xml", function () {
+    var data = cache(request.headers.host, "atom:" + host + "/blog/atom.xml", function () {
         var output = [];
         output.push("<?xml version='1.0' encoding='UTF-8'?>");
         output.push("<feed xmlns='http://www.w3.org/2005/Atom'>");
@@ -297,7 +297,7 @@ var mimeTypeMap = {
 function postHandler(request, response) {
     var pathname = path.normalize(url.parse(request.url, true).pathname.toLowerCase());
     var file = pathname.replace(/^\/?/, "");
-    var data = cache(request.headers.host, file, function() {
+    var data = cache(request.headers.host, "post:" + file, function() {
         var entry = loadPost(file + ".html");
         if (entry) {
             var date = new Date(entry.date);
@@ -337,7 +337,7 @@ function blogHandler(request, response) {
     var query = url.parse(request.url, true).query;
     if (query.id) {
         var key = "/blog?id=" + query.id;
-        var data = cache(request.headers.host, key, function() {
+        var data = cache(request.headers.host, "blog:" + key, function() {
             return renderBlog(draft(request.headers.host), Number(query.id));
         });
         response.writeHead(200, { 
@@ -351,7 +351,7 @@ function blogHandler(request, response) {
     }
 }
 
-function letsEncryptHandler(request, response) {
+function certHandler(request, response) {
     var pathname = path.normalize(url.parse(request.url, true).pathname);
     var file = pathname.replace(/^\/?/, "");
     if (fs.existsSync(file) && fs.statSync(file).isFile) {
@@ -396,7 +396,7 @@ function defaultHandler(request, response) {
                     "Cache-Control": "private, max-age=0", "Expires": -1 
                 });
                 if (request.method !== "HEAD") {
-                    var buffer = cache(request.headers.host, file, function() {
+                    var buffer = cache(request.headers.host, "default:" + file, function() {
                         var buffer = new Buffer(stat.size)
                         try {
                             var descriptor = fs.openSync(file, "r");
@@ -434,7 +434,7 @@ function defaultHandler(request, response) {
                 response.end();
             }
             else {
-                var data = cache(request.headers.host, file, function() {
+                var data = cache(request.headers.host, "default:" + file, function() {
                     var template = fs.readFileSync(file, "utf-8");
                     var context = Object.assign({ }, configuration);
                     context.feed = context.feed ? context.feed : function() {
@@ -537,11 +537,10 @@ router.get("/post.css", rootHandler);
 router.get("/post.html", rootHandler);
 router.get("/site.css", rootHandler);
 router.get("/stream.html", rootHandler);
-router.get("/web.config", rootHandler);
-router.get("/blog/atom.xml", atomHandler); // ATOM feed 
+router.get("/blog/atom.xml", atomHandler); // ATOM feed
 router.get("/blog/*", postHandler); // Render specific HTML blog post
 router.get("/blog", blogHandler); // Stream blog posts
-router.get("/.well-known/acme-challenge/*", letsEncryptHandler); // Handle "Let's Encrypt" challenge
+router.get("/.well-known/acme-challenge/*", certHandler); // "Let's Encrypt" challenge
 router.get("/*", defaultHandler);
 router.default(rootHandler);
 

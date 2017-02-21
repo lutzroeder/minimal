@@ -136,7 +136,7 @@ type pathInfo struct {
 }
 
 func pathStat(host string, path string) pathInfo {
-	return cache(host, "statStat:"+path, func() interface{} {
+	return cache(host, "stat:"+path, func() interface{} {
 		stat := pathInfo{false, false, 0}
 		fileInfo, error := os.Stat(path)
 		stat.exists = !os.IsNotExist(error)
@@ -325,7 +325,7 @@ func rootHandler(response http.ResponseWriter, request *http.Request) {
 
 func atomHandler(response http.ResponseWriter, request *http.Request) {
 	host := scheme(request) + "://" + request.Host
-	data := cacheString(request.Host, host+"/blog/atom.xml", func() string {
+	data := cacheString(request.Host, "atom:"+host+"/blog/atom.xml", func() string {
 		output := []string{}
 		output = append(output, "<?xml version='1.0' encoding='UTF-8'?>")
 		output = append(output, "<feed xmlns='http://www.w3.org/2005/Atom'>")
@@ -372,7 +372,7 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 func postHandler(response http.ResponseWriter, request *http.Request) {
 	file := strings.ToLower(path.Clean(request.URL.Path))
 	file = strings.TrimPrefix(file, "/")
-	data := cacheString(request.Host, file, func() string {
+	data := cacheString(request.Host, "post:" + file, func() string {
 		entry := loadPost(file + ".html")
 		if entry != nil {
 			date, _ := time.Parse("2006-01-02 15:04:05 MST", entry["date"])
@@ -414,7 +414,7 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 func blogHandler(response http.ResponseWriter, request *http.Request) {
 	id := request.URL.Query().Get("id")
 	if start, e := strconv.Atoi(id); e == nil {
-		data := cache(request.Host, "/blog?id="+id, func() interface{} {
+		data := cache(request.Host, "blog:/blog?id="+id, func() interface{} {
 			return renderBlog(draft(request.Host), start)
 		})
 		response.Header().Set("Content-Type", "text/html")
@@ -448,7 +448,7 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 			} else if stat.isDir {
 				http.Redirect(response, request, "/", http.StatusFound)
 			} else {
-				data := cacheBuffer(request.Host, file, func() []byte {
+				data := cacheBuffer(request.Host, "default:" + file, func() []byte {
 					return mustReadFile("./" + file)
 				})
 				if request.Method != "HEAD" {
@@ -469,7 +469,7 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 			} else if stat.isDir || extension != ".html" {
 				http.Redirect(response, request, pathname+"/", http.StatusFound)
 			} else {
-				data := cacheString(request.Host, file, func() string {
+				data := cacheString(request.Host, "default:" + file, func() string {
 					template := mustReadFile(path.Join("./", file))
 					context := make(map[string]interface{})
 					for key, value := range configuration {
@@ -516,7 +516,7 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 	}
 }
 
-func letsEncryptHandler(response http.ResponseWriter, request *http.Request) {
+func certHandler(response http.ResponseWriter, request *http.Request) {
 	file := path.Clean(request.URL.Path)
 	file = strings.TrimLeft(file, "/")
 	if stat, e := os.Stat(file); !os.IsNotExist(e) && !stat.IsDir() {
@@ -557,11 +557,10 @@ func main() {
 	http.HandleFunc("/post.html", rootHandler)
 	http.HandleFunc("/site.css", rootHandler)
 	http.HandleFunc("/stream.html", rootHandler)
-	http.HandleFunc("/web.config", rootHandler)
-	http.HandleFunc("/blog/atom.xml", atomHandler)
-	http.HandleFunc("/blog/", postHandler)
-	http.HandleFunc("/blog", blogHandler)
-	http.HandleFunc("/.well-known/acme-challenge/", letsEncryptHandler)
+	http.HandleFunc("/blog/atom.xml", atomHandler) // ATOM feed
+	http.HandleFunc("/blog/", postHandler) // Render specific HTML blog post
+	http.HandleFunc("/blog", blogHandler) // Stream blog posts
+	http.HandleFunc("/.well-known/acme-challenge/", certHandler) // "Let's Encrypt" challenge
 	http.HandleFunc("/", defaultHandler)
 	port := 8080
 	fmt.Println("http://localhost:" + strconv.Itoa(port))
