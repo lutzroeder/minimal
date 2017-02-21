@@ -40,6 +40,14 @@ function localhost(host) {
     return (domain === "localhost" || domain === "127.0.0.1");
 }
 
+function draft(host) {
+    return localhost(host);
+}
+
+function cache(host) {
+    return !localhost(host) || false;
+}
+
 function scheme(request) {
     if (request.headers["x-forwarded-proto"]) {
         return request.headers["x-forwarded-proto"];
@@ -223,9 +231,8 @@ function atomHandler(request, response) {
     output.push("<link rel='alternate' type='text/html' href='" + host + "/' />");
     output.push("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />");
     posts().forEach(function (file) {
-        var draft = localhost(request.headers.host);
         var entry = loadPost("blog/" + file);
-        if (entry && (draft || entry.state === "post")) {
+        if (entry && (draft(request.headers.host) || entry.state === "post")) {
             var url = host + "/blog/" + path.basename(file, ".html");
             output.push("<entry>");
             output.push("<id>" + url + "</id>");
@@ -295,7 +302,7 @@ function postHandler(request, response) {
 function blogHandler(request, response) {
     var query = url.parse(request.url, true).query;
     if (query.id) {
-        var data = renderBlog(localhost(request.headers.host), Number(query.id));
+        var data = renderBlog(draft(request.headers.host), Number(query.id));
         response.writeHead(200, { "Content-Type" : "text/html", "Content-Length" : Buffer.byteLength(data) });
         response.write(data);
         response.end();
@@ -382,7 +389,7 @@ function defaultHandler(request, response) {
                         return scheme(request) + "://" + request.headers.host + "/blog/atom.xml";
                     };
                     context.blog = function() {
-                        return renderBlog(localhost(request.headers.host), 0);
+                        return renderBlog(draft(request.headers.host), 0);
                     };
                     context.links = function() {
                         return configuration.links.map(function (link) {

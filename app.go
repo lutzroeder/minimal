@@ -83,6 +83,14 @@ func localhost(host string) bool {
 	return domain == "localhost" || domain == "127.0.0.1"
 }
 
+func draft(host string) bool {
+	return localhost(host)
+}
+
+func cache(host string) bool {
+	return !localhost(host) || false
+}
+
 func scheme(request *http.Request) string {
 	if scheme := request.Header.Get("x-forwarded-proto"); len(scheme) > 0 {
 		return scheme
@@ -116,7 +124,7 @@ func truncate(text string, length int) string {
 					index += 1 + len(match[0])
 					closeTag := "</" + tag + ">"
 					end := strings.Index(text[index:], closeTag)
-					if end != 1 {
+					if end != -1 {
 						closeTags[index+end] = closeTag
 					}
 				} else {
@@ -282,9 +290,8 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 	output = append(output, "<link rel='self' type='application/atom+xml' href='"+host+"/blog/atom.xml' />")
 	files := posts()
 	for _, file := range files {
-		draft := localhost(request.Host)
 		entry := loadPost("blog/" + file)
-		if entry != nil && (draft || entry["state"] == "post") {
+		if entry != nil && (draft(request.Host) || entry["state"] == "post") {
 			url := host + "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
 			output = append(output, "<entry>")
 			output = append(output, "<id>"+url+"</id>")
@@ -353,7 +360,7 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 func blogHandler(response http.ResponseWriter, request *http.Request) {
 	id := request.URL.Query().Get("id")
 	if start, e := strconv.Atoi(id); e == nil {
-		data := renderBlog(localhost(request.Host), start)
+		data := renderBlog(draft(request.Host), start)
 		response.Header().Set("Content-Type", "text/html")
 		length, _ := io.WriteString(response, data)
 		response.Header().Set("Content-Length", strconv.Itoa(length))
@@ -433,7 +440,7 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 					return strings.Join(list, "\n")
 				}
 				context["blog"] = func() string {
-					return renderBlog(localhost(request.Host), 0)
+					return renderBlog(draft(request.Host), 0)
 				}
 				data := mustache(string(template), context, func(name string) string {
 					return string(mustReadFile(path.Join("./", name)))
