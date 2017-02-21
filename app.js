@@ -35,6 +35,16 @@ function mustache(template, context, partials) {
     return template;
 }
 
+function scheme(request) {
+    if (request.headers["x-forwarded-proto"]) {
+        return request.headers["x-forwarded-proto"];
+    }
+    if (request.headers["x-forwarded-protocol"]) {
+        return request.headers["x-forwarded-protocol"];
+    }
+    return "http";
+}
+
 function localhost(host) {
     var domain = host ? host.split(":").shift() : "";
     return (domain === "localhost" || domain === "127.0.0.1");
@@ -44,18 +54,29 @@ function draft(host) {
     return localhost(host);
 }
 
-function cache(host) {
-    return !localhost(host) || false;
+var cacheData = {};
+
+function cache(host, key, callback) {
+    if (!draft(host)) {
+        if (!(key in cacheData)) {
+            cacheData[key] = callback();            
+        }
+        return cacheData[key];
+    }
+    return callback();
 }
 
-function scheme(request) {
-    if (request.headers["x-forwarded-proto"]) {
-        return request.headers["x-forwarded-proto"];
-    }
-    if (request.headers["x-forwarded-protocol"]) {
-        return request.headers["x-forwarded-protocol"];
-    }
-    return "http";
+function pathStat(host, path) {
+    return cache(host, "stat:" + path, function () {
+        var stat = { exists: false, isDirectory: false,  size: 0 };
+        stat.exists = fs.existsSync(path);
+        if (stat.exists) {
+            var statData = fs.statSync(path);
+            stat.isDirectory = statData.isDirectory();
+            stat.size = statData.size;
+        }
+        return stat;
+    });
 }
 
 function truncate(text, length) {
@@ -220,37 +241,42 @@ function rootHandler(request, response) {
 
 function atomHandler(request, response) {
     var host = scheme(request) + "://" + request.headers.host;
-    var output = [];
-    output.push("<?xml version='1.0' encoding='UTF-8'?>");
-    output.push("<feed xmlns='http://www.w3.org/2005/Atom'>");
-    output.push("<title>" + configuration.name + "</title>");
-    output.push("<id>" + host + "/</id>");
-    output.push("<icon>" + host + "/favicon.ico</icon>");
-    output.push("<updated>" + new Date().toISOString() + "</updated>");
-    output.push("<author><name>" + configuration.name + "</name></author>");
-    output.push("<link rel='alternate' type='text/html' href='" + host + "/' />");
-    output.push("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />");
-    posts().forEach(function (file) {
-        var entry = loadPost("blog/" + file);
-        if (entry && (draft(request.headers.host) || entry.state === "post")) {
-            var url = host + "/blog/" + path.basename(file, ".html");
-            output.push("<entry>");
-            output.push("<id>" + url + "</id>");
-            if (entry.author && entry.author !== configuration.name) {
-                output.push("<author><name>" + entry.author + "</name></author>");
+    var data = cache(request.headers.host, host + "/blog/atom.xml", function () {
+        var output = [];
+        output.push("<?xml version='1.0' encoding='UTF-8'?>");
+        output.push("<feed xmlns='http://www.w3.org/2005/Atom'>");
+        output.push("<title>" + configuration.name + "</title>");
+        output.push("<id>" + host + "/</id>");
+        output.push("<icon>" + host + "/favicon.ico</icon>");
+        output.push("<updated>" + new Date().toISOString() + "</updated>");
+        output.push("<author><name>" + configuration.name + "</name></author>");
+        output.push("<link rel='alternate' type='text/html' href='" + host + "/' />");
+        output.push("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />");
+        posts().forEach(function (file) {
+            var entry = loadPost("blog/" + file);
+            if (entry && (draft(request.headers.host) || entry.state === "post")) {
+                var url = host + "/blog/" + path.basename(file, ".html");
+                output.push("<entry>");
+                output.push("<id>" + url + "</id>");
+                if (entry.author && entry.author !== configuration.name) {
+                    output.push("<author><name>" + entry.author + "</name></author>");
+                }
+                var date = new Date(entry.date).toISOString();
+                output.push("<published>" + date + "</published>");
+                output.push("<updated>" + (entry.updated ? (new Date(entry.updated).toISOString()) : date) + "</updated>");
+                output.push("<title type='text'>" + entry.title + "</title>");
+                output.push("<content type='html'>" + escapeHtml(entry.content) + "</content>");
+                output.push("<link rel='alternate' type='text/html' href='" + url + "' title='" + entry.title + "' />");
+                output.push("</entry>");
             }
-            var date = new Date(entry.date).toISOString();
-            output.push("<published>" + date + "</published>");
-            output.push("<updated>" + (entry.updated ? (new Date(entry.updated).toISOString()) : date) + "</updated>");
-            output.push("<title type='text'>" + entry.title + "</title>");
-            output.push("<content type='html'>" + escapeHtml(entry.content) + "</content>");
-            output.push("<link rel='alternate' type='text/html' href='" + url + "' title='" + entry.title + "' />");
-            output.push("</entry>");
-        }
+        });
+        output.push("</feed>");
+        return output.join("\n");
     });
-    output.push("</feed>");
-    var data = output.join("\n");
-    response.writeHead(200, { "Content-Type" : "application/atom+xml", "Content-Length" : Buffer.byteLength(data) });
+    response.writeHead(200, { 
+        "Content-Type": "application/atom+xml", 
+        "Content-Length": Buffer.byteLength(data)
+    });
     if (request.method !== "HEAD") {
         response.write(data);
     }
@@ -271,17 +297,25 @@ var mimeTypeMap = {
 function postHandler(request, response) {
     var pathname = path.normalize(url.parse(request.url, true).pathname.toLowerCase());
     var file = pathname.replace(/^\/?/, "");
-    var entry = loadPost(file + ".html");
-    if (entry) {
-        var date = new Date(entry.date);
-        entry.date = date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
-        entry.author = entry.author || configuration.name;
-        var context = Object.assign(configuration, entry);
-        var template = fs.readFileSync("post.html", "utf-8");
-        var data = mustache(template, context, function(name) {
-            return fs.readFileSync(path.join("./", name), "utf-8");
+    var data = cache(request.headers.host, file, function() {
+        var entry = loadPost(file + ".html");
+        if (entry) {
+            var date = new Date(entry.date);
+            entry.date = date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
+            entry.author = entry.author || configuration.name;
+            var context = Object.assign(configuration, entry);
+            var template = fs.readFileSync("post.html", "utf-8");
+            return mustache(template, context, function(name) {
+                return fs.readFileSync(path.join("./", name), "utf-8");
+            });
+        }
+        return null;
+    });
+    if (data) {
+        response.writeHead(200, { 
+            "Content-Type": "text/html", 
+            "Content-Length": Buffer.byteLength(data)
         });
-        response.writeHead(200, { "Content-Type" : "text/html", "Content-Length" : Buffer.byteLength(data) });
         if (request.method !== "HEAD") {
             response.write(data);
         }
@@ -302,8 +336,13 @@ function postHandler(request, response) {
 function blogHandler(request, response) {
     var query = url.parse(request.url, true).query;
     if (query.id) {
-        var data = renderBlog(draft(request.headers.host), Number(query.id));
-        response.writeHead(200, { "Content-Type" : "text/html", "Content-Length" : Buffer.byteLength(data) });
+        var key = "/blog?id=" + query.id;
+        var data = cache(request.headers.host, key, function() {
+            return renderBlog(draft(request.headers.host), Number(query.id));
+        });
+        response.writeHead(200, { 
+            "Content-Type": "text/html",
+            "Content-Length": Buffer.byteLength(data)});
         response.write(data);
         response.end();
     }
@@ -317,7 +356,9 @@ function letsEncryptHandler(request, response) {
     var file = pathname.replace(/^\/?/, "");
     if (fs.existsSync(file) && fs.statSync(file).isFile) {
         var data = fs.readFileSync(file, "utf-8");
-        response.writeHead(200, { "Content-Type" : "text/plain; charset=utf-8", "Content-Length" : Buffer.byteLength(data) });
+        response.writeHead(200, { 
+            "Content-Type": "text/plain; charset=utf-8", 
+            "Content-Length": Buffer.byteLength(data) });
         response.write(data);
         response.end();
     } 
@@ -337,52 +378,63 @@ function defaultHandler(request, response) {
         var file = (pathname.endsWith("/") ? path.join(pathname, "index.html") : pathname).replace(/^\/?/, "");
         var extension = path.extname(file);
         var contentType = mimeTypeMap[extension];
+        var stat = pathStat(request.headers.host, file);
         if (contentType) {
             // Handle binary files
-            fs.stat(file, function (error, stats) {
-                if (error) {
-                    response.writeHead(404, { "Content-Type": contentType });
-                    response.end();
-                }
-                else if (stats.isDirectory()) {
-                    response.writeHead(302, { "Location": pathname + "/" });
-                    response.end();
-                }
-                else {
-                    var stream = fs.createReadStream(file);
-                    stream.on("error", function () {
-                        response.writeHead(404, { "Content-Type": contentType });
-                        response.end();
-                    });
-                    stream.on("open", function () {
-                        response.writeHead(200, {  "Content-Type": contentType, "Content-Length": stats.size, "Cache-Control": "private, max-age=0", "Expires": -1 });
-                        if (request.method === "HEAD") {
-                            response.end();
+            if (!stat.exists) {
+                response.writeHead(404, { "Content-Type": contentType });
+                response.end();
+            }
+            else if (stat.isDirectory) {
+                response.writeHead(302, { "Location": pathname + "/" });
+                response.end();
+            } 
+            else {
+                response.writeHead(200, {
+                    "Content-Type": contentType,
+                    "Content-Length": stat.size,
+                    "Cache-Control": "private, max-age=0", "Expires": -1 
+                });
+                if (request.method !== "HEAD") {
+                    var buffer = cache(request.headers.host, file, function() {
+                        var buffer = new Buffer(stat.size)
+                        try {
+                            var descriptor = fs.openSync(file, "r");
+                            if (fs.readSync(descriptor, buffer, 0, buffer.length, 0) !== buffer.length) {
+                                buffer = null;
+                            }
+                            fs.closeSync(descriptor);
                         }
-                        else {
-                            stream.pipe(response);
+                        catch (error) {
+                            console.log(error);
+                            buffer = null;
                         }
+                        return buffer;
                     });
+                    if (buffer) {
+                        response.write(buffer, "binary");
+                    }
                 }
-            });
+                response.end();
+            }
         }
         else {
             // Handle HTML files
-            fs.stat(file, function (error, stats) {
-                if (error) {
-                    if (file !== "index.html") {
-                        response.writeHead(302, { "Location": path.dirname(pathname) });
-                        response.end();
-                    }
-                    else {
-                        rootHandler(request, response);
-                    }
-                }
-                else if (stats.isDirectory() || extension != ".html") {
-                    response.writeHead(302, { "Location": pathname + "/" });
+            if (!stat.exists) {
+                if (file !== "index.html") {
+                    response.writeHead(302, { "Location": path.dirname(pathname) });
                     response.end();
                 }
                 else {
+                    rootHandler(request, response);
+                }
+            }
+            else if (stat.isDirectory || extension != ".html") {
+                response.writeHead(302, { "Location": pathname + "/" });
+                response.end();
+            }
+            else {
+                var data = cache(request.headers.host, file, function() {
                     var template = fs.readFileSync(file, "utf-8");
                     var context = Object.assign({ }, configuration);
                     context.feed = context.feed ? context.feed : function() {
@@ -401,16 +453,19 @@ function defaultHandler(request, response) {
                             return "<li class='tab'><a href='" + page.url + "'>" + page.name + "</a></li>";
                         }).join("\n");
                     };
-                    var data = mustache(template, context, function(name) {
+                    return mustache(template, context, function(name) {
                         return fs.readFileSync(path.join("./", name), "utf-8");
                     });
-                    response.writeHead(200, { "Content-Type" : "text/html", "Content-Length" : Buffer.byteLength(data) });
-                    if (request.method !== "HEAD") {
-                        response.write(data);
-                    }
-                    response.end();
+                })
+                response.writeHead(200, { 
+                    "Content-Type" : "text/html", 
+                    "Content-Length" : Buffer.byteLength(data)
+                });
+                if (request.method !== "HEAD") {
+                    response.write(data);
                 }
-            });
+                response.end();
+            }
         }
     }
 }
@@ -448,7 +503,8 @@ Router.prototype.handle = function (request, response) {
                 if (handler) {
                     try {
                         handler(request, response);
-                    } catch (error) {
+                    }
+                    catch (error) {
                         console.log(error);
                     }
                     return;

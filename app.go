@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -78,6 +79,16 @@ func mustReadFile(path string) []byte {
 	return file
 }
 
+func scheme(request *http.Request) string {
+	if scheme := request.Header.Get("x-forwarded-proto"); len(scheme) > 0 {
+		return scheme
+	}
+	if scheme := request.Header.Get("x-forwarded-protocol"); len(scheme) > 0 {
+		return scheme
+	}
+	return "http"
+}
+
 func localhost(host string) bool {
 	domain := strings.Split(host, ":")[0]
 	return domain == "localhost" || domain == "127.0.0.1"
@@ -87,18 +98,54 @@ func draft(host string) bool {
 	return localhost(host)
 }
 
-func cache(host string) bool {
-	return !localhost(host) || false
+var cacheData = make(map[string]interface{})
+var cacheMutex = &sync.Mutex{}
+
+func cache(host string, key string, callback func() interface{}) interface{} {
+	if !draft(host) {
+		cacheMutex.Lock()
+		value, ok := cacheData[key]
+		cacheMutex.Unlock()
+		if !ok {
+			value = callback()
+			cacheMutex.Lock()
+			cacheData[key] = value
+			cacheMutex.Unlock()
+		}
+		return value
+	}
+	return callback()
 }
 
-func scheme(request *http.Request) string {
-	if scheme := request.Header.Get("x-forwarded-proto"); len(scheme) > 0 {
-		return scheme
-	}
-	if scheme := request.Header.Get("x-forwarded-protocol"); len(scheme) > 0 {
-		return scheme
-	}
-	return "http"
+func cacheString(host string, key string, callback func() string) string {
+	return cache(host, key, func() interface{} {
+		return callback()
+	}).(string)
+}
+
+func cacheBuffer(host string, key string, callback func() []byte) []byte {
+	return cache(host, key, func() interface{} {
+		return callback()
+	}).([]byte)
+}
+
+type pathInfo struct {
+	exists bool
+	isDir  bool
+	size   int64
+}
+
+func pathStat(host string, path string) pathInfo {
+	return cache(host, "statStat:"+path, func() interface{} {
+		stat := pathInfo{false, false, 0}
+		fileInfo, error := os.Stat(path)
+		stat.exists = !os.IsNotExist(error)
+		if error == nil {
+			stat.isDir = fileInfo.IsDir()
+			stat.size = fileInfo.Size()
+		}
+		return stat
+	}).(pathInfo)
 }
 
 var tagRegexp = regexp.MustCompile(`(\w+)[^>]*>`)
@@ -278,41 +325,43 @@ func rootHandler(response http.ResponseWriter, request *http.Request) {
 
 func atomHandler(response http.ResponseWriter, request *http.Request) {
 	host := scheme(request) + "://" + request.Host
-	output := []string{}
-	output = append(output, "<?xml version='1.0' encoding='UTF-8'?>")
-	output = append(output, "<feed xmlns='http://www.w3.org/2005/Atom'>")
-	output = append(output, "<title>"+configuration["name"].(string)+"</title>")
-	output = append(output, "<id>"+host+"/</id>")
-	output = append(output, "<icon>"+host+"/favicon.ico</icon>")
-	output = append(output, "<updated>"+time.Now().UTC().Format("2006-01-02T15:04:05.999Z07:00")+"</updated>")
-	output = append(output, "<author><name>"+configuration["name"].(string)+"</name></author>")
-	output = append(output, "<link rel='alternate' type='text/html' href='"+host+"/' />")
-	output = append(output, "<link rel='self' type='application/atom+xml' href='"+host+"/blog/atom.xml' />")
-	files := posts()
-	for _, file := range files {
-		entry := loadPost("blog/" + file)
-		if entry != nil && (draft(request.Host) || entry["state"] == "post") {
-			url := host + "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
-			output = append(output, "<entry>")
-			output = append(output, "<id>"+url+"</id>")
-			if author, ok := entry["author"]; ok && author != configuration["name"].(string) {
-				output = append(output, "<author><name>"+author+"</name></author>")
+	data := cacheString(request.Host, host+"/blog/atom.xml", func() string {
+		output := []string{}
+		output = append(output, "<?xml version='1.0' encoding='UTF-8'?>")
+		output = append(output, "<feed xmlns='http://www.w3.org/2005/Atom'>")
+		output = append(output, "<title>"+configuration["name"].(string)+"</title>")
+		output = append(output, "<id>"+host+"/</id>")
+		output = append(output, "<icon>"+host+"/favicon.ico</icon>")
+		output = append(output, "<updated>"+time.Now().UTC().Format("2006-01-02T15:04:05.999Z07:00")+"</updated>")
+		output = append(output, "<author><name>"+configuration["name"].(string)+"</name></author>")
+		output = append(output, "<link rel='alternate' type='text/html' href='"+host+"/' />")
+		output = append(output, "<link rel='self' type='application/atom+xml' href='"+host+"/blog/atom.xml' />")
+		files := posts()
+		for _, file := range files {
+			entry := loadPost("blog/" + file)
+			if entry != nil && (draft(request.Host) || entry["state"] == "post") {
+				url := host + "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
+				output = append(output, "<entry>")
+				output = append(output, "<id>"+url+"</id>")
+				if author, ok := entry["author"]; ok && author != configuration["name"].(string) {
+					output = append(output, "<author><name>"+author+"</name></author>")
+				}
+				date, _ := time.Parse("2006-01-02 15:04:05 MST", entry["date"])
+				output = append(output, "<published>"+date.UTC().Format("2006-01-02T15:04:05.999Z07:00")+"</published>")
+				updated := date
+				if u, ok := entry["updated"]; ok {
+					updated, _ = time.Parse("2006-01-02 15:04:05 MST", u)
+				}
+				output = append(output, "<updated>"+updated.UTC().Format("2006-01-02T15:04:05.999Z07:00")+"</updated>")
+				output = append(output, "<title type='text'>"+entry["title"]+"</title>")
+				output = append(output, "<content type='html'>"+escapeHTML(entry["content"])+"</content>")
+				output = append(output, "<link rel='alternate' type='text/html' href='"+url+"' title='"+entry["title"]+"' />")
+				output = append(output, "</entry>")
 			}
-			date, _ := time.Parse("2006-01-02 15:04:05 MST", entry["date"])
-			output = append(output, "<published>"+date.UTC().Format("2006-01-02T15:04:05.999Z07:00")+"</published>")
-			updated := date
-			if u, ok := entry["updated"]; ok {
-				updated, _ = time.Parse("2006-01-02 15:04:05 MST", u)
-			}
-			output = append(output, "<updated>"+updated.UTC().Format("2006-01-02T15:04:05.999Z07:00")+"</updated>")
-			output = append(output, "<title type='text'>"+entry["title"]+"</title>")
-			output = append(output, "<content type='html'>"+escapeHTML(entry["content"])+"</content>")
-			output = append(output, "<link rel='alternate' type='text/html' href='"+url+"' title='"+entry["title"]+"' />")
-			output = append(output, "</entry>")
 		}
-	}
-	output = append(output, "</feed>")
-	data := strings.Join(output, "\n")
+		output = append(output, "</feed>")
+		return strings.Join(output, "\n")
+	})
 	response.Header().Set("Content-Type", "application/atom+xml")
 	if request.Method != "HEAD" {
 		length, _ := io.WriteString(response, data)
@@ -323,24 +372,29 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 func postHandler(response http.ResponseWriter, request *http.Request) {
 	file := strings.ToLower(path.Clean(request.URL.Path))
 	file = strings.TrimPrefix(file, "/")
-	entry := loadPost(file + ".html")
-	if entry != nil {
-		date, _ := time.Parse("2006-01-02 15:04:05 MST", entry["date"])
-		entry["date"] = date.Format("Jan 2, 2006")
-		if _, ok := entry["author"]; !ok {
-			entry["author"] = configuration["name"].(string)
+	data := cacheString(request.Host, file, func() string {
+		entry := loadPost(file + ".html")
+		if entry != nil {
+			date, _ := time.Parse("2006-01-02 15:04:05 MST", entry["date"])
+			entry["date"] = date.Format("Jan 2, 2006")
+			if _, ok := entry["author"]; !ok {
+				entry["author"] = configuration["name"].(string)
+			}
+			context := make(map[string]interface{})
+			for key, value := range configuration {
+				context[key] = value
+			}
+			for key, value := range entry {
+				context[key] = value
+			}
+			template := string(mustReadFile("./post.html"))
+			return mustache(template, context, func(name string) string {
+				return string(mustReadFile(path.Join("./", name)))
+			})
 		}
-		context := make(map[string]interface{})
-		for key, value := range configuration {
-			context[key] = value
-		}
-		for key, value := range entry {
-			context[key] = value
-		}
-		template := string(mustReadFile("./post.html"))
-		data := mustache(template, context, func(name string) string {
-			return string(mustReadFile(path.Join("./", name)))
-		})
+		return ""
+	})
+	if len(data) > 0 {
 		response.Header().Set("Content-Type", "text/html")
 		if request.Method != "HEAD" {
 			length, _ := io.WriteString(response, data)
@@ -360,9 +414,11 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 func blogHandler(response http.ResponseWriter, request *http.Request) {
 	id := request.URL.Query().Get("id")
 	if start, e := strconv.Atoi(id); e == nil {
-		data := renderBlog(draft(request.Host), start)
+		data := cache(request.Host, "/blog?id="+id, func() interface{} {
+			return renderBlog(draft(request.Host), start)
+		})
 		response.Header().Set("Content-Type", "text/html")
-		length, _ := io.WriteString(response, data)
+		length, _ := io.WriteString(response, data.(string))
 		response.Header().Set("Content-Length", strconv.Itoa(length))
 	} else {
 		rootHandler(response, request)
@@ -385,13 +441,16 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 		file = strings.TrimLeft(file, "/")
 		extension := path.Ext(file)
 		contentType := mime.TypeByExtension(extension)
+		stat := pathStat(request.Host, file)
 		if len(contentType) > 0 && extension != ".html" {
-			if stat, e := os.Stat(file); os.IsNotExist(e) {
+			if !stat.exists {
 				response.WriteHeader(http.StatusNotFound)
-			} else if stat.IsDir() {
+			} else if stat.isDir {
 				http.Redirect(response, request, "/", http.StatusFound)
 			} else {
-				data := mustReadFile("./" + file)
+				data := cacheBuffer(request.Host, file, func() []byte {
+					return mustReadFile("./" + file)
+				})
 				if request.Method != "HEAD" {
 					response.Write(data)
 				}
@@ -401,49 +460,51 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 				response.Header().Set("Expires", "-1")
 			}
 		} else {
-			if stat, e := os.Stat(file); e != nil || os.IsNotExist(e) {
+			if !stat.exists {
 				if file != "index.html" {
 					http.Redirect(response, request, path.Dir(pathname), http.StatusFound)
 				} else {
 					rootHandler(response, request)
 				}
-			} else if stat.IsDir() || extension != ".html" {
+			} else if stat.isDir || extension != ".html" {
 				http.Redirect(response, request, pathname+"/", http.StatusFound)
 			} else {
-				template := mustReadFile(path.Join("./", file))
-				context := make(map[string]interface{})
-				for key, value := range configuration {
-					context[key] = value
-				}
-				if feed, ok := context["feed"]; !ok || len(feed.(string)) == 0 {
-					context["feed"] = func() string {
-						return scheme(request) + "://" + request.Host + "/blog/atom.xml"
+				data := cacheString(request.Host, file, func() string {
+					template := mustReadFile(path.Join("./", file))
+					context := make(map[string]interface{})
+					for key, value := range configuration {
+						context[key] = value
 					}
-				}
-				context["links"] = func() string {
-					list := []string{}
-					for _, link := range configuration["links"].([]interface{}) {
-						name := link.(map[string]interface{})["name"].(string)
-						symbol := link.(map[string]interface{})["symbol"].(string)
-						url := link.(map[string]interface{})["url"].(string)
-						list = append(list, "<a class='icon' target='_blank' href='"+url+"' title='"+name+"'><span class='symbol'>"+symbol+"</span></a>")
+					if feed, ok := context["feed"]; !ok || len(feed.(string)) == 0 {
+						context["feed"] = func() string {
+							return scheme(request) + "://" + request.Host + "/blog/atom.xml"
+						}
 					}
-					return strings.Join(list, "\n")
-				}
-				context["tabs"] = func() string {
-					list := []string{}
-					for _, link := range configuration["pages"].([]interface{}) {
-						name := link.(map[string]interface{})["name"].(string)
-						url := link.(map[string]interface{})["url"].(string)
-						list = append(list, "<li class='tab'><a href='"+url+"'>"+name+"</a></li>")
+					context["links"] = func() string {
+						list := []string{}
+						for _, link := range configuration["links"].([]interface{}) {
+							name := link.(map[string]interface{})["name"].(string)
+							symbol := link.(map[string]interface{})["symbol"].(string)
+							url := link.(map[string]interface{})["url"].(string)
+							list = append(list, "<a class='icon' target='_blank' href='"+url+"' title='"+name+"'><span class='symbol'>"+symbol+"</span></a>")
+						}
+						return strings.Join(list, "\n")
 					}
-					return strings.Join(list, "\n")
-				}
-				context["blog"] = func() string {
-					return renderBlog(draft(request.Host), 0)
-				}
-				data := mustache(string(template), context, func(name string) string {
-					return string(mustReadFile(path.Join("./", name)))
+					context["tabs"] = func() string {
+						list := []string{}
+						for _, link := range configuration["pages"].([]interface{}) {
+							name := link.(map[string]interface{})["name"].(string)
+							url := link.(map[string]interface{})["url"].(string)
+							list = append(list, "<li class='tab'><a href='"+url+"'>"+name+"</a></li>")
+						}
+						return strings.Join(list, "\n")
+					}
+					context["blog"] = func() string {
+						return renderBlog(draft(request.Host), 0)
+					}
+					return mustache(string(template), context, func(name string) string {
+						return string(mustReadFile(path.Join("./", name)))
+					})
 				})
 				response.Header().Set("Content-Type", "text/html")
 				if request.Method != "HEAD" {
