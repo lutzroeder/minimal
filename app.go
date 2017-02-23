@@ -29,9 +29,9 @@ func escapeHTML(text string) string {
 	return entityMap.Replace(text)
 }
 
-var partialRegex = regexp.MustCompile(`\{\{>\s*([-_\/\.\w]+)\s*\}\}`)
-var replaceRegex = regexp.MustCompile(`\{\{\{\s*([-_\/\.\w]+)\s*\}\}\}`)
-var escapeRegex = regexp.MustCompile(`\{\{\s*([-_\/\.\w]+)\s*\}\}`)
+var partialRegex = regexp.MustCompile("{{>\\s*([-_/.\\w]+)\\s*}}")
+var replaceRegex = regexp.MustCompile("{{{\\s*([-_/.\\w]+)\\s*}}}")
+var escapeRegex = regexp.MustCompile("{{\\s*([-_/.\\w]+)\\s*}}")
 
 func mustache(template string, context map[string]interface{}, partials interface{}) string {
 	template = partialRegex.ReplaceAllStringFunc(template, func(match string) string {
@@ -148,8 +148,8 @@ func pathStat(host string, path string) pathInfo {
 	}).(pathInfo)
 }
 
-var tagRegexp = regexp.MustCompile(`(\w+)[^>]*>`)
-var entityRegexp = regexp.MustCompile(`(#?[A-Za-z0-9]+;)`)
+var tagRegexp = regexp.MustCompile("(\\w+)[^>]*>")
+var entityRegexp = regexp.MustCompile("(#?[A-Za-z0-9]+;)")
 
 func truncate(text string, length int) string {
 	closeTags := make(map[int]string)
@@ -295,7 +295,7 @@ func renderBlog(draft bool, start int) string {
 				post = append(post, "<h1><a href='"+location+"'>"+entry["title"]+"</a></h1>\n")
 				post = append(post, "<div class='content'>")
 				content := entry["content"]
-				content = regexp.MustCompile(`\s\s`).ReplaceAllString(content, " ")
+				content = regexp.MustCompile("\\s\\s").ReplaceAllString(content, " ")
 				truncated := truncate(content, 250)
 				post = append(post, truncated+"\n")
 				post = append(post, "</div>")
