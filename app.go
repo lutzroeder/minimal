@@ -20,6 +20,7 @@ import (
 )
 
 var configuration map[string]interface{}
+var environment string
 
 var entityMap = strings.NewReplacer(
 	`&`, "&amp;", `<`, "&lt;", `>`, "&gt;", `"`, "&quot;", `'`, "&#39;", `/`, "&#x2F;", "`", "&#x60;", `=`, "&#x3D;",
@@ -89,28 +90,19 @@ func scheme(request *http.Request) string {
 	return "http"
 }
 
-func localhost(host string) bool {
-	domain := strings.Split(host, ":")[0]
-	return domain == "localhost" || domain == "127.0.0.1"
-}
-
-func draft(host string) bool {
-	return localhost(host)
-}
-
 var cacheData = make(map[string]interface{})
-var cacheMutex = &sync.Mutex{}
+var cacheDataMutex = &sync.Mutex{}
 
 func cache(host string, key string, callback func() interface{}) interface{} {
-	if !draft(host) {
-		cacheMutex.Lock()
+	if environment == "production" {
+		cacheDataMutex.Lock()
 		value, ok := cacheData[key]
-		cacheMutex.Unlock()
+		cacheDataMutex.Unlock()
 		if !ok {
 			value = callback()
-			cacheMutex.Lock()
+			cacheDataMutex.Lock()
 			cacheData[key] = value
-			cacheMutex.Unlock()
+			cacheDataMutex.Unlock()
 		}
 		return value
 	}
@@ -129,23 +121,59 @@ func cacheBuffer(host string, key string, callback func() []byte) []byte {
 	}).([]byte)
 }
 
-type pathInfo struct {
-	exists bool
-	isDir  bool
-	size   int64
+var pathCache = make(map[string]bool)
+
+func initPathCache(dir string) {
+	if environment == "production" {
+		fileInfos, e := ioutil.ReadDir(dir)
+		if e != nil {
+			panic(e)
+		}
+		for _, fileInfo := range fileInfos {
+			file := fileInfo.Name()
+			if !strings.HasPrefix(file, ".") {
+				file = dir + "/" + file
+				if fileInfo.IsDir() {
+					pathCache[file+"/"] = true
+					initPathCache(file)
+				} else {
+					pathCache[file] = true
+				}
+			}
+		}
+	}
 }
 
-func pathStat(host string, path string) pathInfo {
-	return cache(host, "stat:"+path, func() interface{} {
-		stat := pathInfo{false, false, 0}
-		fileInfo, error := os.Stat(path)
-		stat.exists = !os.IsNotExist(error)
-		if error == nil {
-			stat.isDir = fileInfo.IsDir()
-			stat.size = fileInfo.Size()
+func exists(host string, path string) bool {
+	if environment == "production" {
+		path = "./" + path
+		if _, ok := pathCache[path]; ok {
+			return true
 		}
-		return stat
-	}).(pathInfo)
+		if !strings.HasSuffix(path, "/") {
+			if _, ok := pathCache[path+"/"]; ok {
+				return true
+			}
+		}
+		return false
+	}
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
+}
+
+func isDirectory(host string, path string) bool {
+	if environment == "production" {
+		path = "./" + path
+		if !strings.HasSuffix(path, "/") {
+			path = path + "/"
+		}
+		_, ok := pathCache[path]
+		return ok
+	}
+	if stat, err := os.Stat(path); !os.IsNotExist(err) {
+		return stat.IsDir()
+	}
+	return false
 }
 
 var tagRegexp = regexp.MustCompile("(\\w+)[^>]*>")
@@ -275,7 +303,7 @@ func loadPost(path string) map[string]string {
 	return nil
 }
 
-func renderBlog(draft bool, start int) string {
+func renderBlog(start int) string {
 	output := []string{}
 	length := 10
 	index := 0
@@ -284,7 +312,7 @@ func renderBlog(draft bool, start int) string {
 		file := files[0]
 		files = files[1:]
 		entry := loadPost("blog/" + file)
-		if entry != nil && draft || entry["state"] == "post" {
+		if entry != nil && (entry["state"] == "post" || environment != "production") {
 			if index >= start {
 				location := "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
 				date, _ := time.Parse("2006-01-02 15:04:05 MST", entry["date"])
@@ -339,7 +367,7 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 		files := posts()
 		for _, file := range files {
 			entry := loadPost("blog/" + file)
-			if entry != nil && (draft(request.Host) || entry["state"] == "post") {
+			if entry != nil && (entry["state"] == "post" || environment != "production") {
 				url := host + "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
 				output = append(output, "<entry>")
 				output = append(output, "<id>"+url+"</id>")
@@ -372,7 +400,7 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 func postHandler(response http.ResponseWriter, request *http.Request) {
 	file := strings.ToLower(path.Clean(request.URL.Path))
 	file = strings.TrimPrefix(file, "/")
-	data := cacheString(request.Host, "post:" + file, func() string {
+	data := cacheString(request.Host, "post:"+file, func() string {
 		entry := loadPost(file + ".html")
 		if entry != nil {
 			date, _ := time.Parse("2006-01-02 15:04:05 MST", entry["date"])
@@ -415,7 +443,7 @@ func blogHandler(response http.ResponseWriter, request *http.Request) {
 	id := request.URL.Query().Get("id")
 	if start, e := strconv.Atoi(id); e == nil {
 		data := cache(request.Host, "blog:/blog?id="+id, func() interface{} {
-			return renderBlog(draft(request.Host), start)
+			return renderBlog(start)
 		})
 		response.Header().Set("Content-Type", "text/html")
 		length, _ := io.WriteString(response, data.(string))
@@ -439,16 +467,16 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 			file = path.Join(pathname, "index.html")
 		}
 		file = strings.TrimLeft(file, "/")
-		extension := path.Ext(file)
-		contentType := mime.TypeByExtension(extension)
-		stat := pathStat(request.Host, file)
-		if len(contentType) > 0 && extension != ".html" {
-			if !stat.exists {
-				response.WriteHeader(http.StatusNotFound)
-			} else if stat.isDir {
-				http.Redirect(response, request, "/", http.StatusFound)
-			} else {
-				data := cacheBuffer(request.Host, "default:" + file, func() []byte {
+
+		if !exists(request.Host, file) {
+			http.Redirect(response, request, path.Dir(pathname), http.StatusFound)
+		} else if isDirectory(request.Host, file) {
+			http.Redirect(response, request, pathname+"/", http.StatusFound)
+		} else {
+			extension := path.Ext(file)
+			contentType := mime.TypeByExtension(extension)
+			if len(contentType) > 0 && extension != ".html" {
+				data := cacheBuffer(request.Host, "default:"+file, func() []byte {
 					return mustReadFile("./" + file)
 				})
 				if request.Method != "HEAD" {
@@ -458,18 +486,8 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 				response.Header().Set("Content-Length", strconv.Itoa(len(data)))
 				response.Header().Set("Cache-Control", "private, max-age=0")
 				response.Header().Set("Expires", "-1")
-			}
-		} else {
-			if !stat.exists {
-				if file != "index.html" {
-					http.Redirect(response, request, path.Dir(pathname), http.StatusFound)
-				} else {
-					rootHandler(response, request)
-				}
-			} else if stat.isDir || extension != ".html" {
-				http.Redirect(response, request, pathname+"/", http.StatusFound)
 			} else {
-				data := cacheString(request.Host, "default:" + file, func() string {
+				data := cacheString(request.Host, "default:"+file, func() string {
 					template := mustReadFile(path.Join("./", file))
 					context := make(map[string]interface{})
 					for key, value := range configuration {
@@ -500,7 +518,7 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 						return strings.Join(list, "\n")
 					}
 					context["blog"] = func() string {
-						return renderBlog(draft(request.Host), 0)
+						return renderBlog(0)
 					}
 					return mustache(string(template), context, func(name string) string {
 						return string(mustReadFile(path.Join("./", name)))
@@ -544,6 +562,9 @@ func main() {
 	if e := json.Unmarshal(file, &configuration); e != nil {
 		panic(e)
 	}
+	environment = os.Getenv("GO_ENV")
+	fmt.Println(environment);
+	initPathCache(".");
 	http.HandleFunc("/.git", rootHandler)
 	http.HandleFunc("/admin", rootHandler)
 	http.HandleFunc("/admin.cfg", rootHandler)
@@ -557,9 +578,9 @@ func main() {
 	http.HandleFunc("/post.html", rootHandler)
 	http.HandleFunc("/site.css", rootHandler)
 	http.HandleFunc("/stream.html", rootHandler)
-	http.HandleFunc("/blog/atom.xml", atomHandler) // ATOM feed
-	http.HandleFunc("/blog/", postHandler) // Render specific HTML blog post
-	http.HandleFunc("/blog", blogHandler) // Stream blog posts
+	http.HandleFunc("/blog/atom.xml", atomHandler)               // ATOM feed
+	http.HandleFunc("/blog/", postHandler)                       // Render specific HTML blog post
+	http.HandleFunc("/blog", blogHandler)                        // Stream blog posts
 	http.HandleFunc("/.well-known/acme-challenge/", certHandler) // "Let's Encrypt" challenge
 	http.HandleFunc("/", defaultHandler)
 	port := 8080

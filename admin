@@ -72,8 +72,10 @@ EOF
     echo "$(tput bold)configure ${site}.service$(tput sgr0)"
     if [ ${runtime} = "go" ]; then 
         command="$(which go) run $(pwd)/app.go"
+        environment="GO_ENV"
     else 
         command="$(which node) $(pwd)/app.js"
+        environment="NODE_ENV"
     fi
 cat > "${site}.service" << EOF
 [Unit]
@@ -81,7 +83,7 @@ Description=${site}.service
 [Service]
 WorkingDirectory=$(pwd)
 ExecStart=${command}
-Environment=NODE_ENV=production
+Environment=${environment}=production
 Restart=always
 RestartSec=10
 StandardOutput=syslog
@@ -177,9 +179,9 @@ server_update() {
 
 client_start() {
     if [ ${runtime} = "go" ]; then 
-        sleep 1 && git web--browse http://localhost:8080 & go run app.go
+        sleep 1 && git web--browse http://localhost:8080 & GO_ENV=${GO_ENV:-development} go run app.go
     else 
-        sleep 0.5 && git web--browse http://localhost:8080 & node app.js
+        sleep 0.5 && git web--browse http://localhost:8080 & NODE_ENV=${NODE_ENV:-development} node app.js
     fi
 }
 

@@ -7,9 +7,6 @@ var http = require("http");
 var path = require("path");
 var url = require("url");
 
-console.log(process.title + " " + process.version);
-var configuration = JSON.parse(fs.readFileSync("./app.json", "utf-8"));
-
 var entityMap = {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;", "/": "&#x2F;", "`": "&#x60;", "=": "&#x3D;"
 };
@@ -45,19 +42,10 @@ function scheme(request) {
     return "http";
 }
 
-function localhost(host) {
-    var domain = host ? host.split(":").shift() : "";
-    return (domain === "localhost" || domain === "127.0.0.1");
-}
-
-function draft(host) {
-    return localhost(host);
-}
-
 var cacheData = {};
 
 function cache(host, key, callback) {
-    if (!draft(host)) {
+    if (environment === "production") {
         if (!(key in cacheData)) {
             cacheData[key] = callback();            
         }
@@ -66,17 +54,39 @@ function cache(host, key, callback) {
     return callback();
 }
 
-function pathStat(host, path) {
-    return cache(host, "stat:" + path, function () {
-        var stat = { exists: false, isDirectory: false,  size: 0 };
-        stat.exists = fs.existsSync(path);
-        if (stat.exists) {
-            var statData = fs.statSync(path);
-            stat.isDirectory = statData.isDirectory();
-            stat.size = statData.size;
-        }
-        return stat;
-    });
+var pathCache = {}
+
+function initPathCache(directory) {
+    if (environment === "production") {
+        fs.readdirSync(directory).forEach(function(file) {
+            if (!file.startsWith(".")) {
+                file = directory + "/" + file;
+                if (fs.statSync(file).isDirectory()) {
+                    pathCache[file + "/"] = true;
+                    initPathCache(file);
+                }
+                else {
+                    pathCache[file] = true;
+                }
+            }
+        });        
+    }
+}
+
+function exists(host, path) {
+    if (environment === "production") {
+        path = "./" + path;
+        return pathCache[path] || (!path.endsWith("/") && pathCache[path + "/"]);
+    }
+    return fs.existsSync(path);
+}
+
+function isDirectory(host, path) {
+    if (environment === "production") {
+        path = "./" + (path.endsWith("/") ? path : path + "/");
+        return pathCache[path];
+    }
+    return fs.statSync(path).isDirectory();
 }
 
 function truncate(text, length) {
@@ -193,7 +203,7 @@ function loadPost(file) {
     return null;
 }
 
-function renderBlog(draft, start) {
+function renderBlog(start) {
     var length = 10;
     var output = [];
     var index = 0;
@@ -201,7 +211,7 @@ function renderBlog(draft, start) {
     while (files.length > 0 && index < (start + length)) {
         var file = files.shift();
         var entry = loadPost("blog/" + file);
-        if (entry && (draft || entry.state === "post")) {
+        if (entry && (entry.state === "post" || environment !== "production")) {
             if (index >= start) {
                 var location = "/blog/" + path.basename(file, ".html");
                 var date = new Date(entry.date);
@@ -210,7 +220,7 @@ function renderBlog(draft, start) {
                 post.push("<div class='item'>");
                 post.push("<div class='date'>" + entry.date + "</div>\n");
                 post.push("<h1><a href='" + location + "'>" + entry.title + "</a></h1>\n");
-   				post.push("<div class='content'>")
+                post.push("<div class='content'>")
                 var content = entry.content;
                 content = content.replace(/\s\s/g, " ");
                 var truncated = truncate(content, 250);
@@ -254,7 +264,7 @@ function atomHandler(request, response) {
         output.push("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />");
         posts().forEach(function (file) {
             var entry = loadPost("blog/" + file);
-            if (entry && (draft(request.headers.host) || entry.state === "post")) {
+            if (entry && (entry.state === "post" || environment !== "production")) {
                 var url = host + "/blog/" + path.basename(file, ".html");
                 output.push("<entry>");
                 output.push("<id>" + url + "</id>");
@@ -338,7 +348,7 @@ function blogHandler(request, response) {
     if (query.id) {
         var key = "/blog?id=" + query.id;
         var data = cache(request.headers.host, "blog:" + key, function() {
-            return renderBlog(draft(request.headers.host), Number(query.id));
+            return renderBlog(Number(query.id));
         });
         response.writeHead(200, { 
             "Content-Type": "text/html",
@@ -376,64 +386,45 @@ function defaultHandler(request, response) {
     }
     else {
         var file = (pathname.endsWith("/") ? path.join(pathname, "index.html") : pathname).replace(/^\/?/, "");
-        var extension = path.extname(file);
-        var contentType = mimeTypeMap[extension];
-        var stat = pathStat(request.headers.host, file);
-        if (contentType) {
-            // Handle binary files
-            if (!stat.exists) {
-                response.writeHead(404, { "Content-Type": contentType });
-                response.end();
-            }
-            else if (stat.isDirectory) {
-                response.writeHead(302, { "Location": pathname + "/" });
-                response.end();
-            } 
-            else {
+        if (!exists(request.Host, file)) {
+            response.writeHead(302, { "Location": path.dirname(pathname) });
+            response.end();
+        }
+        else if (isDirectory(request.Host, file)) {
+            response.writeHead(302, { "Location": pathname + "/" });
+            response.end();
+        }
+        else {
+            var extension = path.extname(file);
+            var contentType = mimeTypeMap[extension];
+            if (contentType) {
+                // Handle binary files
+                var buffer = cache(request.headers.host, "default:" + file, function() {
+                    try {
+                        var size = fs.statSync(file).size;
+                        var buffer = new Buffer(size)
+                        var descriptor = fs.openSync(file, "r");
+                        fs.readSync(descriptor, buffer, 0, buffer.length, 0);
+                        fs.closeSync(descriptor);
+                        return buffer;
+                    }
+                    catch (error) {
+                        console.log(error);
+                    }
+                    return new Buffer(0);
+                });
                 response.writeHead(200, {
                     "Content-Type": contentType,
-                    "Content-Length": stat.size,
+                    "Content-Length": buffer.length,
                     "Cache-Control": "private, max-age=0", "Expires": -1 
                 });
                 if (request.method !== "HEAD") {
-                    var buffer = cache(request.headers.host, "default:" + file, function() {
-                        var buffer = new Buffer(stat.size)
-                        try {
-                            var descriptor = fs.openSync(file, "r");
-                            if (fs.readSync(descriptor, buffer, 0, buffer.length, 0) !== buffer.length) {
-                                buffer = null;
-                            }
-                            fs.closeSync(descriptor);
-                        }
-                        catch (error) {
-                            console.log(error);
-                            buffer = null;
-                        }
-                        return buffer;
-                    });
-                    if (buffer) {
-                        response.write(buffer, "binary");
-                    }
+                    response.write(buffer, "binary");
                 }
-                response.end();
-            }
-        }
-        else {
-            // Handle HTML files
-            if (!stat.exists) {
-                if (file !== "index.html") {
-                    response.writeHead(302, { "Location": path.dirname(pathname) });
-                    response.end();
-                }
-                else {
-                    rootHandler(request, response);
-                }
-            }
-            else if (stat.isDirectory || extension != ".html") {
-                response.writeHead(302, { "Location": pathname + "/" });
                 response.end();
             }
             else {
+                // Handle HTML files
                 var data = cache(request.headers.host, "default:" + file, function() {
                     var template = fs.readFileSync(file, "utf-8");
                     var context = Object.assign({ }, configuration);
@@ -441,7 +432,7 @@ function defaultHandler(request, response) {
                         return scheme(request) + "://" + request.headers.host + "/blog/atom.xml";
                     };
                     context.blog = function() {
-                        return renderBlog(draft(request.headers.host), 0);
+                        return renderBlog(0);
                     };
                     context.links = function() {
                         return configuration.links.map(function (link) {
@@ -544,6 +535,11 @@ router.get("/.well-known/acme-challenge/*", certHandler); // "Let's Encrypt" cha
 router.get("/*", defaultHandler);
 router.default(rootHandler);
 
+var environment = process.env.NODE_ENV;
+console.log(process.title + " " + process.version);
+var configuration = JSON.parse(fs.readFileSync("./app.json", "utf-8"));
+console.log(environment);
+initPathCache(".");
 var server = http.createServer(function (request, response) {
     console.log(request.method + " " + request.url);
     router.handle(request, response);
