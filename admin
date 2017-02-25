@@ -178,7 +178,7 @@ server_update() {
 }
 
 client_start() {
-    if [ ${runtime} = "go" ]; then 
+    if [ ${1:-${runtime}} = "go" ]; then 
         sleep 1 && git web--browse http://localhost:8080 & GO_ENV=${GO_ENV:-development} go run app.go
     else 
         sleep 0.5 && git web--browse http://localhost:8080 & NODE_ENV=${NODE_ENV:-development} node app.js
@@ -259,7 +259,7 @@ client() {
     command="$1"
     shift
     case "${command}" in
-        "start") client_start;;
+        "start") client_start $@;;
         "push") client_push $@;;
         "update") client_update $@;;
         "status") client_status;;

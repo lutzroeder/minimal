@@ -44,7 +44,7 @@ function scheme(request) {
 
 var cacheData = {};
 
-function cache(host, key, callback) {
+function cache(key, callback) {
     if (environment === "production") {
         if (!(key in cacheData)) {
             cacheData[key] = callback();            
@@ -73,7 +73,7 @@ function initPathCache(directory) {
     }
 }
 
-function exists(host, path) {
+function exists(path) {
     if (environment === "production") {
         path = "./" + path;
         return pathCache[path] || (!path.endsWith("/") && pathCache[path + "/"]);
@@ -81,7 +81,7 @@ function exists(host, path) {
     return fs.existsSync(path);
 }
 
-function isDirectory(host, path) {
+function isDirectory(path) {
     if (environment === "production") {
         path = "./" + (path.endsWith("/") ? path : path + "/");
         return pathCache[path];
@@ -251,7 +251,7 @@ function rootHandler(request, response) {
 
 function atomHandler(request, response) {
     var host = scheme(request) + "://" + request.headers.host;
-    var data = cache(request.headers.host, "atom:" + host + "/blog/atom.xml", function () {
+    var data = cache("atom:" + host + "/blog/atom.xml", function () {
         var output = [];
         output.push("<?xml version='1.0' encoding='UTF-8'?>");
         output.push("<feed xmlns='http://www.w3.org/2005/Atom'>");
@@ -307,7 +307,7 @@ var mimeTypeMap = {
 function postHandler(request, response) {
     var pathname = path.normalize(url.parse(request.url, true).pathname.toLowerCase());
     var file = pathname.replace(/^\/?/, "");
-    var data = cache(request.headers.host, "post:" + file, function() {
+    var data = cache("post:" + file, function() {
         var entry = loadPost(file + ".html");
         if (entry) {
             var date = new Date(entry.date);
@@ -347,7 +347,7 @@ function blogHandler(request, response) {
     var query = url.parse(request.url, true).query;
     if (query.id) {
         var key = "/blog?id=" + query.id;
-        var data = cache(request.headers.host, "blog:" + key, function() {
+        var data = cache("blog:" + key, function() {
             return renderBlog(Number(query.id));
         });
         response.writeHead(200, { 
@@ -386,11 +386,11 @@ function defaultHandler(request, response) {
     }
     else {
         var file = (pathname.endsWith("/") ? path.join(pathname, "index.html") : pathname).replace(/^\/?/, "");
-        if (!exists(request.Host, file)) {
+        if (!exists(file)) {
             response.writeHead(302, { "Location": path.dirname(pathname) });
             response.end();
         }
-        else if (isDirectory(request.Host, file)) {
+        else if (isDirectory(file)) {
             response.writeHead(302, { "Location": pathname + "/" });
             response.end();
         }
@@ -399,7 +399,7 @@ function defaultHandler(request, response) {
             var contentType = mimeTypeMap[extension];
             if (contentType) {
                 // Handle binary files
-                var buffer = cache(request.headers.host, "default:" + file, function() {
+                var buffer = cache("default:" + file, function() {
                     try {
                         var size = fs.statSync(file).size;
                         var buffer = new Buffer(size)
@@ -425,7 +425,7 @@ function defaultHandler(request, response) {
             }
             else {
                 // Handle HTML files
-                var data = cache(request.headers.host, "default:" + file, function() {
+                var data = cache("default:" + file, function() {
                     var template = fs.readFileSync(file, "utf-8");
                     var context = Object.assign({ }, configuration);
                     context.feed = context.feed ? context.feed : function() {
@@ -547,4 +547,5 @@ var server = http.createServer(function (request, response) {
 var port = process.env.PORT || 8080;
 server.listen(port, function() {
     console.log("http://localhost:" + port);
+    console.log();
 });

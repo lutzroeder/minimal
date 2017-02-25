@@ -93,7 +93,7 @@ func scheme(request *http.Request) string {
 var cacheData = make(map[string]interface{})
 var cacheDataMutex = &sync.Mutex{}
 
-func cache(host string, key string, callback func() interface{}) interface{} {
+func cache(key string, callback func() interface{}) interface{} {
 	if environment == "production" {
 		cacheDataMutex.Lock()
 		value, ok := cacheData[key]
@@ -109,14 +109,14 @@ func cache(host string, key string, callback func() interface{}) interface{} {
 	return callback()
 }
 
-func cacheString(host string, key string, callback func() string) string {
-	return cache(host, key, func() interface{} {
+func cacheString(key string, callback func() string) string {
+	return cache(key, func() interface{} {
 		return callback()
 	}).(string)
 }
 
-func cacheBuffer(host string, key string, callback func() []byte) []byte {
-	return cache(host, key, func() interface{} {
+func cacheBuffer(key string, callback func() []byte) []byte {
+	return cache(key, func() interface{} {
 		return callback()
 	}).([]byte)
 }
@@ -144,7 +144,7 @@ func initPathCache(dir string) {
 	}
 }
 
-func exists(host string, path string) bool {
+func exists(path string) bool {
 	if environment == "production" {
 		path = "./" + path
 		if _, ok := pathCache[path]; ok {
@@ -161,7 +161,7 @@ func exists(host string, path string) bool {
 	return !os.IsNotExist(err)
 }
 
-func isDirectory(host string, path string) bool {
+func isDirectory(path string) bool {
 	if environment == "production" {
 		path = "./" + path
 		if !strings.HasSuffix(path, "/") {
@@ -353,7 +353,7 @@ func rootHandler(response http.ResponseWriter, request *http.Request) {
 
 func atomHandler(response http.ResponseWriter, request *http.Request) {
 	host := scheme(request) + "://" + request.Host
-	data := cacheString(request.Host, "atom:"+host+"/blog/atom.xml", func() string {
+	data := cacheString("atom:"+host+"/blog/atom.xml", func() string {
 		output := []string{}
 		output = append(output, "<?xml version='1.0' encoding='UTF-8'?>")
 		output = append(output, "<feed xmlns='http://www.w3.org/2005/Atom'>")
@@ -400,7 +400,7 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 func postHandler(response http.ResponseWriter, request *http.Request) {
 	file := strings.ToLower(path.Clean(request.URL.Path))
 	file = strings.TrimPrefix(file, "/")
-	data := cacheString(request.Host, "post:"+file, func() string {
+	data := cacheString("post:"+file, func() string {
 		entry := loadPost(file + ".html")
 		if entry != nil {
 			date, _ := time.Parse("2006-01-02 15:04:05 MST", entry["date"])
@@ -442,7 +442,7 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 func blogHandler(response http.ResponseWriter, request *http.Request) {
 	id := request.URL.Query().Get("id")
 	if start, e := strconv.Atoi(id); e == nil {
-		data := cache(request.Host, "blog:/blog?id="+id, func() interface{} {
+		data := cache("blog:/blog?id="+id, func() interface{} {
 			return renderBlog(start)
 		})
 		response.Header().Set("Content-Type", "text/html")
@@ -468,15 +468,15 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 		}
 		file = strings.TrimLeft(file, "/")
 
-		if !exists(request.Host, file) {
+		if !exists(file) {
 			http.Redirect(response, request, path.Dir(pathname), http.StatusFound)
-		} else if isDirectory(request.Host, file) {
+		} else if isDirectory(file) {
 			http.Redirect(response, request, pathname+"/", http.StatusFound)
 		} else {
 			extension := path.Ext(file)
 			contentType := mime.TypeByExtension(extension)
 			if len(contentType) > 0 && extension != ".html" {
-				data := cacheBuffer(request.Host, "default:"+file, func() []byte {
+				data := cacheBuffer("default:"+file, func() []byte {
 					return mustReadFile("./" + file)
 				})
 				if request.Method != "HEAD" {
@@ -487,7 +487,7 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 				response.Header().Set("Cache-Control", "private, max-age=0")
 				response.Header().Set("Expires", "-1")
 			} else {
-				data := cacheString(request.Host, "default:"+file, func() string {
+				data := cacheString("default:"+file, func() string {
 					template := mustReadFile(path.Join("./", file))
 					context := make(map[string]interface{})
 					for key, value := range configuration {
@@ -585,5 +585,6 @@ func main() {
 	http.HandleFunc("/", defaultHandler)
 	port := 8080
 	fmt.Println("http://localhost:" + strconv.Itoa(port))
+	fmt.Println();
 	http.ListenAndServe(":8080", loggerHandler{http.DefaultServeMux})
 }
