@@ -251,15 +251,17 @@ func truncate(text string, length int) string {
 }
 
 func posts() []string {
-	files := []string{}
-	fileInfos, _ := ioutil.ReadDir("blog/")
-	for i := len(fileInfos) - 1; i >= 0; i-- {
-		file := fileInfos[i].Name()
-		if path.Ext(file) == ".html" {
-			files = append(files, file)
+	return cache("blog:*.*", func() interface{} {
+		files := []string{}
+		fileInfos, _ := ioutil.ReadDir("blog/")
+		for i := len(fileInfos) - 1; i >= 0; i-- {
+			file := fileInfos[i].Name()
+			if path.Ext(file) == ".html" {
+				files = append(files, file)
+			}
 		}
-	}
-	return files
+		return files
+	}).([]string)
 }
 
 func loadPost(path string) map[string]string {
@@ -303,11 +305,10 @@ func loadPost(path string) map[string]string {
 	return nil
 }
 
-func renderBlog(start int) string {
+func renderBlog(files []string, start int) string {
 	output := []string{}
 	length := 10
 	index := 0
-	files := posts()
 	for len(files) > 0 && index < start+length {
 		file := files[0]
 		files = files[1:]
@@ -442,11 +443,15 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 func blogHandler(response http.ResponseWriter, request *http.Request) {
 	id := request.URL.Query().Get("id")
 	if start, e := strconv.Atoi(id); e == nil {
-		data := cache("blog:/blog?id="+id, func() interface{} {
-			return renderBlog(start)
-		})
+		files := posts();
+		data := ""
+		if (start < len(files)) {
+			data = cacheString("blog:/blog?id="+id, func() string {
+				return renderBlog(files, start)
+			})
+		}
 		response.Header().Set("Content-Type", "text/html")
-		length, _ := io.WriteString(response, data.(string))
+		length, _ := io.WriteString(response, data)
 		response.Header().Set("Content-Length", strconv.Itoa(length))
 	} else {
 		rootHandler(response, request)
@@ -518,7 +523,7 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 						return strings.Join(list, "\n")
 					}
 					context["blog"] = func() string {
-						return renderBlog(0)
+						return renderBlog(posts(), 0)
 					}
 					return mustache(string(template), context, func(name string) string {
 						return string(mustReadFile(path.Join("./", name)))
@@ -552,7 +557,7 @@ type loggerHandler struct {
 }
 
 func (logger loggerHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
-	fmt.Println(request.Method + " " + request.URL.Path)
+	fmt.Println(request.Method + " " + request.RequestURI)
 	logger.handler.ServeHTTP(response, request)
 }
 

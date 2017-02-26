@@ -164,7 +164,11 @@ function truncate(text, length) {
 }
 
 function posts() {
-    return fs.readdirSync("blog/").filter(function (file) { return path.extname(file) === ".html"; }).sort().reverse();
+    return cache("blog:*.*", function() {
+        return fs.readdirSync("./blog/").filter(function (file) {
+            return path.extname(file) === ".html"; }
+        ).sort().reverse();
+    });
 }
 
 function loadPost(file) {
@@ -203,11 +207,10 @@ function loadPost(file) {
     return null;
 }
 
-function renderBlog(start) {
+function renderBlog(files, start) {
     var length = 10;
     var output = [];
     var index = 0;
-    var files = posts();
     while (files.length > 0 && index < (start + length)) {
         var file = files.shift();
         var entry = loadPost("blog/" + file);
@@ -346,10 +349,15 @@ function postHandler(request, response) {
 function blogHandler(request, response) {
     var query = url.parse(request.url, true).query;
     if (query.id) {
+        var id = Number(query.id);
         var key = "/blog?id=" + query.id;
-        var data = cache("blog:" + key, function() {
-            return renderBlog(Number(query.id));
-        });
+        var files = posts();
+        var data = "";
+        if (id < files.length) {
+            data = cache("blog:" + key, function() {
+                return renderBlog(files, id);
+            });
+        }
         response.writeHead(200, { 
             "Content-Type": "text/html",
             "Content-Length": Buffer.byteLength(data)});
@@ -432,7 +440,7 @@ function defaultHandler(request, response) {
                         return scheme(request) + "://" + request.headers.host + "/blog/atom.xml";
                     };
                     context.blog = function() {
-                        return renderBlog(0);
+                        return renderBlog(posts(), 0);
                     };
                     context.links = function() {
                         return configuration.links.map(function (link) {
