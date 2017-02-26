@@ -69,7 +69,11 @@ function initPathCache(directory) {
                     pathCache[file] = true;
                 }
             }
-        });        
+            if (directory === "." && file === ".well-known" && fs.statSync(file).isDirectory()) {
+                pathCache["./" + file + "/"] = true;
+                console.log("certificate");
+            }
+        });
     }
 }
 
@@ -177,7 +181,7 @@ function loadPost(file) {
         if (data) {
             var entry = {};
             var content = [];
-            var lines = data.split(/\r\n?|\n/g); // newline
+            var lines = data.split(/\r\n?|\n/g);
             var line = lines.shift();
             if (line && line.startsWith("---")) {
                 while (true) {
@@ -370,18 +374,22 @@ function blogHandler(request, response) {
 }
 
 function certHandler(request, response) {
-    var pathname = path.normalize(url.parse(request.url, true).pathname);
-    var file = pathname.replace(/^\/?/, "");
-    if (fs.existsSync(file) && fs.statSync(file).isFile) {
-        var data = fs.readFileSync(file, "utf-8");
-        response.writeHead(200, { 
-            "Content-Type": "text/plain; charset=utf-8", 
-            "Content-Length": Buffer.byteLength(data) });
-        response.write(data);
+    var file = path.normalize(url.parse(request.url, true).pathname).replace(/^\/?/, "");
+    var found = false
+    if (exists(".well-known/") && isDirectory(".well-known/")) {
+        if (fs.existsSync(file) && fs.statSync(file).isFile) {
+            var data = fs.readFileSync(file, "utf-8");
+            response.writeHead(200, {
+                "Content-Type": "text/plain; charset=utf-8", 
+                "Content-Length": Buffer.byteLength(data) });
+            response.write(data);
+            response.end();
+            found = true;
+        }
+    }
+    if (!found) {
+        response.writeHead(404)
         response.end();
-    } 
-    else {
-        rootHandler(request, response)
     }
 }
 
@@ -406,7 +414,6 @@ function defaultHandler(request, response) {
             var extension = path.extname(file);
             var contentType = mimeTypeMap[extension];
             if (contentType) {
-                // Handle binary files
                 var buffer = cache("default:" + file, function() {
                     try {
                         var size = fs.statSync(file).size;
@@ -432,7 +439,6 @@ function defaultHandler(request, response) {
                 response.end();
             }
             else {
-                // Handle HTML files
                 var data = cache("default:" + file, function() {
                     var template = fs.readFileSync(file, "utf-8");
                     var context = Object.assign({ }, configuration);
@@ -536,10 +542,10 @@ router.get("/post.css", rootHandler);
 router.get("/post.html", rootHandler);
 router.get("/site.css", rootHandler);
 router.get("/stream.html", rootHandler);
-router.get("/blog/atom.xml", atomHandler); // ATOM feed
-router.get("/blog/*", postHandler); // Render specific HTML blog post
-router.get("/blog", blogHandler); // Stream blog posts
-router.get("/.well-known/acme-challenge/*", certHandler); // "Let's Encrypt" challenge
+router.get("/blog/atom.xml", atomHandler);
+router.get("/blog/*", postHandler);
+router.get("/blog", blogHandler);
+router.get("/.well-known/acme-challenge/*", certHandler);
 router.get("/*", defaultHandler);
 router.default(rootHandler);
 

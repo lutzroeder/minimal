@@ -140,6 +140,10 @@ func initPathCache(dir string) {
 					pathCache[file] = true
 				}
 			}
+			if dir == "." && file == ".well-known" && fileInfo.IsDir() {
+				pathCache["./"+file+"/"] = true
+				fmt.Println("certificate")
+			}
 		}
 	}
 }
@@ -540,15 +544,19 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 }
 
 func certHandler(response http.ResponseWriter, request *http.Request) {
-	file := path.Clean(request.URL.Path)
-	file = strings.TrimLeft(file, "/")
-	if stat, e := os.Stat(file); !os.IsNotExist(e) && !stat.IsDir() {
-		data := mustReadFile(file)
-		response.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		response.Header().Set("Content-Length", strconv.Itoa(len(data)))
-		response.Write(data)
-	} else {
-		rootHandler(response, request)
+	file := strings.TrimLeft(path.Clean(request.URL.Path), "/")
+	found := false
+	if exists(".well-known/") && isDirectory(".well-known/") {
+		if stat, e := os.Stat(file); !os.IsNotExist(e) && !stat.IsDir() {
+			data := mustReadFile(file)
+			response.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			response.Header().Set("Content-Length", strconv.Itoa(len(data)))
+			response.Write(data)
+			found = true
+		}
+	}
+	if !found {
+		response.WriteHeader(http.StatusNotFound)
 	}
 }
 
@@ -583,10 +591,10 @@ func main() {
 	http.HandleFunc("/post.html", rootHandler)
 	http.HandleFunc("/site.css", rootHandler)
 	http.HandleFunc("/stream.html", rootHandler)
-	http.HandleFunc("/blog/atom.xml", atomHandler)               // ATOM feed
-	http.HandleFunc("/blog/", postHandler)                       // Render specific HTML blog post
-	http.HandleFunc("/blog", blogHandler)                        // Stream blog posts
-	http.HandleFunc("/.well-known/acme-challenge/", certHandler) // "Let's Encrypt" challenge
+	http.HandleFunc("/blog/atom.xml", atomHandler)
+	http.HandleFunc("/blog/", postHandler)
+	http.HandleFunc("/blog", blogHandler)
+	http.HandleFunc("/.well-known/acme-challenge/", certHandler)
 	http.HandleFunc("/", defaultHandler)
 	port := 8080
 	fmt.Println("http://localhost:" + strconv.Itoa(port))

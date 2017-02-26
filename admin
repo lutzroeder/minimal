@@ -121,26 +121,6 @@ server_uninstall() {
     fi
 }
 
-server_cert() {
-    echo "$(tput bold)apt-get install letsencrypt$(tput sgr0)"
-    sudo apt-get install --yes letsencrypt # https://letsencrypt.org/getting-started
-
-    if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
-        echo "$(tput bold)renew certificate$(tput sgr0)"
-        sudo letsencrypt renew
-    else
-        echo "$(tput bold)create certificate$(tput sgr0)"
-        mkdir -p .well-known/acme-challenge
-        sudo letsencrypt certonly --webroot -w $(pwd) -d ${domain} -d www.${domain} --agree-tos --email ${mail}
-        rm -R .well-known
-        rm letsencrypt.log
-    fi
-
-    echo "$(tput bold)reload nginx.service$(tput sgr0)"
-    sudo systemctl reload nginx.service
-    sudo systemctl status nginx.service --no-pager --lines=1000 --full
-}
-
 server_start() {
     echo "$(tput bold)start ${site}.service$(tput sgr0)"
     sudo systemctl start ${site}.service
@@ -154,6 +134,33 @@ server_stop() {
         sudo systemctl stop "${site}.service"
         sudo systemctl status ${site}.service  --no-pager --lines=1000 --full
     fi
+}
+
+server_cert() {
+    echo "$(tput bold)apt-get install letsencrypt$(tput sgr0)"
+    sudo apt-get install --yes letsencrypt
+
+    mkdir ./.well-known
+    server_stop
+    server_start
+
+    if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
+        echo "$(tput bold)renew certificate$(tput sgr0)"
+        sudo letsencrypt renew
+    else
+        echo "$(tput bold)create certificate$(tput sgr0)"
+        mkdir -p .well-known/acme-challenge
+        sudo letsencrypt certonly --webroot -w $(pwd) -d ${domain} -d www.${domain} --agree-tos --email ${mail}
+        rm letsencrypt.log
+    fi
+
+    rm -R ./.well-known
+    server_stop
+    server_start
+
+    echo "$(tput bold)reload nginx.service$(tput sgr0)"
+    sudo systemctl reload nginx.service
+    sudo systemctl status nginx.service --no-pager --lines=1000 --full
 }
 
 server_status() {
