@@ -486,7 +486,7 @@ Router.prototype.route = function (path) {
     if (!route) {
         route = {
             path: path,
-            regexp: (path instanceof RegExp) ? path : new RegExp("^" + path.replace("/*", "/(.*)") + "$", "i"),
+            regexp: new RegExp("^" + path.replace("/*", "/(.*)") + "$", "i"),
             handlers: {}
         };
         this.routes.push(route);
@@ -498,22 +498,20 @@ Router.prototype.handle = function (request, response) {
     var pathname = path.normalize(url.parse(request.url, true).pathname);
     for (var i = 0; i < this.routes.length; i++) {
         var route = this.routes[i];
-        if (route) {
-            if (pathname.match(route.regexp) !== null) {
-                var method = request.method.toUpperCase();
-                if (method === "HEAD" && !route.handlers["HEAD"]) {
-                    method = "GET";
+        if (pathname.match(route.regexp) !== null) {
+            var method = request.method.toUpperCase();
+            if (method === "HEAD" && !route.handlers["HEAD"]) {
+                method = "GET";
+            }
+            var handler = route.handlers[method];
+            if (handler) {
+                try {
+                    handler(request, response);
                 }
-                var handler = route.handlers[method];
-                if (handler) {
-                    try {
-                        handler(request, response);
-                    }
-                    catch (error) {
-                        console.log(error);
-                    }
-                    return;
+                catch (error) {
+                    console.log(error);
                 }
+                return;
             }
         }
     }
