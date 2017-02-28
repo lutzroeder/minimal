@@ -549,9 +549,9 @@ router.get("/.well-known/acme-challenge/*", certHandler);
 router.get("/*", defaultHandler);
 router.default(rootHandler);
 
-var environment = process.env.NODE_ENV;
 console.log(process.title + " " + process.version);
 var configuration = JSON.parse(fs.readFileSync("./app.json", "utf-8"));
+var environment = process.env.NODE_ENV;
 console.log(environment);
 initPathCache(".");
 var server = http.createServer(function (request, response) {
