@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -270,40 +269,30 @@ func posts() []string {
 
 func loadPost(path string) map[string]string {
 	if stat, e := os.Stat(path); !os.IsNotExist(e) && !stat.IsDir() {
-		file, e := os.Open(path)
-		if e != nil {
-			panic(e)
-		}
+		data := string(mustReadFile(path))
 		entry := make(map[string]string)
 		content := []string{}
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			line := scanner.Text()
+		metadata := -1
+		lines := regexp.MustCompile("\\r\\n?|\\n").Split(data, -1)
+		for len(lines) > 0 {
+			line := lines[0]
+			lines = lines[1:]
 			if strings.HasPrefix(line, "---") {
-				for scanner.Scan() {
-					line := scanner.Text()
-					if strings.HasPrefix(line, "---") {
-						break
-					}
+				metadata++
+			} else {
+				if metadata == 0 {
 					index := strings.Index(line, ":")
 					if index >= 0 {
 						name := strings.Trim(strings.Trim(line[0:index], " "), "\"")
-						value := strings.Trim(line[index+1:], " ")
+						value := strings.Trim(strings.Trim(line[index+1:], " "), "\"")
 						entry[name] = value
 					}
+				} else {
+					content = append(content, line)
 				}
-			} else {
-				content = append(content, line)
 			}
 		}
-		for scanner.Scan() {
-			content = append(content, scanner.Text())
-		}
 		entry["content"] = strings.Join(content, "\n")
-		if e := scanner.Err(); e != nil {
-			panic(e)
-		}
-		file.Close()
 		return entry
 	}
 	return nil

@@ -186,30 +186,31 @@ function loadPost(file) {
         if (data) {
             var entry = {};
             var content = [];
+            var metadata = -1;
             var lines = data.split(/\r\n?|\n/g);
-            var line = lines.shift();
-            if (line && line.startsWith("---")) {
-                while (true) {
-                    line = lines.shift();
-                    if (!line || line.startsWith("---")) {
-                        break;
-                    }
-                    var index = line.indexOf(":");
-                    if (index > -1) {
-                        var name = line.slice(0, index).trim();
-                        var value = line.slice(index + 1).trim();
-                        if (value.startsWith('"') && value.endsWith('"')) {
-                            value = value.slice(1, -1);
+            while (lines.length > 0) {
+                var line = lines.shift();
+                if (line.startsWith("---")) {
+                    metadata++;
+                }
+                else {
+                    if (metadata == 0) {
+                        var index = line.indexOf(":");
+                        if (index >= 0) {
+                            var name = line.slice(0, index).trim();
+                            var value = line.slice(index + 1).trim();
+                            if (value.startsWith('"') && value.endsWith('"')) {
+                                value = value.slice(1, -1);
+                            }
+                            entry[name] = value;
                         }
-                        entry[name] = value;
+                    }
+                    else {
+                        content.push(line);
                     }
                 }
             }
-            else {
-                content.append(line);
-            }
-            content = content.concat(lines);
-            entry.content = content.join("\n");
+            entry["content"] = content.join("\n");
             return entry;
         }
     }
@@ -266,28 +267,28 @@ function atomHandler(request, response) {
         var output = [];
         output.push("<?xml version='1.0' encoding='UTF-8'?>");
         output.push("<feed xmlns='http://www.w3.org/2005/Atom'>");
-        output.push("<title>" + configuration.name + "</title>");
+        output.push("<title>" + configuration["name"] + "</title>");
         output.push("<id>" + host + "/</id>");
         output.push("<icon>" + host + "/favicon.ico</icon>");
         output.push("<updated>" + new Date().toISOString() + "</updated>");
-        output.push("<author><name>" + configuration.name + "</name></author>");
+        output.push("<author><name>" + configuration["name"] + "</name></author>");
         output.push("<link rel='alternate' type='text/html' href='" + host + "/' />");
         output.push("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />");
         posts().forEach(function (file) {
             var entry = loadPost("blog/" + file);
-            if (entry && (entry.state === "post" || environment !== "production")) {
+            if (entry && (entry["state"] === "post" || environment !== "production")) {
                 var url = host + "/blog/" + path.basename(file, ".html");
                 output.push("<entry>");
                 output.push("<id>" + url + "</id>");
-                if (entry.author && entry.author !== configuration.name) {
-                    output.push("<author><name>" + entry.author + "</name></author>");
+                if (entry["author"] && entry["author"] !== configuration["name"]) {
+                    output.push("<author><name>" + entry["author"] + "</name></author>");
                 }
-                var date = new Date(entry.date).toISOString();
+                var date = new Date(entry["date"]).toISOString();
                 output.push("<published>" + date + "</published>");
-                output.push("<updated>" + (entry.updated ? (new Date(entry.updated).toISOString()) : date) + "</updated>");
-                output.push("<title type='text'>" + entry.title + "</title>");
-                output.push("<content type='html'>" + escapeHtml(entry.content) + "</content>");
-                output.push("<link rel='alternate' type='text/html' href='" + url + "' title='" + entry.title + "' />");
+                output.push("<updated>" + (entry["updated"] ? (new Date(entry["updated"]).toISOString()) : date) + "</updated>");
+                output.push("<title type='text'>" + entry["title"] + "</title>");
+                output.push("<content type='html'>" + escapeHtml(entry["content"]) + "</content>");
+                output.push("<link rel='alternate' type='text/html' href='" + url + "' title='" + entry["title"] + "' />");
                 output.push("</entry>");
             }
         });
@@ -321,9 +322,9 @@ function postHandler(request, response) {
     var data = cache("post:" + file, function() {
         var entry = loadPost(file + ".html");
         if (entry) {
-            var date = new Date(entry.date);
-            entry.date = date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
-            entry.author = entry.author || configuration.name;
+            var date = new Date(entry["date"]);
+            entry["date"] = date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
+            entry["author"] = entry["author"] || configuration["name"];
             var context = Object.assign(configuration, entry);
             var template = fs.readFileSync("post.html", "utf-8");
             return mustache(template, context, function(name) {
@@ -451,13 +452,13 @@ function defaultHandler(request, response) {
                         return renderBlog(posts(), 0);
                     };
                     context.links = function() {
-                        return configuration.links.map(function (link) {
-                            return "<a class='icon' target='_blank' href='" + link.url + "' title='" + link.name + "'><span class='symbol'>" + link.symbol + "</span></a>";
+                        return configuration["links"].map(function (link) {
+                            return "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + link.symbol + "</span></a>";
                         }).join("\n");
                     };
                     context.tabs = function() {
-                        return configuration.pages.map(function (page) {
-                            return "<li class='tab'><a href='" + page.url + "'>" + page.name + "</a></li>";
+                        return configuration["pages"].map(function (page) {
+                            return "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>";
                         }).join("\n");
                     };
                     return mustache(template, context, function(name) {
