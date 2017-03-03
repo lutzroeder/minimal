@@ -165,7 +165,7 @@ func exists(path string) bool {
 	return !os.IsNotExist(err)
 }
 
-func isDirectory(path string) bool {
+func isDir(path string) bool {
 	if environment == "production" {
 		path = "./" + path
 		if !strings.HasSuffix(path, "/") {
@@ -255,7 +255,7 @@ func truncate(text string, length int) string {
 }
 
 func posts() []string {
-	return cache("blog:*.*", func() interface{} {
+	return append([]string{}, cache("blog:files", func() interface{} {
 		files := []string{}
 		fileInfos, _ := ioutil.ReadDir("blog/")
 		for i := len(fileInfos) - 1; i >= 0; i-- {
@@ -265,7 +265,7 @@ func posts() []string {
 			}
 		}
 		return files
-	}).([]string)
+	}).([]string)...)
 }
 
 func loadPost(path string) map[string]string {
@@ -316,7 +316,7 @@ func renderBlog(files []string, start int) string {
 	for len(files) > 0 && index < start+length {
 		file := files[0]
 		files = files[1:]
-		entry := loadPost("blog/" + file)
+		entry := loadPost("./blog/" + file)
 		if entry != nil && (entry["state"] == "post" || environment != "production") {
 			if index >= start {
 				location := "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
@@ -324,20 +324,19 @@ func renderBlog(files []string, start int) string {
 				entry["date"] = date.Format("Jan 2, 2006")
 				post := []string{}
 				post = append(post, "<div class='item'>")
-				post = append(post, "<div class='date'>"+entry["date"]+"</div>\n")
-				post = append(post, "<h1><a href='"+location+"'>"+entry["title"]+"</a></h1>\n")
+				post = append(post, "<div class='date'>"+entry["date"]+"</div>")
+				post = append(post, "<h1><a href='"+location+"'>"+entry["title"]+"</a></h1>")
 				post = append(post, "<div class='content'>")
 				content := entry["content"]
 				content = regexp.MustCompile("\\s\\s").ReplaceAllString(content, " ")
 				truncated := truncate(content, 250)
-				post = append(post, truncated+"\n")
+				post = append(post, truncated)
 				post = append(post, "</div>")
 				if truncated != content {
-					post = append(post, "<div class='more'><a href='"+location+"'>"+"Read more&hellip;"+"</a></div>\n")
+					post = append(post, "<div class='more'><a href='"+location+"'>"+"Read more&hellip;"+"</a></div>")
 				}
 				post = append(post, "</div>")
-				output = append(output, strings.Join(post, ""))
-				output = append(output, "\n")
+				output = append(output, strings.Join(post, "\n") + "\n")
 			}
 			index++
 		}
@@ -403,8 +402,7 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 }
 
 func postHandler(response http.ResponseWriter, request *http.Request) {
-	file := strings.ToLower(path.Clean(request.URL.Path))
-	file = strings.TrimPrefix(file, "/")
+	file := strings.TrimPrefix(strings.ToLower(path.Clean(request.URL.Path)),"/")
 	data := cacheString("post:"+file, func() string {
 		entry := loadPost(file + ".html")
 		if entry != nil {
@@ -476,15 +474,14 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 			file = path.Join(pathname, "index.html")
 		}
 		file = strings.TrimLeft(file, "/")
-
 		if !exists(file) {
 			http.Redirect(response, request, path.Dir(pathname), http.StatusFound)
-		} else if isDirectory(file) {
+		} else if isDir(file) {
 			http.Redirect(response, request, pathname+"/", http.StatusFound)
 		} else {
 			extension := path.Ext(file)
 			contentType := mime.TypeByExtension(extension)
-			if len(contentType) > 0 && extension != ".html" {
+			if len(contentType) > 0 && strings.Split(contentType, ";")[0] != "text/html" {
 				data := cacheBuffer("default:"+file, func() []byte {
 					return mustReadFile("./" + file)
 				})
@@ -546,7 +543,7 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 func certHandler(response http.ResponseWriter, request *http.Request) {
 	file := strings.TrimLeft(path.Clean(request.URL.Path), "/")
 	found := false
-	if exists(".well-known/") && isDirectory(".well-known/") {
+	if exists(".well-known/") && isDir(".well-known/") {
 		if stat, e := os.Stat(file); !os.IsNotExist(e) && !stat.IsDir() {
 			data := mustReadFile(file)
 			response.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -581,6 +578,7 @@ func main() {
 	http.HandleFunc("/.git", rootHandler)
 	http.HandleFunc("/admin", rootHandler)
 	http.HandleFunc("/admin.cfg", rootHandler)
+	http.HandleFunc("/test", rootHandler)
 	http.HandleFunc("/app.go", rootHandler)
 	http.HandleFunc("/app.js", rootHandler)
 	http.HandleFunc("/app.json", rootHandler)
@@ -598,6 +596,5 @@ func main() {
 	http.HandleFunc("/", defaultHandler)
 	port := 8080
 	fmt.Println("http://localhost:" + strconv.Itoa(port))
-	fmt.Println();
 	http.ListenAndServe(":8080", loggerHandler{http.DefaultServeMux})
 }

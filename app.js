@@ -42,12 +42,17 @@ function scheme(request) {
     return "http";
 }
 
+function redirect(response, status, location) {
+    response.writeHead(status, { "Location": location });
+    response.end();
+}
+
 var cacheData = {};
 
 function cache(key, callback) {
     if (environment === "production") {
         if (!(key in cacheData)) {
-            cacheData[key] = callback();            
+            cacheData[key] = callback();
         }
         return cacheData[key];
     }
@@ -168,11 +173,11 @@ function truncate(text, length) {
 }
 
 function posts() {
-    return cache("blog:*.*", function() {
+    return cache("blog:files", function() {
         return fs.readdirSync("./blog/").filter(function (file) {
             return path.extname(file) === ".html"; }
         ).sort().reverse();
-    });
+    }).slice(0);
 }
 
 function loadPost(file) {
@@ -225,19 +230,19 @@ function renderBlog(files, start) {
                 entry.date = date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
                 var post = [];
                 post.push("<div class='item'>");
-                post.push("<div class='date'>" + entry.date + "</div>\n");
-                post.push("<h1><a href='" + location + "'>" + entry.title + "</a></h1>\n");
+                post.push("<div class='date'>" + entry.date + "</div>");
+                post.push("<h1><a href='" + location + "'>" + entry.title + "</a></h1>");
                 post.push("<div class='content'>")
                 var content = entry.content;
                 content = content.replace(/\s\s/g, " ");
                 var truncated = truncate(content, 250);
-                post.push(truncated + "\n");
+                post.push(truncated);
                 post.push("</div>");
                 if (truncated != content) {
-                    post.push("<div class='more'><a href='" + location + "'>" + "Read more&hellip;" + "</a></div>\n");
+                    post.push("<div class='more'><a href='" + location + "'>" + "Read more&hellip;" + "</a></div>");
                 }
                 post.push("</div>");
-                output.push(post.join("") + "\n");
+                output.push(post.join("\n") + "\n");
             }
             index++;
         }
@@ -248,12 +253,11 @@ function renderBlog(files, start) {
         var data = mustache(template, context, null);
         output.push(data);
     }
-    return output.join("");
+    return output.join("\n");
 }
 
 function rootHandler(request, response) {
-    response.writeHead(302, { "Location": "/" });
-    response.end();
+    redirect(response, 302, "/");
 }
 
 function atomHandler(request, response) {
@@ -397,18 +401,15 @@ function defaultHandler(request, response) {
     var pathname = path.normalize(url.parse(request.url, true).pathname.toLowerCase());
     if (pathname.endsWith("/index.html"))
     {
-        response.writeHead(301, { "Location": "/" + pathname.substring(0, pathname.length - 11).replace(/^\/?/, "") });
-        response.end();
+        redirect(response, 301, "/" + pathname.substring(0, pathname.length - 11).replace(/^\/?/, ""));
     }
     else {
         var file = (pathname.endsWith("/") ? path.join(pathname, "index.html") : pathname).replace(/^\/?/, "");
         if (!exists(file)) {
-            response.writeHead(302, { "Location": path.dirname(pathname) });
-            response.end();
+            redirect(response, 302, path.dirname(pathname));
         }
         else if (isDirectory(file)) {
-            response.writeHead(302, { "Location": pathname + "/" });
-            response.end();
+            redirect(response, 302, pathname + "/");
         }
         else {
             var extension = path.extname(file);
@@ -431,7 +432,8 @@ function defaultHandler(request, response) {
                 response.writeHead(200, {
                     "Content-Type": contentType,
                     "Content-Length": buffer.length,
-                    "Cache-Control": "private, max-age=0", "Expires": -1 
+                    "Cache-Control": "private, max-age=0",
+                    "Expires": -1 
                 });
                 if (request.method !== "HEAD") {
                     response.write(buffer, "binary");
@@ -530,6 +532,7 @@ var router = new Router();
 router.get("/.git(/.*)?", rootHandler);
 router.get("/admin", rootHandler);
 router.get("/admin.cfg", rootHandler);
+router.get("/test", rootHandler);
 router.get("/app.go", rootHandler);
 router.get("/app.js", rootHandler);
 router.get("/app.json", rootHandler);
@@ -559,5 +562,4 @@ var server = http.createServer(function (request, response) {
 var port = process.env.PORT || 8080;
 server.listen(port, function() {
     console.log("http://localhost:" + port);
-    console.log();
 });
