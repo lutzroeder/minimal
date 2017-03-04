@@ -47,6 +47,16 @@ function redirect(response, status, location) {
     response.end();
 }
 
+function formatDate(date, format) {
+    if (format === "iso") {
+        return date.toISOString().replace(/\.[0-9]*Z/, "Z")
+    }
+    if (format === "user") {
+        return date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
+    }
+    return ""
+}
+
 var cacheData = {};
 
 function cache(key, callback) {
@@ -224,17 +234,16 @@ function renderBlog(files, start) {
     while (files.length > 0 && index < (start + length)) {
         var file = files.shift();
         var entry = loadPost("blog/" + file);
-        if (entry && (entry.state === "post" || environment !== "production")) {
+        if (entry && (entry["state"] === "post" || environment !== "production")) {
             if (index >= start) {
                 var location = "/blog/" + path.basename(file, ".html");
-                var date = new Date(entry.date);
-                entry.date = date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
+                entry["date"] = formatDate(new Date(entry["date"]), "user");
                 var post = [];
                 post.push("<div class='item'>");
-                post.push("<div class='date'>" + entry.date + "</div>");
-                post.push("<h1><a href='" + location + "'>" + entry.title + "</a></h1>");
+                post.push("<div class='date'>" + entry["date"] + "</div>");
+                post.push("<h1><a href='" + location + "'>" + entry["title"] + "</a></h1>");
                 post.push("<div class='content'>")
-                var content = entry.content;
+                var content = entry["content"];
                 content = content.replace(/\s\s/g, " ");
                 var truncated = truncate(content, 250);
                 post.push(truncated);
@@ -270,7 +279,9 @@ function atomHandler(request, response) {
         output.push("<title>" + configuration["name"] + "</title>");
         output.push("<id>" + host + "/</id>");
         output.push("<icon>" + host + "/favicon.ico</icon>");
-        output.push("<updated>" + new Date().toISOString() + "</updated>");
+        var index = output.length;
+        var recent = null;
+        output.push("");
         output.push("<author><name>" + configuration["name"] + "</name></author>");
         output.push("<link rel='alternate' type='text/html' href='" + host + "/' />");
         output.push("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />");
@@ -283,15 +294,19 @@ function atomHandler(request, response) {
                 if (entry["author"] && entry["author"] !== configuration["name"]) {
                     output.push("<author><name>" + entry["author"] + "</name></author>");
                 }
-                var date = new Date(entry["date"]).toISOString();
+                var date = formatDate(new Date(entry["date"]), "iso");
                 output.push("<published>" + date + "</published>");
-                output.push("<updated>" + (entry["updated"] ? (new Date(entry["updated"]).toISOString()) : date) + "</updated>");
+                var updated = entry["updated"] ? formatDate(new Date(entry["updated"]), "iso") : date;
+                output.push("<updated>" + updated + "</updated>");
+                recent = recent ? recent : updated;
                 output.push("<title type='text'>" + entry["title"] + "</title>");
                 output.push("<content type='html'>" + escapeHtml(entry["content"]) + "</content>");
                 output.push("<link rel='alternate' type='text/html' href='" + url + "' title='" + entry["title"] + "' />");
                 output.push("</entry>");
             }
         });
+        recent = recent ? recent : formatDate(new Date(), "iso");
+        output[index] = "<updated>" + recent + "</updated>";
         output.push("</feed>");
         return output.join("\n");
     });
@@ -322,8 +337,7 @@ function postHandler(request, response) {
     var data = cache("post:" + file, function() {
         var entry = loadPost(file + ".html");
         if (entry) {
-            var date = new Date(entry["date"]);
-            entry["date"] = date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
+            entry["date"] = formatDate(new Date(entry["date"]), "user");
             entry["author"] = entry["author"] || configuration["name"];
             var context = Object.assign(configuration, entry);
             var template = fs.readFileSync("post.html", "utf-8");
@@ -533,10 +547,10 @@ var router = new Router();
 router.get("/.git(/.*)?", rootHandler);
 router.get("/admin", rootHandler);
 router.get("/admin.cfg", rootHandler);
-router.get("/test", rootHandler);
 router.get("/app.go", rootHandler);
 router.get("/app.js", rootHandler);
 router.get("/app.json", rootHandler);
+router.get("/app.python", rootHandler);
 router.get("/header.html", rootHandler);
 router.get("/meta.html", rootHandler);
 router.get("/package.json", rootHandler);

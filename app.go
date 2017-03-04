@@ -89,6 +89,16 @@ func scheme(request *http.Request) string {
 	return "http"
 }
 
+func formatDate(date time.Time, format string) string {
+	if format == "iso" {
+		return date.UTC().Format("2006-01-02T15:04:05Z")
+	}
+	if format == "user" {
+		return date.Format("Jan 2, 2006")
+	}
+	return ""
+}
+
 var cacheData = make(map[string]interface{})
 var cacheDataMutex = &sync.Mutex{}
 
@@ -309,8 +319,8 @@ func renderBlog(files []string, start int) string {
 		if entry != nil && (entry["state"] == "post" || environment != "production") {
 			if index >= start {
 				location := "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
-				date, _ := time.Parse("2006-01-02 15:04:05 MST", entry["date"])
-				entry["date"] = date.Format("Jan 2, 2006")
+				date, _ := time.Parse("2006-01-02 15:04:05 -07:00", entry["date"])
+				entry["date"] = formatDate(date, "user")
 				post := []string{}
 				post = append(post, "<div class='item'>")
 				post = append(post, "<div class='date'>"+entry["date"]+"</div>")
@@ -353,7 +363,9 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 		output = append(output, "<title>"+configuration["name"].(string)+"</title>")
 		output = append(output, "<id>"+host+"/</id>")
 		output = append(output, "<icon>"+host+"/favicon.ico</icon>")
-		output = append(output, "<updated>"+time.Now().UTC().Format("2006-01-02T15:04:05.999Z07:00")+"</updated>")
+		index := len(output)
+		recent := ""
+		output = append(output, "")
 		output = append(output, "<author><name>"+configuration["name"].(string)+"</name></author>")
 		output = append(output, "<link rel='alternate' type='text/html' href='"+host+"/' />")
 		output = append(output, "<link rel='self' type='application/atom+xml' href='"+host+"/blog/atom.xml' />")
@@ -367,19 +379,33 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 				if author, ok := entry["author"]; ok && author != configuration["name"].(string) {
 					output = append(output, "<author><name>"+author+"</name></author>")
 				}
-				date, _ := time.Parse("2006-01-02 15:04:05 MST", entry["date"])
-				output = append(output, "<published>"+date.UTC().Format("2006-01-02T15:04:05.999Z07:00")+"</published>")
-				updated := date
-				if u, ok := entry["updated"]; ok {
-					updated, _ = time.Parse("2006-01-02 15:04:05 MST", u)
+				date := "";
+				if value, ok := entry["date"]; ok {
+					if time, err := time.Parse("2006-01-02 15:04:05 -07:00", value); err == nil {
+						date = formatDate(time, "iso")
+					}
 				}
-				output = append(output, "<updated>"+updated.UTC().Format("2006-01-02T15:04:05.999Z07:00")+"</updated>")
+				output = append(output, "<published>"+date+"</published>")
+				updated := date
+				if value, ok := entry["updated"]; ok {
+					if time, err := time.Parse("2006-01-02 15:04:05 -07:00", value); err == nil {
+						updated = formatDate(time, "iso")
+					}
+				}
+				output = append(output, "<updated>"+updated+"</updated>")
+				if len(recent) == 0 {
+					recent = updated					
+				}
 				output = append(output, "<title type='text'>"+entry["title"]+"</title>")
 				output = append(output, "<content type='html'>"+escapeHTML(entry["content"])+"</content>")
 				output = append(output, "<link rel='alternate' type='text/html' href='"+url+"' title='"+entry["title"]+"' />")
 				output = append(output, "</entry>")
 			}
 		}
+		if (len(recent) == 0) {
+			recent = formatDate(time.Now(), "iso")
+		}
+		output[index] = "<updated>"+recent+"</updated>"
 		output = append(output, "</feed>")
 		return strings.Join(output, "\n")
 	})
@@ -395,8 +421,8 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 	data := cacheString("post:"+file, func() string {
 		entry := loadPost(file + ".html")
 		if entry != nil {
-			date, _ := time.Parse("2006-01-02 15:04:05 MST", entry["date"])
-			entry["date"] = date.Format("Jan 2, 2006")
+			date, _ := time.Parse("2006-01-02 15:04:05 -07:00", entry["date"])
+			entry["date"] = formatDate(date, "user")
 			if _, ok := entry["author"]; !ok {
 				entry["author"] = configuration["name"].(string)
 			}
@@ -567,10 +593,10 @@ func main() {
 	http.HandleFunc("/.git", rootHandler)
 	http.HandleFunc("/admin", rootHandler)
 	http.HandleFunc("/admin.cfg", rootHandler)
-	http.HandleFunc("/test", rootHandler)
 	http.HandleFunc("/app.go", rootHandler)
 	http.HandleFunc("/app.js", rootHandler)
 	http.HandleFunc("/app.json", rootHandler)
+	http.HandleFunc("/app.python", rootHandler)
 	http.HandleFunc("/header.html", rootHandler)
 	http.HandleFunc("/meta.html", rootHandler)
 	http.HandleFunc("/package.json", rootHandler)
