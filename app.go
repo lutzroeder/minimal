@@ -100,18 +100,18 @@ func formatDate(date time.Time, format string) string {
 }
 
 var cacheData = make(map[string]interface{})
-var cacheDataMutex = &sync.Mutex{}
+var cacheLock = &sync.Mutex{}
 
 func cache(key string, callback func() interface{}) interface{} {
 	if environment == "production" {
-		cacheDataMutex.Lock()
+		cacheLock.Lock()
 		value, ok := cacheData[key]
-		cacheDataMutex.Unlock()
+		cacheLock.Unlock()
 		if !ok {
 			value = callback()
-			cacheDataMutex.Lock()
+			cacheLock.Lock()
 			cacheData[key] = value
-			cacheDataMutex.Unlock()
+			cacheLock.Unlock()
 		}
 		return value
 	}
@@ -189,7 +189,7 @@ func isDir(path string) bool {
 	return false
 }
 
-var tagRegexp = regexp.MustCompile("(\\w+)[^>]*>")
+var tagRegexp = regexp.MustCompile("<(\\w+)[^>]*>")
 var entityRegexp = regexp.MustCompile("(#?[A-Za-z0-9]+;)")
 
 func truncate(text string, length int) string {
@@ -209,11 +209,9 @@ func truncate(text string, length int) string {
 					if tag == "pre" || tag == "code" || tag == "img" {
 						break
 					}
-					index += 1 + len(match[0])
-					closeTag := "</" + tag + ">"
-					end := strings.Index(text[index:], closeTag)
-					if end != -1 {
-						closeTags[index+end] = closeTag
+					index += len(match[0])
+					if match := regexp.MustCompile("</"+tag+"\\s*>").FindStringIndex(text[index:]); match != nil {
+						closeTags[index+match[0]] = "</" + tag + ">"
 					}
 				} else {
 					index++

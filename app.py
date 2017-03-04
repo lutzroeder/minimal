@@ -136,8 +136,8 @@ def posts():
         return files
     return list(cache("blog:files", get_posts))
 
-tag_regexp = re.compile("(\\w+)[^>]*>")
-entity_regexp = re.compile(r"(\\w+;)")
+tag_regexp = re.compile("<(\\w+)[^>]*>")
+entity_regexp = re.compile("(#?[A-Za-z0-9]+;)")
 
 def truncate(text, length):
     close_tags = {}
@@ -149,17 +149,17 @@ def truncate(text, length):
             if index in close_tags:
                 index += len(close_tags.pop(index))
             else:
-                index += 1
                 match = tag_regexp.match(text[index:])
                 if match:
                     tag = match.groups()[0]
                     if tag == "pre" or tag == "code" or tag == "img":
                         break
                     index += match.end()
-                    match = re.search(r"(</" + tag + "[^>]*>)", text[index:], re.IGNORECASE)
+                    match = re.search("(</" + tag + "\\s*>)", text[index:], re.IGNORECASE)
                     if match:
-                        close_tags[index + match.start()] = match.groups()[0]
+                        close_tags[index + match.start()] = "</" + tag + ">"
                 else:
+                    index += 1
                     count += 1
         elif text[index] == "&":
             index += 1
@@ -490,7 +490,6 @@ print("Python " + platform.python_version())
 with open("./app.json") as configurationFile:
     configuration = json.load(configurationFile)
 environment = os.getenv("PYTHON_ENV")
-environment = "production"
 print(environment)
 init_path_cache(".")
 router = Router()

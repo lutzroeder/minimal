@@ -121,17 +121,16 @@ function truncate(text, length) {
                 index += closeTagLength;
             } 
             else {
-                var match = text.substring(index).match(/(\w+)[^>]*>/);
+                var match = text.substring(index).match("<(\\w+)[^>]*>");
                 if (match) {
                     var tag = match[1];
                     if (tag == "pre" || tag == "code" || tag == "img") {
                         break;
                     }
-                    index += 1 + match[0].length;
-                    var closeTag = "</" + tag + ">";
-                    var end = text.indexOf(closeTag, index);
+                    index += match[0].length;
+                    var end = text.substring(index).search("(</" + tag + "\\s*>)")
                     if (end != -1) {
-                        closeTags[end] = closeTag;
+                        closeTags[index + end] = "</" + tag + ">";
                     }
                 }
                 else {
@@ -142,7 +141,7 @@ function truncate(text, length) {
         }
         else if (text[index] == "&") {
             index++;
-            var entity = text.substring(index).match(/(#?[A-Za-z0-9]+;)/);
+            var entity = text.substring(index).match("(#?[A-Za-z0-9]+;)");
             if (entity) {
                 index += match[0].length;
             }
@@ -154,7 +153,7 @@ function truncate(text, length) {
                 count++;
             }
             var i = index;
-            while (text[i] != ' ' && text[i] != '<' && text[i] != '&' && i < text.length) {
+            while (i < text.length && text[i] != ' ' && text[i] != '<' && text[i] != '&') {
                 i++;
             }
             var skip = i - index;
