@@ -10,7 +10,10 @@ server_install() {
     if [ ${runtime} = "go" ]; then 
         echo "$(tput bold)apt-get install golang$(tput sgr0)"
         sudo apt-get install --yes golang
-    else 
+    elif [ ${runtime} = "python" ]; then
+        echo "$(tput bold)apt-get install python$(tput sgr0)"
+        sudo apt-get install --yes python
+    else
         echo "$(tput bold)apt-get install nodejs$(tput sgr0)"
         sudo apt-get install --yes nodejs
     fi
@@ -73,7 +76,10 @@ EOF
     if [ ${runtime} = "go" ]; then 
         command="$(which go) run $(pwd)/app.go"
         environment="GO_ENV"
-    else 
+    elif [ ${runtime} = "python" ]; then
+        command="$(which python) $(pwd)/app.py"
+        environment="PYTHON_ENV"
+    else
         command="$(which node) $(pwd)/app.js"
         environment="NODE_ENV"
     fi
@@ -187,7 +193,9 @@ server_update() {
 client_start() {
     if [ ${1:-${runtime}} = "go" ]; then 
         sleep 1 && git web--browse http://localhost:8080 & GO_ENV=${GO_ENV:-development} go run app.go
-    else 
+    elif [ ${1:-${runtime}} = "python" ]; then
+        sleep 0.5 && git web--browse http://localhost:8080 & PYTHON_ENV=${PYTHON_ENV:-development} python app.py
+    else
         sleep 0.5 && git web--browse http://localhost:8080 & NODE_ENV=${NODE_ENV:-development} node app.js
     fi
 }
@@ -218,6 +226,39 @@ client_push() {
         echo "$(tput bold)git push$(tput sgr0)"
         git push
     fi
+}
+
+client_test() {
+    output="./.test"
+    mkdir -p ${output}
+    echo "node..."
+    NODE_ENV=production node ./app.js &> /dev/null & pid=$!
+    sleep 0.5
+    curl -s http://localhost:8080/ > ${output}/root_node.html
+    curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_node.xml
+    kill -9 ${pid}
+    wait ${pid} 2>/dev/null
+    echo "python..."
+    PYTHON_ENV=production python ./app.py &> /dev/null & pid=$!
+    sleep 0.5
+    curl -s http://localhost:8080/ > ${output}/root_python.html
+    curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_python.xml
+    kill -9 ${pid}
+    wait ${pid} 2>/dev/null
+    echo "go..."
+    go build -o ./app ./app.go
+    GO_ENV=production ./app &> /dev/null & pid=$!
+    sleep 0.5
+    curl -s http://localhost:8080/ > ${output}/root_go.html
+    curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_go.xml
+    kill -9 ${pid}
+    wait ${pid} 2>/dev/null
+    rm ./app
+    echo "compare"
+    cmp ${output}/root_node.html ${output}/root_go.html
+    cmp ${output}/root_node.html ${output}/root_python.html
+    cmp ${output}/atom_node.xml ${output}/atom_go.xml
+    cmp ${output}/atom_node.xml ${output}/atom_python.xml
 }
 
 client_console() {
@@ -271,6 +312,7 @@ client() {
         "update") client_update $@;;
         "status") client_status;;
         "console") client_console;;
+        "test") client_test;;
         *)
             description;
             echo "Usage: $(tput bold)$(basename "$0")$(tput sgr0) <client-command>"
