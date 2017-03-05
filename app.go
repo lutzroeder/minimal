@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -348,6 +349,14 @@ func renderBlog(files []string, start int) string {
 	return strings.Join(output, "\n")
 }
 
+func writeString(response http.ResponseWriter, request *http.Request, contentType string, text string) {
+	response.Header().Set("Content-Type", contentType)
+	response.Header().Set("Content-Length", strconv.Itoa(bytes.NewBufferString(text).Len()))
+	if request.Method != "HEAD" {
+		io.WriteString(response, text)
+	}
+}
+
 func rootHandler(response http.ResponseWriter, request *http.Request) {
 	http.Redirect(response, request, "/", http.StatusFound)
 }
@@ -407,11 +416,7 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 		output = append(output, "</feed>")
 		return strings.Join(output, "\n")
 	})
-	response.Header().Set("Content-Type", "application/atom+xml")
-	if request.Method != "HEAD" {
-		length, _ := io.WriteString(response, data)
-		response.Header().Set("Content-Length", strconv.Itoa(length))
-	}
+	writeString(response, request, "application/atom+xml", data)
 }
 
 func postHandler(response http.ResponseWriter, request *http.Request) {
@@ -439,11 +444,7 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 		return ""
 	})
 	if len(data) > 0 {
-		response.Header().Set("Content-Type", "text/html")
-		if request.Method != "HEAD" {
-			length, _ := io.WriteString(response, data)
-			response.Header().Set("Content-Length", strconv.Itoa(length))
-		}
+		writeString(response, request, "text/html", data)
 	} else {
 		extension := path.Ext(file)
 		contentType := mime.TypeByExtension(extension)
@@ -465,9 +466,7 @@ func blogHandler(response http.ResponseWriter, request *http.Request) {
 				return renderBlog(files, start)
 			})
 		}
-		response.Header().Set("Content-Type", "text/html")
-		length, _ := io.WriteString(response, data)
-		response.Header().Set("Content-Length", strconv.Itoa(length))
+		writeString(response, request, "text/html", data)
 	} else {
 		rootHandler(response, request)
 	}
@@ -543,11 +542,7 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 						return string(mustReadFile(path.Join("./", name)))
 					})
 				})
-				response.Header().Set("Content-Type", "text/html")
-				if request.Method != "HEAD" {
-					length, _ := io.WriteString(response, data)
-					response.Header().Set("Content-Length", strconv.Itoa(length))
-				}
+				writeString(response, request, "text/html", data)
 			}
 		}
 	}

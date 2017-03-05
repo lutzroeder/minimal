@@ -152,11 +152,10 @@ function truncate(text, length) {
                 index++;
                 count++;
             }
-            var i = index;
-            while (i < text.length && text[i] != ' ' && text[i] != '<' && text[i] != '&') {
-                i++;
+            var skip = text.substring(index).search(" |<|&")
+            if (skip == -1) {
+                skip = text.length - index;
             }
-            var skip = i - index;
             if (count + skip > length) {
                 ellipsis = "&hellip;"
             }
@@ -265,6 +264,17 @@ function renderBlog(files, start) {
     return output.join("\n");
 }
 
+function writeString(request, response, contentType, data) {
+    response.writeHead(200, { 
+        "Content-Type": contentType, 
+        "Content-Length": Buffer.byteLength(data)
+    });
+    if (request.method !== "HEAD") {
+        response.write(data);
+    }
+    response.end();
+}
+
 function rootHandler(request, response) {
     redirect(response, 302, "/");
 }
@@ -309,14 +319,7 @@ function atomHandler(request, response) {
         output.push("</feed>");
         return output.join("\n");
     });
-    response.writeHead(200, { 
-        "Content-Type": "application/atom+xml", 
-        "Content-Length": Buffer.byteLength(data)
-    });
-    if (request.method !== "HEAD") {
-        response.write(data);
-    }
-    response.end();
+    writeString(request, response, "application/atom+xml", data);
 }
 
 var mimeTypeMap = {
@@ -347,14 +350,7 @@ function postHandler(request, response) {
         return null;
     });
     if (data) {
-        response.writeHead(200, { 
-            "Content-Type": "text/html", 
-            "Content-Length": Buffer.byteLength(data)
-        });
-        if (request.method !== "HEAD") {
-            response.write(data);
-        }
-        response.end();
+        writeString(request, response, "text/html", data);
     }
     else {
         var extension = path.extname(file)
@@ -380,11 +376,7 @@ function blogHandler(request, response) {
                 return renderBlog(files, id);
             });
         }
-        response.writeHead(200, { 
-            "Content-Type": "text/html",
-            "Content-Length": Buffer.byteLength(data)});
-        response.write(data);
-        response.end();
+        writeString(request, response, "text/html", data);
     }
     else {
         rootHandler(request, response)
@@ -478,14 +470,7 @@ function defaultHandler(request, response) {
                         return fs.readFileSync(path.join("./", name), "utf-8");
                     });
                 })
-                response.writeHead(200, { 
-                    "Content-Type" : "text/html", 
-                    "Content-Length" : Buffer.byteLength(data)
-                });
-                if (request.method !== "HEAD") {
-                    response.write(data);
-                }
-                response.end();
+                writeString(request, response, "text/html", data);
             }
         }
     }

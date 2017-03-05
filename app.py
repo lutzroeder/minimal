@@ -138,6 +138,7 @@ def posts():
 
 tag_regexp = re.compile(r"<(\w+)[^>]*>")
 entity_regexp = re.compile(r"(#?[A-Za-z0-9]+;)")
+break_regexp = re.compile(r" |<|&")
 
 def truncate(text, length):
     close_tags = {}
@@ -171,10 +172,10 @@ def truncate(text, length):
             if text[index] == " ":
                 index += 1
                 count += 1
-            i = index
-            while i < len(text) and text[i] != " " and text[i] != "<" and text[i] != "&":
-                i += 1
-            skip = i - index
+            skip = len(text) - index
+            match = break_regexp.search(text[index:])
+            if match:
+                skip = match.start()
             if count + skip > length:
                 ellipsis = "&hellip;"
             if count + skip - 15 > length:
@@ -250,6 +251,15 @@ def render_blog(files, start):
         output.append(data)
     return "\n".join(output)
 
+def write_string(request, content_type, data):
+    encoded = data.encode("utf-8")
+    request.send_response(200)
+    request.send_header("Content-Type", content_type)
+    request.send_header("Content-Length", len(encoded))
+    request.end_headers()
+    if request.command != "HEAD":
+        request.wfile.write(encoded)
+
 def atom_handler(request):
     host = scheme(request) + "://" + request.headers.get("host")
     def render_feed():
@@ -296,13 +306,7 @@ def atom_handler(request):
         output.append("</feed>")
         return "\n".join(output)
     data = cache("atom:" + host + "/blog/atom.xml", render_feed)
-    data = data.encode("utf-8")
-    request.send_response(200)
-    request.send_header("Content-Type", "text/html")
-    request.send_header("Content-Length", len(data))
-    request.end_headers()
-    if request.command != "HEAD":
-        request.wfile.write(data)
+    write_string(request, "application/atom+xml", data)
 
 def post_handler(request):
     url = urlparse(request.path)
@@ -323,13 +327,7 @@ def post_handler(request):
         return ""
     data = cache("post:"+ filename, render_post)
     if len(data) > 0:
-        data = data.encode("utf-8")
-        request.send_response(200)
-        request.send_header("Content-Type", "text/html")
-        request.send_header("Content-Length", len(data))
-        request.end_headers()
-        if request.command != "HEAD":
-            request.wfile.write(data)
+        write_string(request, "text/html", data)
     else:
         extension = os.path.splitext(filename)
         if extension in mimetypes.types_map:
@@ -349,13 +347,7 @@ def blog_handler(request):
             def get_blog():
                 return render_blog(files, start)
             data = cache("blog:" + key, get_blog)
-        data = data.encode("UTF-8")
-        request.send_response(200)
-        request.send_header("Content-Type", "text/html")
-        request.send_header("Content-Length", len(data))
-        request.end_headers()
-        if request.command != "HEAD":
-            request.wfile.write(data)
+        write_string(request, "text/html", data)
     else:
         root_handler(request)
 
@@ -436,13 +428,7 @@ def default_handler(request):
                         return read_file(path_join("./", name))
                     return mustache(template, context, partials)
                 data = cache("default:" + filename, content)
-                data = data.encode("UTF-8")
-                request.send_response(200)
-                request.send_header("Content-Type", "text/html")
-                request.send_header("Content-Length", len(data))
-                request.end_headers()
-                if request.command != "HEAD":
-                    request.wfile.write(data)
+                write_string(request, "text/html", data)
 
 def root_handler(request):
     request.send_response(301)
