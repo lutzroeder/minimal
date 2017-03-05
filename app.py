@@ -139,6 +139,7 @@ def posts():
 tag_regexp = re.compile(r"<(\w+)[^>]*>")
 entity_regexp = re.compile(r"(#?[A-Za-z0-9]+;)")
 break_regexp = re.compile(r" |<|&")
+truncate_map = { "pre": True, "code": True, "img": True, "table": True, "style": True, "script": True }
 
 def truncate(text, length):
     close_tags = {}
@@ -152,8 +153,8 @@ def truncate(text, length):
             else:
                 match = tag_regexp.match(text[index:])
                 if match:
-                    tag = match.groups()[0]
-                    if tag == "pre" or tag == "code" or tag == "img":
+                    tag = match.groups()[0].lower()
+                    if tag in truncate_map and truncate_map[tag]:
                         break
                     index += match.end()
                     match = re.search("(</" + tag + "\\s*>)", text[index:], re.IGNORECASE)
@@ -263,20 +264,22 @@ def write_string(request, content_type, data):
 def atom_handler(request):
     host = scheme(request) + "://" + request.headers.get("host")
     def render_feed():
+        count = 10
         output = []
         output.append("<?xml version='1.0' encoding='UTF-8'?>")
         output.append("<feed xmlns='http://www.w3.org/2005/Atom'>")
-        output.append("<title>" + configuration['name'] + "</title>")
+        output.append("<title>" + configuration["name"] + "</title>")
         output.append("<id>" + host + "/</id>")
         output.append("<icon>" + host + "/favicon.ico</icon>")
         index = len(output)
         recent = ""
         output.append("")
-        output.append("<author><name>" + configuration['name'] + "</name></author>")
+        output.append("<author><name>" + configuration["name"] + "</name></author>")
         output.append("<link rel='alternate' type='text/html' href='" + host + "/' />")
-        output.append("<link rel='self' type='application/atom+xml' href='" + \
-            host + "/blog/atom.xml' />")
-        for filename in posts():
+        output.append("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />")
+        files = posts()
+        while len(files) > 0 and count > 0:
+            filename = files.pop(0)
             entry = load_post("blog/" + filename)
             if entry and (entry["state"] == "post" or environment != "production"):
                 url = host + "/blog/" + os.path.splitext(filename)[0]
@@ -294,12 +297,12 @@ def atom_handler(request):
                 output.append("<updated>" + updated + "</updated>")
                 if len(recent) == 0:
                     recent = updated
-                output.append("<title type='text'>" + entry['title'] + "</title>")
-                output.append("<content type='html'>" + \
-                    escape_html(entry['content']) + "</content>")
-                output.append("<link rel='alternate' type='text/html' href='" + \
-                    url + "' title='" + entry['title'] + "' />")
+                output.append("<title type='text'>" + entry["title"] + "</title>")
+                content = escape_html(truncate(entry["content"], 10000))
+                output.append("<content type='html'>" + content + "</content>")
+                output.append("<link rel='alternate' type='text/html' href='" + url + "' title='" + entry["title"] + "' />")
                 output.append("</entry>")
+                count -= 1
         if len(recent) == 0:
             recent = format_date(datetime.datetime.now(), "iso")
         output[index] = "<updated>" + recent + "</updated>"
@@ -406,22 +409,19 @@ def default_handler(request):
                     template = read_file(os.path.join("./", filename))
                     context = configuration.copy()
                     if not "feed" in context or len(context["feed"]) == 0:
-                        context["feed"] = scheme(request) + "://" + \
-                            request.headers.get("host") + "/blog/atom.xml"
+                        context["feed"] = scheme(request) + "://" + request.headers.get("host") + "/blog/atom.xml"
                     def content_blog():
                         return render_blog(posts(), 0)
                     context["blog"] = content_blog
                     def content_links():
                         def content_link(link):
-                            return "<a class='icon' target='_blank' href='" + link['url'] + \
-                                "' title='" + link["name"] + "'><span class='symbol'>" + \
+                            return "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + \
                                 link["symbol"] + "</span></a>"
-                        return "\n".join(map(content_link, configuration['links']))
-                    context['links'] = content_links
+                        return "\n".join(map(content_link, configuration["links"]))
+                    context["links"] = content_links
                     def content_tabs():
                         def content_tab(page):
-                            return "<li class='tab'><a href='" + page["url"] + "'>" + \
-                                page["name"] + "</a></li>"
+                            return "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>"
                         return "\n".join(map(content_tab, configuration["pages"]))
                     context["tabs"] = content_tabs
                     def partials(name):
@@ -472,7 +472,7 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         return
 
-print("Python " + platform.python_version())
+print("python " + platform.python_version())
 with open("./app.json") as configurationFile:
     configuration = json.load(configurationFile)
 environment = os.getenv("PYTHON_ENV")

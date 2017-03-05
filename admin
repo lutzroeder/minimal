@@ -231,30 +231,30 @@ client_push() {
 client_test() {
     output="./.test"
     mkdir -p ${output}
-    echo "node..."
-    NODE_ENV=production node ./app.js &> /dev/null & pid=$!
+    echo "$(tput bold)node$(tput sgr0)"
+    NODE_ENV=production node ./app.js & pid=$!
     sleep 0.5
     curl -s http://localhost:8080/ > ${output}/root_node.html
     curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_node.xml
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
-    echo "python..."
-    PYTHON_ENV=production python ./app.py &> /dev/null & pid=$!
+    echo "$(tput bold)python$(tput sgr0)"
+    PYTHON_ENV=production python ./app.py & pid=$!
     sleep 0.5
     curl -s http://localhost:8080/ > ${output}/root_python.html
     curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_python.xml
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
-    echo "go..."
+    echo "$(tput bold)go$(tput sgr0)"
     go build -o ./app ./app.go
-    GO_ENV=production ./app &> /dev/null & pid=$!
+    GO_ENV=production ./app & pid=$!
     sleep 0.5
     curl -s http://localhost:8080/ > ${output}/root_go.html
     curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_go.xml
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
     rm ./app
-    echo "compare"
+    echo "$(tput bold)compare$(tput sgr0)"
     cmp ${output}/root_node.html ${output}/root_go.html
     cmp ${output}/root_node.html ${output}/root_python.html
     cmp ${output}/atom_node.xml ${output}/atom_go.xml

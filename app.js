@@ -108,6 +108,8 @@ function isDirectory(path) {
     return fs.statSync(path).isDirectory();
 }
 
+var truncateMap = { "pre": true, "code": true, "img": true, "table": true, "style": true, "script": true }
+
 function truncate(text, length) {
     var closeTags = {};
     var ellipsis = ""
@@ -123,12 +125,13 @@ function truncate(text, length) {
             else {
                 var match = text.substring(index).match("<(\\w+)[^>]*>");
                 if (match) {
-                    var tag = match[1];
-                    if (tag == "pre" || tag == "code" || tag == "img") {
+                    var tag = match[1].toLowerCase();
+                    if (tag in truncateMap) {
                         break;
                     }
                     index += match[0].length;
-                    var end = text.substring(index).search("(</" + tag + "\\s*>)")
+                    var closeTagRegExp = new RegExp("(</" + tag + "\\s*>)", "i");
+                    var end = text.substring(index).search(closeTagRegExp)
                     if (end != -1) {
                         closeTags[index + end] = "</" + tag + ">";
                     }
@@ -226,8 +229,8 @@ function loadPost(file) {
 }
 
 function renderBlog(files, start) {
-    var length = 10;
     var output = [];
+    var length = 10;
     var index = 0;
     while (files.length > 0 && index < (start + length)) {
         var file = files.shift();
@@ -282,6 +285,7 @@ function rootHandler(request, response) {
 function atomHandler(request, response) {
     var host = scheme(request) + "://" + request.headers.host;
     var data = cache("atom:" + host + "/blog/atom.xml", function () {
+        var count = 10;
         var output = [];
         output.push("<?xml version='1.0' encoding='UTF-8'?>");
         output.push("<feed xmlns='http://www.w3.org/2005/Atom'>");
@@ -294,7 +298,9 @@ function atomHandler(request, response) {
         output.push("<author><name>" + configuration["name"] + "</name></author>");
         output.push("<link rel='alternate' type='text/html' href='" + host + "/' />");
         output.push("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />");
-        posts().forEach(function (file) {
+        var files = posts();
+        while (files.length > 0 && count > 0) {
+            var file = files.shift();
             var entry = loadPost("blog/" + file);
             if (entry && (entry["state"] === "post" || environment !== "production")) {
                 var url = host + "/blog/" + path.basename(file, ".html");
@@ -309,11 +315,13 @@ function atomHandler(request, response) {
                 output.push("<updated>" + updated + "</updated>");
                 recent = recent ? recent : updated;
                 output.push("<title type='text'>" + entry["title"] + "</title>");
-                output.push("<content type='html'>" + escapeHtml(entry["content"]) + "</content>");
+                var content = escapeHtml(truncate(entry["content"], 10000));
+                output.push("<content type='html'>" + content + "</content>");
                 output.push("<link rel='alternate' type='text/html' href='" + url + "' title='" + entry["title"] + "' />");
                 output.push("</entry>");
+                count--;
             }
-        });
+        }
         recent = recent ? recent : formatDate(new Date(), "iso");
         output[index] = "<updated>" + recent + "</updated>";
         output.push("</feed>");

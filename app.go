@@ -192,6 +192,9 @@ func isDir(path string) bool {
 
 var tagRegexp = regexp.MustCompile("<(\\w+)[^>]*>")
 var entityRegexp = regexp.MustCompile("(#?[A-Za-z0-9]+;)")
+var truncateMap = map[string]bool {
+	"pre": true, "code": true, "img": true, "table": true, "style": true, "script": true,
+}
 
 func truncate(text string, length int) string {
 	closeTags := make(map[int]string)
@@ -206,12 +209,12 @@ func truncate(text string, length int) string {
 			} else {
 				match := tagRegexp.FindStringSubmatch(text[index:])
 				if len(match) > 0 {
-					tag := match[1]
-					if tag == "pre" || tag == "code" || tag == "img" {
+					tag := strings.ToLower(match[1])
+					if value, ok := truncateMap[tag]; ok && value {
 						break
 					}
 					index += len(match[0])
-					if match := regexp.MustCompile("</" + tag + "\\s*>").FindStringIndex(text[index:]); match != nil {
+					if match := regexp.MustCompile("(?i)</" + tag + "\\s*>").FindStringIndex(text[index:]); match != nil {
 						closeTags[index+match[0]] = "</" + tag + ">"
 					}
 				} else {
@@ -364,6 +367,7 @@ func rootHandler(response http.ResponseWriter, request *http.Request) {
 func atomHandler(response http.ResponseWriter, request *http.Request) {
 	host := scheme(request) + "://" + request.Host
 	data := cacheString("atom:"+host+"/blog/atom.xml", func() string {
+		count := 10
 		output := []string{}
 		output = append(output, "<?xml version='1.0' encoding='UTF-8'?>")
 		output = append(output, "<feed xmlns='http://www.w3.org/2005/Atom'>")
@@ -377,7 +381,9 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 		output = append(output, "<link rel='alternate' type='text/html' href='"+host+"/' />")
 		output = append(output, "<link rel='self' type='application/atom+xml' href='"+host+"/blog/atom.xml' />")
 		files := posts()
-		for _, file := range files {
+		for len(files) > 0 && count > 0 {
+			file := files[0]
+			files = files[1:]
 			entry := loadPost("blog/" + file)
 			if entry != nil && (entry["state"] == "post" || environment != "production") {
 				url := host + "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
@@ -404,9 +410,11 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 					recent = updated
 				}
 				output = append(output, "<title type='text'>"+entry["title"]+"</title>")
-				output = append(output, "<content type='html'>"+escapeHTML(entry["content"])+"</content>")
+				content := escapeHTML(truncate(entry["content"], 4000))
+				output = append(output, "<content type='html'>"+content+"</content>")
 				output = append(output, "<link rel='alternate' type='text/html' href='"+url+"' title='"+entry["title"]+"' />")
 				output = append(output, "</entry>")
+				count--;
 			}
 		}
 		if len(recent) == 0 {
