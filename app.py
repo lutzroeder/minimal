@@ -2,23 +2,23 @@
 
 import codecs
 import datetime
-import dateutil.parser
-import dateutil.tz
 import json
 import mimetypes
 import os
 import re
 import platform
 import sys
+import dateutil.parser
+import dateutil.tz
 
 if sys.version_info[0] > 2:
-	from urllib.parse import urlparse
-	from http.server import HTTPServer
-	from http.server import BaseHTTPRequestHandler
+    from urllib.parse import urlparse
+    from http.server import HTTPServer
+    from http.server import BaseHTTPRequestHandler
 else:
-	from urlparse import urlparse
-	from BaseHTTPServer import HTTPServer
-	from BaseHTTPServer import BaseHTTPRequestHandler 
+    from urlparse import urlparse
+    from BaseHTTPServer import HTTPServer
+    from BaseHTTPServer import BaseHTTPRequestHandler
 
 entity_map = {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;",
@@ -136,8 +136,8 @@ def posts():
         return files
     return list(cache("blog:files", get_posts))
 
-tag_regexp = re.compile("<(\\w+)[^>]*>")
-entity_regexp = re.compile("(#?[A-Za-z0-9]+;)")
+tag_regexp = re.compile(r"<(\w+)[^>]*>")
+entity_regexp = re.compile(r"(#?[A-Za-z0-9]+;)")
 
 def truncate(text, length):
     close_tags = {}
@@ -194,7 +194,7 @@ def load_post(path):
         entry = {}
         content = []
         metadata = -1
-        lines = re.split("\\r\\n?|\\n", data)
+        lines = re.split(r"\r\n?|\n", data)
         while len(lines) > 0:
             line = lines.pop(0)
             if line.startswith("---"):
@@ -209,7 +209,7 @@ def load_post(path):
                             value = value[1:-1]
                         entry[name] = value
                 else:
-                    content.append(line)                           
+                    content.append(line)
         entry["content"] = "\n".join(content)
         return entry
     return None
@@ -232,7 +232,7 @@ def render_blog(files, start):
                 post.append("<h1><a href='" + location + "'>" + entry["title"] + "</a></h1>")
                 post.append("<div class='content'>")
                 content = entry["content"]
-                content = re.sub("\\s\\s", " ", content)
+                content = re.sub(r"\s\s", " ", content)
                 truncated = truncate(content, 250)
                 post.append(truncated)
                 post.append("</div>")
@@ -291,7 +291,7 @@ def atom_handler(request):
                     url + "' title='" + entry['title'] + "' />")
                 output.append("</entry>")
         if len(recent) == 0:
-            recent = format_date(datetime.now(), "iso")
+            recent = format_date(datetime.datetime.now(), "iso")
         output[index] = "<updated>" + recent + "</updated>"
         output.append("</feed>")
         return "\n".join(output)
@@ -341,13 +341,13 @@ def blog_handler(request):
     url = urlparse(request.path)
     query = urlparse.parse_qs(url.query)
     if "id" in query:
-        id = int(query["id"][0])
+        start = int(query["id"][0])
         key = "/blog?id=" + query["id"][0]
         files = posts()
         data = ""
-        if id < len(files):
+        if start < len(files):
             def get_blog():
-                return render_blog(files, id)
+                return render_blog(files, start)
             data = cache("blog:" + key, get_blog)
         data = data.encode("UTF-8")
         request.send_response(200)
@@ -362,7 +362,7 @@ def blog_handler(request):
 def cert_handler(request):
     url = urlparse(request.path)
     filename = os.path.abspath(url.path)
-    found = false
+    found = False
     if exists(".well-known/") and isdir(".well-known/"):
         if os.path.exists(filename) and os.path.isfile(filename):
             data = read_file(filename)
@@ -372,7 +372,7 @@ def cert_handler(request):
             request.end_headers()
             if request.command != "HEAD":
                 request.wfile.write(data)
-            found = true
+            found = True
     if not found:
         request.send_response(404)
         request.end_headers()
