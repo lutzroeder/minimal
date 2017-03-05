@@ -4,7 +4,6 @@
 <div class='name'><a href='/'>{{name}}</a></div>
 <div class='bio'>{{{bio}}}</div>
 <div class='toolbar' id='toolbar'>{{{links}}}</div>
-<a class='button' id='subscribe' href='{{feed}}'>Subscribe</a>
 </div>
 <nav class='navigation'>
 <ul class='tabbar' id='tabbar'>{{{tabs}}}</ul>
@@ -16,9 +15,6 @@ if (path !== "/" && path.endsWith("/")) {
 var link = document.body.querySelector('#tabbar').querySelector("a[href='" + path + "']");
 if (link != null) {
     link.className = link.className + ' active';
-}
-if (path != null && path !== "/") {
-    document.body.querySelector('#subscribe').style.visibility = 'hidden';
 }
 </script>
 </nav>
