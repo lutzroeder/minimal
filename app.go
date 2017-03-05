@@ -210,7 +210,7 @@ func truncate(text string, length int) string {
 						break
 					}
 					index += len(match[0])
-					if match := regexp.MustCompile("</"+tag+"\\s*>").FindStringIndex(text[index:]); match != nil {
+					if match := regexp.MustCompile("</" + tag + "\\s*>").FindStringIndex(text[index:]); match != nil {
 						closeTags[index+match[0]] = "</" + tag + ">"
 					}
 				} else {
@@ -333,7 +333,7 @@ func renderBlog(files []string, start int) string {
 					post = append(post, "<div class='more'><a href='"+location+"'>"+"Read more&hellip;"+"</a></div>")
 				}
 				post = append(post, "</div>")
-				output = append(output, strings.Join(post, "\n") + "\n")
+				output = append(output, strings.Join(post, "\n")+"\n")
 			}
 			index++
 		}
@@ -377,7 +377,7 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 				if author, ok := entry["author"]; ok && author != configuration["name"].(string) {
 					output = append(output, "<author><name>"+author+"</name></author>")
 				}
-				date := "";
+				date := ""
 				if value, ok := entry["date"]; ok {
 					if time, err := time.Parse("2006-01-02 15:04:05 -07:00", value); err == nil {
 						date = formatDate(time, "iso")
@@ -392,7 +392,7 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 				}
 				output = append(output, "<updated>"+updated+"</updated>")
 				if len(recent) == 0 {
-					recent = updated					
+					recent = updated
 				}
 				output = append(output, "<title type='text'>"+entry["title"]+"</title>")
 				output = append(output, "<content type='html'>"+escapeHTML(entry["content"])+"</content>")
@@ -400,10 +400,10 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 				output = append(output, "</entry>")
 			}
 		}
-		if (len(recent) == 0) {
+		if len(recent) == 0 {
 			recent = formatDate(time.Now(), "iso")
 		}
-		output[index] = "<updated>"+recent+"</updated>"
+		output[index] = "<updated>" + recent + "</updated>"
 		output = append(output, "</feed>")
 		return strings.Join(output, "\n")
 	})
@@ -415,7 +415,7 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 }
 
 func postHandler(response http.ResponseWriter, request *http.Request) {
-	file := strings.TrimPrefix(strings.ToLower(path.Clean(request.URL.Path)),"/")
+	file := strings.TrimPrefix(strings.ToLower(path.Clean(request.URL.Path)), "/")
 	data := cacheString("post:"+file, func() string {
 		entry := loadPost(file + ".html")
 		if entry != nil {
@@ -458,9 +458,9 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 func blogHandler(response http.ResponseWriter, request *http.Request) {
 	id := request.URL.Query().Get("id")
 	if start, e := strconv.Atoi(id); e == nil {
-		files := posts();
+		files := posts()
 		data := ""
-		if (start < len(files)) {
+		if start < len(files) {
 			data = cacheString("blog:/blog?id="+id, func() string {
 				return renderBlog(files, start)
 			})
@@ -586,8 +586,8 @@ func main() {
 		panic(e)
 	}
 	environment = os.Getenv("GO_ENV")
-	fmt.Println(environment);
-	initPathCache(".");
+	fmt.Println(environment)
+	initPathCache(".")
 	http.HandleFunc("/.git", rootHandler)
 	http.HandleFunc("/admin", rootHandler)
 	http.HandleFunc("/admin.cfg", rootHandler)
