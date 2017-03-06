@@ -190,6 +190,11 @@ server_update() {
     server_start
 }
 
+server_test() {
+    server_stop
+    client_test
+}
+
 client_start() {
     if [ ${1:-${runtime}} = "go" ]; then 
         sleep 1 && git web--browse http://localhost:8080 & GO_ENV=${GO_ENV:-development} go run app.go
@@ -287,6 +292,7 @@ server() {
         "stop") server_stop;;
         "update") server_update;;
         "status") server_status;;
+        "test") server_test;;
         *)
         description;
         echo "Usage: $(tput bold)$(basename "$0")$(tput sgr0) <server-command>"
