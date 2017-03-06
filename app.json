@@ -8,7 +8,7 @@
     { "name": "Facebook", "symbol": "&#xe227;", "url": "http://www.facebook.com/lutzroeder" },
     { "name": "LinkedIn", "symbol": "&#xe252;", "url": "https://www.linkedin.com/in/lutzroeder" },
     { "name": "GitHub",   "symbol": "&#xe237;", "url": "http://www.github.com/lutzroeder" },
-    { "name": "RSS",      "symbol": "&#xe271;", "url": "http://feeds.feedburner.com/lutzroeder" }
+    { "name": "Feed",     "symbol": "&#xe271;", "url": "http://feeds.feedburner.com/lutzroeder" }
   ],
   "pages": [
     { "name": "Blog",     "url": "/" },
