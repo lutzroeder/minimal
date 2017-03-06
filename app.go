@@ -90,15 +90,16 @@ func scheme(request *http.Request) string {
 	return "http"
 }
 
-func formatDate(date time.Time, format string) string {
-	if format == "iso" {
-		return date.UTC().Format("2006-01-02T15:04:05Z")
-	}
-	if format == "user" {
+func formatDate(date time.Time) string {
+	return date.UTC().Format("2006-01-02T15:04:05Z")
+}
+
+func formatUserDate(text string) string {
+	if date, e := time.Parse("2006-01-02 15:04:05 -07:00", text); e == nil {
 		return date.Format("Jan 2, 2006")
 	}
 	return ""
-}
+} 
 
 var cacheData = make(map[string]interface{})
 var cacheLock = &sync.Mutex{}
@@ -321,8 +322,9 @@ func renderBlog(files []string, start int) string {
 		if entry != nil && (entry["state"] == "post" || environment != "production") {
 			if index >= start {
 				location := "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
-				date, _ := time.Parse("2006-01-02 15:04:05 -07:00", entry["date"])
-				entry["date"] = formatDate(date, "user")
+				if date, ok := entry["date"]; ok {
+					entry["date"] = formatUserDate(date)
+				}
 				post := []string{}
 				post = append(post, "<div class='item'>")
 				post = append(post, "<div class='date'>"+entry["date"]+"</div>")
@@ -395,14 +397,14 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 				date := ""
 				if value, ok := entry["date"]; ok {
 					if time, err := time.Parse("2006-01-02 15:04:05 -07:00", value); err == nil {
-						date = formatDate(time, "iso")
+						date = formatDate(time)
 					}
 				}
 				output = append(output, "<published>"+date+"</published>")
 				updated := date
 				if value, ok := entry["updated"]; ok {
 					if time, err := time.Parse("2006-01-02 15:04:05 -07:00", value); err == nil {
-						updated = formatDate(time, "iso")
+						updated = formatDate(time)
 					}
 				}
 				output = append(output, "<updated>"+updated+"</updated>")
@@ -418,7 +420,7 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 			}
 		}
 		if len(recent) == 0 {
-			recent = formatDate(time.Now(), "iso")
+			recent = formatDate(time.Now())
 		}
 		output[index] = "<updated>" + recent + "</updated>"
 		output = append(output, "</feed>")
@@ -432,8 +434,9 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 	data := cacheString("post:"+file, func() string {
 		entry := loadPost(file + ".html")
 		if entry != nil {
-			date, _ := time.Parse("2006-01-02 15:04:05 -07:00", entry["date"])
-			entry["date"] = formatDate(date, "user")
+			if date, ok := entry["date"]; ok {
+				entry["date"] = formatUserDate(date)
+			}
 			if _, ok := entry["author"]; !ok {
 				entry["author"] = configuration["name"].(string)
 			}

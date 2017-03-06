@@ -47,14 +47,14 @@ function redirect(response, status, location) {
     response.end();
 }
 
-function formatDate(date, format) {
-    if (format === "iso") {
-        return date.toISOString().replace(/\.[0-9]*Z/, "Z")
-    }
-    if (format === "user") {
-        return date.toLocaleDateString("en-US", { month: "short"}) + " " + date.getDate() + ", " + date.getFullYear();
-    }
-    return ""
+function formatDate(date) {
+    return date.toISOString().replace(/\.[0-9]*Z/, "Z")
+}
+
+function formatUserDate(text) {
+    var date = new Date(text.split(/ \+| \-/)[0] + "Z");
+    var months = [ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" ];
+    return months[date.getMonth()] + " " + date.getDate() + ", " + date.getFullYear();
 }
 
 var cacheData = {};
@@ -238,7 +238,7 @@ function renderBlog(files, start) {
         if (entry && (entry["state"] === "post" || environment !== "production")) {
             if (index >= start) {
                 var location = "/blog/" + path.basename(file, ".html");
-                entry["date"] = formatDate(new Date(entry["date"]), "user");
+                entry["date"] = formatUserDate(entry["date"]);
                 var post = [];
                 post.push("<div class='item'>");
                 post.push("<div class='date'>" + entry["date"] + "</div>");
@@ -309,9 +309,9 @@ function atomHandler(request, response) {
                 if (entry["author"] && entry["author"] !== configuration["name"]) {
                     output.push("<author><name>" + entry["author"] + "</name></author>");
                 }
-                var date = formatDate(new Date(entry["date"]), "iso");
+                var date = formatDate(new Date(entry["date"]));
                 output.push("<published>" + date + "</published>");
-                var updated = entry["updated"] ? formatDate(new Date(entry["updated"]), "iso") : date;
+                var updated = entry["updated"] ? formatDate(new Date(entry["updated"])) : date;
                 output.push("<updated>" + updated + "</updated>");
                 recent = recent ? recent : updated;
                 output.push("<title type='text'>" + entry["title"] + "</title>");
@@ -322,7 +322,7 @@ function atomHandler(request, response) {
                 count--;
             }
         }
-        recent = recent ? recent : formatDate(new Date(), "iso");
+        recent = recent ? recent : formatDate(new Date());
         output[index] = "<updated>" + recent + "</updated>";
         output.push("</feed>");
         return output.join("\n");
@@ -347,7 +347,7 @@ function postHandler(request, response) {
     var data = cache("post:" + file, function() {
         var entry = loadPost(file + ".html");
         if (entry) {
-            entry["date"] = formatDate(new Date(entry["date"]), "user");
+            entry["date"] = formatUserDate(entry["date"]);
             entry["author"] = entry["author"] || configuration["name"];
             var context = Object.assign(configuration, entry);
             var template = fs.readFileSync("post.html", "utf-8");

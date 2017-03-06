@@ -80,12 +80,12 @@ def redirect(request, status, location):
     request.send_header("Location", location)
     request.end_headers()
 
-def format_date(date, format):
-    if format == "iso":
-        return date.astimezone(dateutil.tz.gettz("UTC")).isoformat("T").split("+")[0] + "Z"
-    if format == "user":
-        return date.strftime("%b %-d, %Y").replace(" 0", " ")
-    return ""
+def format_date(date):
+    return date.astimezone(dateutil.tz.gettz("UTC")).isoformat("T").split("+")[0] + "Z"
+
+def format_user_date(text):
+    date = dateutil.parser.parse(text)
+    return date.strftime("%b %-d, %Y").replace(" 0", " ")
 
 cache_data = {}
 
@@ -226,8 +226,8 @@ def render_blog(files, start):
         if entry and (entry["state"] == "post" or environment != "production"):
             if index >= start:
                 location = "/blog/" + os.path.splitext(filename)[0]
-                date = dateutil.parser.parse(entry["date"])
-                entry["date"] = format_date(date, "user")
+                if "date" in entry:
+                    entry["date"] = format_user_date(entry["date"])
                 post = []
                 post.append("<div class='item'>")
                 post.append("<div class='date'>" + entry["date"] + "</div>")
@@ -289,11 +289,11 @@ def atom_handler(request):
                     output.append("<author><name>" + entry["author"] + "</name></author>")
                 date = ""
                 if "date" in entry:
-                    date = format_date(dateutil.parser.parse(entry["date"]), "iso")
+                    date = format_date(dateutil.parser.parse(entry["date"]))
                 output.append("<published>" + date + "</published>")
                 updated = date
                 if "updated" in entry:
-                    updated = format_date(dateutil.parser.parse(entry["updated"]), "iso")
+                    updated = format_date(dateutil.parser.parse(entry["updated"]))
                 output.append("<updated>" + updated + "</updated>")
                 if len(recent) == 0:
                     recent = updated
@@ -304,7 +304,7 @@ def atom_handler(request):
                 output.append("</entry>")
                 count -= 1
         if len(recent) == 0:
-            recent = format_date(datetime.datetime.now(), "iso")
+            recent = format_date(datetime.datetime.now())
         output[index] = "<updated>" + recent + "</updated>"
         output.append("</feed>")
         return "\n".join(output)
@@ -317,12 +317,12 @@ def post_handler(request):
     def render_post():
         entry = load_post(filename + ".html")
         if entry:
-            date = dateutil.parser.parse(entry["date"])
             context = configuration.copy()
             context.update(entry)
             if not "author" in context:
                 context["author"] = context["name"]
-            context["date"] = format_date(date, "user")
+            if "date" in entry:
+                context["date"] = format_user_date(entry["date"])
             template = read_file("./post.html")
             def partials(name):
                 return read_file(path_join("./", name))
