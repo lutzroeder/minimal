@@ -522,10 +522,11 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 					for key, value := range configuration {
 						context[key] = value
 					}
-					if feed, ok := context["feed"]; !ok || len(feed.(string)) == 0 {
-						context["feed"] = func() string {
-							return scheme(request) + "://" + request.Host + "/blog/atom.xml"
+					context["feed"] = func() string {
+						if feed, ok := configuration["feed"]; ok && len(feed.(string)) > 0 {
+							return feed.(string);
 						}
+						return scheme(request) + "://" + request.Host + "/blog/atom.xml"
 					}
 					context["links"] = func() string {
 						list := []string{}
