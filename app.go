@@ -408,7 +408,7 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 					}
 				}
 				output = append(output, "<updated>"+updated+"</updated>")
-				if len(recent) == 0 {
+				if len(recent) == 0 || recent < updated {
 					recent = updated
 				}
 				output = append(output, "<title type='text'>"+entry["title"]+"</title>")

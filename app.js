@@ -313,7 +313,9 @@ function atomHandler(request, response) {
                 output.push("<published>" + date + "</published>");
                 var updated = entry["updated"] ? formatDate(new Date(entry["updated"])) : date;
                 output.push("<updated>" + updated + "</updated>");
-                recent = recent ? recent : updated;
+                if (!recent || recent < updated) {
+                    recent = updated;
+                }
                 output.push("<title type='text'>" + entry["title"] + "</title>");
                 var content = escapeHtml(truncate(entry["content"], 10000));
                 output.push("<content type='html'>" + content + "</content>");

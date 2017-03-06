@@ -295,7 +295,7 @@ def atom_handler(request):
                 if "updated" in entry:
                     updated = format_date(dateutil.parser.parse(entry["updated"]))
                 output.append("<updated>" + updated + "</updated>")
-                if len(recent) == 0:
+                if len(recent) == 0 or recent < updated:
                     recent = updated
                 output.append("<title type='text'>" + entry["title"] + "</title>")
                 content = escape_html(truncate(entry["content"], 10000))
