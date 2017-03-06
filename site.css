@@ -24,10 +24,10 @@ body { margin: 0 0 65px 0; background-color: #f8f8f8; }
 .header .profile .name { font-size: 32px; font-weight: bold; margin-left: -2px; }
 .header .profile .bio { font-size: 16px; color: #666666; line-height: 22px; margin-top: 4px; display: block; }
 .header .profile .portrait { border: 0; border-radius: 50%; width: 100px !important; height: 100px !important; float: right; margin-left: 20px; }
-.header .profile .toolbar { font-size: 14px; color: #8f8f8f; padding: 20px 0 0px 0; vertical-align: center; line-height: 25px; height: 26px; }
+.header .profile .links { font-size: 14px; color: #8f8f8f; padding: 20px 0 0px 0; vertical-align: center; line-height: 25px; height: 26px; }
 .header .symbol { font-family: "Mono Social Icons Font"; font-size: 20px; text-rendering: optimizeLegibility; }
 .header .navigation { box-sizing: border-box; max-width: 640px !important; margin: 0 auto 0 auto; padding: 0px 20px 0px 20px; }
-.header .navigation .tabbar { border-top: 1px solid rgba(0, 0, 0, .05)!important; display: block; flex-direction: row; text-align: left; margin: 0; padding: 15px 0 17px 0; list-style: none; list-style-image: none; font-size: 16px; }
+.header .navigation .tabs { border-top: 1px solid rgba(0, 0, 0, .05)!important; display: block; flex-direction: row; text-align: left; margin: 0; padding: 15px 0 17px 0; list-style: none; list-style-image: none; font-size: 16px; }
 .header .navigation .tab { display: table-cell; text-align: left; letter-spacing: 0; padding-right: 20px; white-space: nowrap; }
 .header .navigation .tab a { color: #8f8f8f; }
 .header .navigation .tab a:hover { color: #666666; }

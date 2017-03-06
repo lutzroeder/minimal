@@ -3,16 +3,16 @@
 <a href='/'><img class='portrait' src='/portrait.jpg' /></a>
 <div class='name'><a href='/'>{{name}}</a></div>
 <div class='bio'>{{{bio}}}</div>
-<div class='toolbar' id='toolbar'>{{{links}}}</div>
+<div class='links' id='links'>{{{links}}}</div>
 </div>
 <nav class='navigation'>
-<ul class='tabbar' id='tabbar'>{{{tabs}}}</ul>
+<ul class='tabs' id='tabs'>{{{tabs}}}</ul>
 <script type='text/javascript'>
 var path = location.pathname;
 if (path !== "/" && path.endsWith("/")) {
     path = path.substring(0, path.length - 1);
 }
-var link = document.body.querySelector('#tabbar').querySelector("a[href='" + path + "']");
+var link = document.body.querySelector('#tabs').querySelector("a[href='" + path + "']");
 if (link != null) {
     link.className = link.className + ' active';
 }
