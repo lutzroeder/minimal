@@ -12,7 +12,7 @@ server_install() {
         sudo apt-get install --yes golang
     elif [ ${runtime} = "python" ]; then
         echo "$(tput bold)apt-get install python$(tput sgr0)"
-        sudo apt-get install --yes python
+        sudo apt-get install --yes python python-dateutil
     else
         echo "$(tput bold)apt-get install nodejs$(tput sgr0)"
         sudo apt-get install --yes nodejs
