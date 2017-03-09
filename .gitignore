@@ -1,5 +1,6 @@
+/app
+/debug
 *.pyc
-.vscode/
 .test/
 .DS_Store
 .DS_Store?
