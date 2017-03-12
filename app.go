@@ -540,9 +540,9 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 					}
 					context["tabs"] = func() string {
 						list := []string{}
-						for _, link := range configuration["pages"].([]interface{}) {
-							name := link.(map[string]interface{})["name"].(string)
-							url := link.(map[string]interface{})["url"].(string)
+						for _, page := range configuration["pages"].([]interface{}) {
+							name := page.(map[string]interface{})["name"].(string)
+							url := page.(map[string]interface{})["url"].(string)
 							list = append(list, "<li class='tab'><a href='"+url+"'>"+name+"</a></li>")
 						}
 						return strings.Join(list, "\n")

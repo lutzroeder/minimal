@@ -500,7 +500,7 @@ Router.prototype.route = function (path) {
     if (!route) {
         route = {
             path: path,
-            regexp: new RegExp("^" + path.replace("/*", "/(.*)") + "$", "i"),
+            regexp: new RegExp("^" + path.replace("*", "(.*)") + "$", "i"),
             handlers: {}
         };
         this.routes.push(route);
@@ -541,20 +541,12 @@ Router.prototype.default = function (handler) {
 };
 
 var router = new Router();
-router.get("/.git(/.*)?", rootHandler);
-router.get("/admin", rootHandler);
-router.get("/admin.cfg", rootHandler);
-router.get("/app.go", rootHandler);
-router.get("/app.js", rootHandler);
-router.get("/app.json", rootHandler);
-router.get("/app.py", rootHandler);
-router.get("/header.html", rootHandler);
-router.get("/meta.html", rootHandler);
+router.get("/.git*", rootHandler);
+router.get("/admin*", rootHandler);
+router.get("/app.*", rootHandler);
+router.get("/*.html", rootHandler);
+router.get("/*.css", rootHandler);
 router.get("/package.json", rootHandler);
-router.get("/post.css", rootHandler);
-router.get("/post.html", rootHandler);
-router.get("/site.css", rootHandler);
-router.get("/stream.html", rootHandler);
 router.get("/blog/atom.xml", atomHandler);
 router.get("/blog/*", postHandler);
 router.get("/blog", blogHandler);
