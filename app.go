@@ -601,7 +601,7 @@ func main() {
 	http.HandleFunc("/app.go", rootHandler)
 	http.HandleFunc("/app.js", rootHandler)
 	http.HandleFunc("/app.json", rootHandler)
-	http.HandleFunc("/app.python", rootHandler)
+	http.HandleFunc("/app.py", rootHandler)
 	http.HandleFunc("/header.html", rootHandler)
 	http.HandleFunc("/meta.html", rootHandler)
 	http.HandleFunc("/package.json", rootHandler)

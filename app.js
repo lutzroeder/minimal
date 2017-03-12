@@ -544,7 +544,7 @@ router.get("/admin.cfg", rootHandler);
 router.get("/app.go", rootHandler);
 router.get("/app.js", rootHandler);
 router.get("/app.json", rootHandler);
-router.get("/app.python", rootHandler);
+router.get("/app.py", rootHandler);
 router.get("/header.html", rootHandler);
 router.get("/meta.html", rootHandler);
 router.get("/package.json", rootHandler);
