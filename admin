@@ -47,7 +47,7 @@ server {
     gzip_min_length 1000;
     gzip_http_version 1.0;
     gzip_disable 'msie6';
-    gzip_types text/plain text/css text/html text/javascript application/json application/atom+xml application/rss+xml;
+    gzip_types text/plain text/css text/javascript application/json application/atom+xml application/rss+xml;
     gzip_vary on;
     location / {
         proxy_pass http://localhost:8080;
@@ -165,7 +165,8 @@ server_cert() {
     server_start
 
     echo "$(tput bold)reload nginx.service$(tput sgr0)"
-    sudo systemctl reload nginx.service
+    sudo systemctl stop nginx.service
+    sudo systemctl start nginx.service
     sudo systemctl status nginx.service --no-pager --lines=1000 --full
 }
 
