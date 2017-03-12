@@ -324,9 +324,7 @@ def post_handler(request):
             if "date" in entry:
                 context["date"] = format_user_date(entry["date"])
             template = read_file("./post.html")
-            def partials(name):
-                return read_file(path_join("./", name))
-            return mustache(template, context, partials)
+            return mustache(template, context, lambda name: read_file(path_join("./", name)))
         return ""
     data = cache("post:"+ filename, render_post)
     if len(data) > 0:
@@ -347,9 +345,7 @@ def blog_handler(request):
         files = posts()
         data = ""
         if start < len(files):
-            def get_blog():
-                return render_blog(files, start)
-            data = cache("blog:" + key, get_blog)
+            data = cache("blog:" + key, lambda: render_blog(files, start))
         write_string(request, "text/html", data)
     else:
         root_handler(request)
@@ -408,28 +404,17 @@ def default_handler(request):
                 def content():
                     template = read_file(os.path.join("./", filename))
                     context = configuration.copy()
-                    def content_feed():
-                        if "feed" in configuration and len(configuration["feed"]) > 0:
-                            return configuration["feed"]
-                        return scheme(request) + "://" + request.headers.get("host") + "/blog/atom.xml"
-                    def content_blog():
-                        return render_blog(posts(), 0)
-                    def content_links():
-                        def content_link(link):
-                            return "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + \
-                                link["symbol"] + "</span></a>"
-                        return "\n".join(map(content_link, configuration["links"]))
-                    def content_tabs():
-                        def content_tab(page):
-                            return "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>"
-                        return "\n".join(map(content_tab, configuration["pages"]))
-                    context["feed"] = content_feed
-                    context["blog"] = content_blog
-                    context["links"] = content_links
-                    context["tabs"] = content_tabs
-                    def partials(name):
-                        return read_file(path_join("./", name))
-                    return mustache(template, context, partials)
+                    context["feed"] = lambda: configuration["feed"] if \
+                        ("feed" in configuration and len(configuration["feed"]) > 0) else \
+                        scheme(request) + "://" + request.headers.get("host") + "/blog/atom.xml"
+                    context["blog"] = lambda: render_blog(posts(), 0)
+                    context["links"] = lambda: "\n".join( \
+                        "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + link["symbol"] + "</span></a>" \
+                        for link in configuration["links"])
+                    context["tabs"] = lambda: "\n".join( \
+                        "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>" \
+                        for page in configuration["pages"]) 
+                    return mustache(template, context, lambda name: read_file(path_join("./", name)))
                 data = cache("default:" + filename, content)
                 write_string(request, "text/html", data)
 
@@ -448,7 +433,7 @@ class Router(object):
         if not route:
             route = {
                 "path": path,
-                "regexp": re.compile("^" + path.replace("/*", "/(.*)") + "$"),
+                "regexp": re.compile("^" + path.replace("*", "(.*)") + "$"),
                 "handlers": {}
             }
             self.routes.append(route)
@@ -482,20 +467,12 @@ environment = os.getenv("PYTHON_ENV")
 print(environment)
 init_path_cache(".")
 router = Router()
-router.get("/.git(/.*)?", root_handler)
-router.get("/admin", root_handler)
-router.get("/admin.cfg", root_handler)
-router.get("/app.go", root_handler)
-router.get("/app.js", root_handler)
-router.get("/app.json", root_handler)
-router.get("/app.py", root_handler)
-router.get("/header.html", root_handler)
-router.get("/meta.html", root_handler)
+router.get("/.git*", root_handler)
+router.get("/admin*", root_handler)
+router.get("/app", root_handler)
 router.get("/package.json", root_handler)
-router.get("/post.css", root_handler)
-router.get("/post.html", root_handler)
-router.get("/site.css", root_handler)
-router.get("/stream.html", root_handler)
+router.get("/*.css", root_handler)
+router.get("/*.html", root_handler)
 router.get("/blog/atom.xml", atom_handler)
 router.get("/blog/*", post_handler)
 router.get("/blog", blog_handler)
