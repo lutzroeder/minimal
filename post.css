@@ -25,9 +25,8 @@ body { margin: 85px 0 85px 0; }
 .item .content { font-family: "Merriweather", Georgia, Cambria, "Times New Roman", Times, serif; font-size: 18px; line-height: 1.88; letter-spacing: 0.01em; word-break: break-word; word-wrap: break-word; }
 .item .content p { margin: 10px 0 16px 0; }
 .item .content a, .item p a:visited, .item p a:link, .item p a:active { color: inherit; text-decoration: none; background-size: 2px 2px; background-position: 0 22px; background-repeat: repeat-x; background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.6) 50%); }
-.item .content code { background-color: #f3f3f3; padding: 4px; font-family: Menlo, Monaco, Consolas, 'Courier New', Courier, monospace; font-size: 16px; border-radius: 3px; }
-.item .content pre { margin: 16px 0 16px 0; padding: 12px; line-height: 0; letter-spacing: 0; background-color: #f3f3f3;  overflow: auto; border-radius: 3px; }
-.item .content pre code { padding: 0; line-height: 1.4; color: #333333; word-break: normal; word-wrap: normal; border-radius: 0; }
+.item .content code { background-color: #f3f3f3; color: #333333; padding: 4px; border-radius: 3px; font-family: Menlo, Monaco, Consolas, 'Courier New', Courier, monospace; font-size: 16px; }
+.item .content pre { background-color: #f3f3f3; color: #333333; padding: 12px; border-radius: 3px; font-family: Menlo, Monaco, Consolas, 'Courier New', Courier, monospace; font-size: 16px; line-height: 1.4; letter-spacing: 0; overflow: auto; word-break: normal; word-wrap: normal; margin: 16px 0 16px 0; }
 
 @media only screen and (min-device-pixel-ratio:2), only screen and (min-resolution:2dppx), only screen and (-webkit-min-device-pixel-ratio:2) {
 .item .content a, .item p a:visited, .item p a:link, .item p a:active { background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 25%, rgba(0, 0, 0, 0) 25%); }
