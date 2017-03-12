@@ -408,21 +408,24 @@ def default_handler(request):
                 def content():
                     template = read_file(os.path.join("./", filename))
                     context = configuration.copy()
-                    if not "feed" in context or len(context["feed"]) == 0:
-                        context["feed"] = scheme(request) + "://" + request.headers.get("host") + "/blog/atom.xml"
+                    def content_feed():
+                        if "feed" in configuration and len(configuration["feed"]) > 0:
+                            return configuration["feed"]
+                        return scheme(request) + "://" + request.headers.get("host") + "/blog/atom.xml"
                     def content_blog():
                         return render_blog(posts(), 0)
-                    context["blog"] = content_blog
                     def content_links():
                         def content_link(link):
                             return "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + \
                                 link["symbol"] + "</span></a>"
                         return "\n".join(map(content_link, configuration["links"]))
-                    context["links"] = content_links
                     def content_tabs():
                         def content_tab(page):
                             return "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>"
                         return "\n".join(map(content_tab, configuration["pages"]))
+                    context["feed"] = content_feed
+                    context["blog"] = content_blog
+                    context["links"] = content_links
                     context["tabs"] = content_tabs
                     def partials(name):
                         return read_file(path_join("./", name))

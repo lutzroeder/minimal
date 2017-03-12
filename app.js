@@ -460,18 +460,21 @@ function defaultHandler(request, response) {
                 var data = cache("default:" + file, function() {
                     var template = fs.readFileSync(file, "utf-8");
                     var context = Object.assign({ }, configuration);
-                    context.feed = context.feed ? context.feed : function() {
+                    context["feed"] = function() {
+                        if (configuration["feed"] && configuration["feed"].length > 0) {
+                            return configuration["feed"];              
+                        }
                         return scheme(request) + "://" + request.headers.host + "/blog/atom.xml";
                     };
-                    context.blog = function() {
+                    context["blog"] = function() {
                         return renderBlog(posts(), 0);
                     };
-                    context.links = function() {
+                    context["links"] = function() {
                         return configuration["links"].map(function (link) {
                             return "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + link.symbol + "</span></a>";
                         }).join("\n");
                     };
-                    context.tabs = function() {
+                    context["tabs"] = function() {
                         return configuration["pages"].map(function (page) {
                             return "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>";
                         }).join("\n");
