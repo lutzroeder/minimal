@@ -204,21 +204,19 @@ function loadPost(file) {
                 if (line.startsWith("---")) {
                     metadata++;
                 }
-                else {
-                    if (metadata == 0) {
-                        var index = line.indexOf(":");
-                        if (index >= 0) {
-                            var name = line.slice(0, index).trim();
-                            var value = line.slice(index + 1).trim();
-                            if (value.startsWith('"') && value.endsWith('"')) {
-                                value = value.slice(1, -1);
-                            }
-                            entry[name] = value;
+                else if (metadata == 0) {
+                    var index = line.indexOf(":");
+                    if (index >= 0) {
+                        var name = line.slice(0, index).trim();
+                        var value = line.slice(index + 1).trim();
+                        if (value.startsWith('"') && value.endsWith('"')) {
+                            value = value.slice(1, -1);
                         }
+                        entry[name] = value;
                     }
-                    else {
-                        content.push(line);
-                    }
+                }
+                else {
+                    content.push(line);
                 }
             }
             entry["content"] = content.join("\n");

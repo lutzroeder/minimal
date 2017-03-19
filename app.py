@@ -201,17 +201,16 @@ def load_post(path):
             line = lines.pop(0)
             if line.startswith("---"):
                 metadata += 1
+            elif metadata == 0:
+                index = line.find(":")
+                if index >= 0:
+                    name = line[0:index].strip()
+                    value = line[index+1:].strip()
+                    if value.startswith('"') and value.endswith('"'):
+                        value = value[1:-1]
+                    entry[name] = value
             else:
-                if metadata == 0:
-                    index = line.find(":")
-                    if index >= 0:
-                        name = line[0:index].strip()
-                        value = line[index+1:].strip()
-                        if value.startswith('"') and value.endswith('"'):
-                            value = value[1:-1]
-                        entry[name] = value
-                else:
-                    content.append(line)
+                content.append(line)
         entry["content"] = "\n".join(content)
         return entry
     return None
@@ -246,8 +245,7 @@ def render_blog(files, start):
             index += 1
     if len(files) > 0:
         template = read_file("./stream.html")
-        context = {}
-        context["url"] = "/blog?id=" + str(index)
+        context = { "url": "/blog?id=" + str(index) }
         data = mustache(template, context, None)
         output.append(data)
     return "\n".join(output)

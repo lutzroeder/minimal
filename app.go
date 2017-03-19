@@ -292,17 +292,15 @@ func loadPost(path string) map[string]string {
 			lines = lines[1:]
 			if strings.HasPrefix(line, "---") {
 				metadata++
-			} else {
-				if metadata == 0 {
-					index := strings.Index(line, ":")
-					if index >= 0 {
-						name := strings.Trim(strings.Trim(line[0:index], " "), "\"")
-						value := strings.Trim(strings.Trim(line[index+1:], " "), "\"")
-						entry[name] = value
-					}
-				} else {
-					content = append(content, line)
+			} else if metadata == 0 {
+				index := strings.Index(line, ":")
+				if index >= 0 {
+					name := strings.Trim(strings.Trim(line[0:index], " "), "\"")
+					value := strings.Trim(strings.Trim(line[index+1:], " "), "\"")
+					entry[name] = value
 				}
+			} else {
+				content = append(content, line)
 			}
 		}
 		entry["content"] = strings.Join(content, "\n")
@@ -346,8 +344,7 @@ func renderBlog(files []string, start int) string {
 	}
 	if len(files) > 0 {
 		template := string(mustReadFile("./stream.html"))
-		context := make(map[string]interface{})
-		context["url"] = "/blog?id=" + strconv.Itoa(index)
+		context := map[string]interface{} { "url": "/blog?id=" + strconv.Itoa(index) }
 		data := mustache(template, context, nil)
 		output = append(output, data)
 	}
