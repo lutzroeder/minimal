@@ -30,11 +30,9 @@ def escape_html(text):
 
 def mustache(template, context, partials):
     def replace_partial(match):
-        name = match.group(1)
-        value = match.group(0)
         if callable(partials):
-            value = partials(name)
-        return value
+            return partials(match.group(1))
+        return match.group(0)
     template = re.sub(r"\{\{>\s*([-_/.\w]+)\s*\}\}", replace_partial, template)
     def replace(match):
         name = match.group(1)

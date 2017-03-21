@@ -34,40 +34,31 @@ var partialRegex = regexp.MustCompile("{{>\\s*([-_/.\\w]+)\\s*}}")
 var replaceRegex = regexp.MustCompile("{{{\\s*([-_/.\\w]+)\\s*}}}")
 var escapeRegex = regexp.MustCompile("{{\\s*([-_/.\\w]+)\\s*}}")
 
-func mustache(template string, context map[string]interface{}, partials interface{}) string {
+func mustache(template string, context map[string]interface{}, partials func(string) string) string {
 	template = partialRegex.ReplaceAllStringFunc(template, func(match string) string {
-		name := partialRegex.FindStringSubmatch(match)[1]
-		value := match
-		if f, ok := partials.(func(string) string); ok {
-			value = f(name)
-		}
-		return value
+		return partials(partialRegex.FindStringSubmatch(match)[1]);
 	})
 	template = replaceRegex.ReplaceAllStringFunc(template, func(match string) string {
-		name := replaceRegex.FindStringSubmatch(match)[1]
-		value := match
-		if o, ok := context[name]; ok {
+		if o, ok := context[replaceRegex.FindStringSubmatch(match)[1]]; ok {
 			if f, ok := o.(func() string); ok {
-				value = f()
+				return f()
 			}
 			if v, ok := o.(string); ok {
-				value = v
+				return v
 			}
 		}
-		return value
+		return match
 	})
 	template = escapeRegex.ReplaceAllStringFunc(template, func(match string) string {
-		name := escapeRegex.FindStringSubmatch(match)[1]
-		value := match
-		if o, ok := context[name]; ok {
+		if o, ok := context[escapeRegex.FindStringSubmatch(match)[1]]; ok {
 			if f, ok := o.(func() string); ok {
-				value = f()
+				return escapeHTML(f())
 			}
 			if v, ok := o.(string); ok {
-				value = v
+				return escapeHTML(v)
 			}
 		}
-		return escapeHTML(value)
+		return match
 	})
 	return template
 }
