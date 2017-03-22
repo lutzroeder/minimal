@@ -446,7 +446,7 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 				fmt.Println(err)
 			} else {
 				return mustache(string(template), context, func(name string) string {
-					data, err := ioutil.ReadFile(path.Join("./", name))
+					data, err := ioutil.ReadFile(name)
 					if err != nil {
 						fmt.Println(err)
 						return ""
@@ -509,7 +509,7 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 			contentType := mime.TypeByExtension(extension)
 			if len(contentType) > 0 && strings.Split(contentType, ";")[0] != "text/html" {
 				data := cacheBuffer("default:"+file, func() []byte {
-					data, err := ioutil.ReadFile("./" + file)
+					data, err := ioutil.ReadFile(file)
 					if err != nil {
 						fmt.Println(err)
 						return []byte{}
@@ -525,7 +525,7 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 				response.Header().Set("Expires", "-1")
 			} else {
 				data := cacheString("default:"+file, func() string {
-					template, err := ioutil.ReadFile(path.Join("./", file))
+					template, err := ioutil.ReadFile(file)
 					if err != nil {
 						fmt.Println(err)
 					} else {
@@ -562,7 +562,7 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 							return renderBlog(posts(), 0)
 						}
 						return mustache(string(template), context, func(name string) string {
-							data, err := ioutil.ReadFile(path.Join("./", name))
+							data, err := ioutil.ReadFile(name)
 							if err != nil {
 								fmt.Println(err)
 								return ""

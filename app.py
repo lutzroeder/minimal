@@ -60,11 +60,6 @@ def read_file(path):
     with codecs.open(path, "r", "utf-8") as open_file:
         return open_file.read()
 
-def path_join(root, path):
-    if root == "./" and path.startswith("/"):
-        return "." + path
-    return os.path.join(root, path)
-
 def scheme(request):
     value = request.headers.get("x-forwarded-proto")
     if value and len(value) > 0:
@@ -321,7 +316,7 @@ def post_handler(request):
             if "date" in entry:
                 context["date"] = format_user_date(entry["date"])
             template = read_file("./post.html")
-            return mustache(template, context, lambda name: read_file(path_join("./", name)))
+            return mustache(template, context, lambda name: read_file(name))
         return ""
     data = cache("post:"+ filename, render_post)
     if len(data) > 0:
@@ -411,7 +406,7 @@ def default_handler(request):
                     context["tabs"] = lambda: "\n".join( \
                         "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>" \
                         for page in configuration["pages"]) 
-                    return mustache(template, context, lambda name: read_file(path_join("./", name)))
+                    return mustache(template, context, lambda name: read_file(name))
                 data = cache("default:" + filename, content)
                 write_string(request, "text/html", data)
 

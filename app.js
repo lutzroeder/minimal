@@ -352,7 +352,7 @@ function postHandler(request, response) {
             var context = Object.assign(configuration, entry);
             var template = fs.readFileSync("post.html", "utf-8");
             return mustache(template, context, function(name) {
-                return fs.readFileSync(path.join("./", name), "utf-8");
+                return fs.readFileSync(name, "utf-8");
             });
         }
         return null;
@@ -478,7 +478,7 @@ function defaultHandler(request, response) {
                         }).join("\n");
                     };
                     return mustache(template, context, function(name) {
-                        return fs.readFileSync(path.join("./", name), "utf-8");
+                        return fs.readFileSync(name, "utf-8");
                     });
                 })
                 writeString(request, response, "text/html", data);
