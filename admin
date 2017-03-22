@@ -204,7 +204,7 @@ server_pull() {
 
 server_update() {
     server_stop
-    server_unistall
+    server_uninstall
     server_pull
     source "${configuration}"
     server_install

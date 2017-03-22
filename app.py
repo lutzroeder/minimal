@@ -190,7 +190,7 @@ def truncate(text, length):
     return "".join(output)
 
 def load_post(path):
-    if os.path.isfile(path) and os.path.exists(path):
+    if exists(path) and not isdir(path):
         data = read_file(path)
         entry = {}
         content = []
@@ -220,7 +220,7 @@ def render_blog(files, start):
     index = 0
     while len(files) > 0 and index < start + length:
         filename = files.pop(0)
-        entry = load_post("./blog/" + filename)
+        entry = load_post("blog/" + filename)
         if entry and (entry["state"] == "post" or environment != "production"):
             if index >= start:
                 location = "/blog/" + os.path.splitext(filename)[0]

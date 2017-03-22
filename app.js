@@ -192,7 +192,7 @@ function posts() {
 }
 
 function loadPost(file) {
-    if (fs.existsSync(file) && fs.statSync(file).isFile) {
+    if (exists(file) && !isDirectory(file)) {
         var data = fs.readFileSync(file, "utf-8");
         if (data) {
             var entry = {};
