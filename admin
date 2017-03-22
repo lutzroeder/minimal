@@ -2,10 +2,13 @@
 
 pushd $(dirname ${BASH_SOURCE[0]}) > /dev/null
 
-source ./admin.cfg
+configuration=$(basename ${BASH_SOURCE[0]}).cfg
+source "${configuration}"
 
 server_install() {
     server_uninstall
+
+    sudo apt-get update
 
     if [ ${runtime} = "go" ]; then 
         echo "$(tput bold)apt-get install golang$(tput sgr0)"
@@ -15,6 +18,7 @@ server_install() {
         sudo apt-get install --yes python python-dateutil
     else
         echo "$(tput bold)apt-get install nodejs$(tput sgr0)"
+        curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
         sudo apt-get install --yes nodejs
     fi
 
@@ -23,25 +27,36 @@ server_install() {
 
     echo "$(tput bold)configure reverse proxy$(tput sgr0)"
     sudo systemctl stop nginx.service
-cat << EOF > "${site}.conf"
+
+cat << EOF >> "${site}.conf"
 server {
     listen 80;
+EOF
+
+    if [ -n "${domain}" ]; then
+        if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
+ssl=$(cat << EOF
     listen 443 ssl;
-    server_name ${domain};
     ssl_certificate /etc/letsencrypt/live/${domain}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
     ssl_prefer_server_ciphers on;
     ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
+EOF
+)
+        cat << EOF >> "${site}.conf"
+${ssl}
+    server_name ${domain};
     return 301 \$scheme://www.${domain}\$request_uri;
 }
 server {
     listen 80;
-    listen 443 ssl;
+${ssl}
     server_name www.${domain};
-    ssl_certificate /etc/letsencrypt/live/${domain}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
-    ssl_prefer_server_ciphers on;
-    ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
+EOF
+        fi
+    fi
+
+cat << EOF >> "${site}.conf"
     gzip on;
     gzip_proxied any;
     gzip_min_length 1000;
@@ -143,6 +158,11 @@ server_stop() {
 }
 
 server_cert() {
+    if [ -z ${domain} ] || [ -z ${email} ]; then
+        echo "Update 'domain' and 'email' in $(tput smul)${configuration}$(tput sgr0)."
+        return
+    fi
+
     echo "$(tput bold)apt-get install letsencrypt$(tput sgr0)"
     sudo apt-get install --yes letsencrypt
 
@@ -156,7 +176,7 @@ server_cert() {
     else
         echo "$(tput bold)create certificate$(tput sgr0)"
         mkdir -p .well-known/acme-challenge
-        sudo letsencrypt certonly --webroot -w $(pwd) -d ${domain} -d www.${domain} --agree-tos --email ${mail}
+        sudo letsencrypt certonly --webroot -w $(pwd) -d ${domain} -d www.${domain} --agree-tos --email ${email}
         rm letsencrypt.log
     fi
 
@@ -186,7 +206,7 @@ server_update() {
     server_stop
     server_unistall
     server_pull
-    source ./admin.cfg
+    source "${configuration}"
     server_install
     server_start
 }
@@ -201,6 +221,8 @@ client_start() {
         sleep 1 && git web--browse http://localhost:8080 & GO_ENV=${GO_ENV:-development} go run app.go
     elif [ ${1:-${runtime}} = "python" ]; then
         sleep 0.5 && git web--browse http://localhost:8080 & PYTHON_ENV=${PYTHON_ENV:-development} python app.py
+    elif [ ${1:-${runtime}} = "dotnet" ]; then
+        sleep 5 && git web--browse http://localhost:8080 & dotnet restore & ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development} dotnet run
     else
         sleep 0.5 && git web--browse http://localhost:8080 & NODE_ENV=${NODE_ENV:-development} node app.js
     fi
@@ -235,7 +257,7 @@ client_push() {
 }
 
 client_test() {
-    output="./.test"
+    output="./.vscode/out/test"
     mkdir -p ${output}
     echo "$(tput bold)node$(tput sgr0)"
     NODE_ENV=production node ./app.js & pid=$!
@@ -274,7 +296,7 @@ client_console() {
 description() {
     echo;
     echo "  This script automates common tasks to run this website."
-    echo "  It can be configured via $(tput smul)admin.cfg$(tput sgr0) and provides two sets of commmands,"
+    echo "  It can be configured via $(tput smul)${configuration}$(tput sgr0) and provides two sets of commmands,"
     echo "  one for local development and another for running the website on an"
     echo "  actual Linux server. Your computer is considered a server if the "
     echo "  script is located at /var/www/\${site}/."
@@ -295,18 +317,19 @@ server() {
         "status") server_status;;
         "test") server_test;;
         *)
-        description;
-        echo "Usage: $(tput bold)$(basename "$0")$(tput sgr0) <server-command>"
-        echo
-        echo "    $(tput bold)install$(tput sgr0)    Install NGINX and $(tput bold)${site}.service$(tput sgr0)"
-        echo "    $(tput bold)start$(tput sgr0)      Start service"
-        echo "    $(tput bold)status$(tput sgr0)     Print current service status"
-        echo "    $(tput bold)update$(tput sgr0)     Run stop, pull, start and status"
-        echo "    $(tput bold)cert$(tput sgr0)       Create or renew SSL certificate"
-        echo "    $(tput bold)pull$(tput sgr0)       Fetch Git repo and reset master branch"
-        echo "    $(tput bold)stop$(tput sgr0)       Stop service"
-        echo "    $(tput bold)uninstall$(tput sgr0)  Stop and uninstall service"
-        echo;
+            description;
+            echo "Usage: $(tput bold)$(basename "$0")$(tput sgr0) <server-command>"
+            echo
+            echo "    $(tput bold)install$(tput sgr0)    Install NGINX and $(tput bold)${site}.service$(tput sgr0)"
+            echo "    $(tput bold)start$(tput sgr0)      Start service"
+            echo "    $(tput bold)status$(tput sgr0)     Print current service status"
+            echo "    $(tput bold)update$(tput sgr0)     Run stop, pull, start and status"
+            echo "    $(tput bold)cert$(tput sgr0)       Create or renew SSL certificate"
+            echo "    $(tput bold)pull$(tput sgr0)       Fetch Git repo and reset master branch"
+            echo "    $(tput bold)stop$(tput sgr0)       Stop service"
+            echo "    $(tput bold)uninstall$(tput sgr0)  Stop and uninstall service"
+            echo;
+        ;;
     esac
 }
 
