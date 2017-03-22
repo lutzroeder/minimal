@@ -36,10 +36,12 @@ var escapeRegex = regexp.MustCompile("{{\\s*([-_/.\\w]+)\\s*}}")
 
 func mustache(template string, context map[string]interface{}, partials func(string) string) string {
 	template = partialRegex.ReplaceAllStringFunc(template, func(match string) string {
-		return partials(partialRegex.FindStringSubmatch(match)[1]);
+		name := partialRegex.FindStringSubmatch(match)[1]
+		return mustache(partials(name), context, partials)
 	})
 	template = replaceRegex.ReplaceAllStringFunc(template, func(match string) string {
-		if o, ok := context[replaceRegex.FindStringSubmatch(match)[1]]; ok {
+		name := replaceRegex.FindStringSubmatch(match)[1]
+		if o, ok := context[name]; ok {
 			if f, ok := o.(func() string); ok {
 				return f()
 			}
@@ -50,7 +52,8 @@ func mustache(template string, context map[string]interface{}, partials func(str
 		return match
 	})
 	template = escapeRegex.ReplaceAllStringFunc(template, func(match string) string {
-		if o, ok := context[escapeRegex.FindStringSubmatch(match)[1]]; ok {
+		name := escapeRegex.FindStringSubmatch(match)[1]
+		if o, ok := context[name]; ok {
 			if f, ok := o.(func() string); ok {
 				return escapeHTML(f())
 			}
@@ -61,14 +64,6 @@ func mustache(template string, context map[string]interface{}, partials func(str
 		return match
 	})
 	return template
-}
-
-func mustReadFile(path string) []byte {
-	file, e := ioutil.ReadFile(path)
-	if e != nil {
-		panic(e)
-	}
-	return file
 }
 
 func scheme(request *http.Request) string {
@@ -90,7 +85,7 @@ func formatUserDate(text string) string {
 		return date.Format("Jan 2, 2006")
 	}
 	return ""
-} 
+}
 
 var cacheData = make(map[string]interface{})
 var cacheLock = &sync.Mutex{}
@@ -127,24 +122,25 @@ var pathCache = make(map[string]bool)
 
 func initPathCache(dir string) {
 	if environment == "production" {
-		fileInfos, e := ioutil.ReadDir(dir)
-		if e != nil {
-			panic(e)
-		}
-		for _, fileInfo := range fileInfos {
-			file := fileInfo.Name()
-			if !strings.HasPrefix(file, ".") {
-				file = dir + "/" + file
-				if fileInfo.IsDir() {
-					pathCache[file+"/"] = true
-					initPathCache(file)
-				} else {
-					pathCache[file] = true
+		fileInfos, err := ioutil.ReadDir(dir)
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			for _, fileInfo := range fileInfos {
+				file := fileInfo.Name()
+				if !strings.HasPrefix(file, ".") {
+					file = dir + "/" + file
+					if fileInfo.IsDir() {
+						pathCache[file+"/"] = true
+						initPathCache(file)
+					} else {
+						pathCache[file] = true
+					}
 				}
-			}
-			if dir == "." && file == ".well-known" && fileInfo.IsDir() {
-				pathCache["./"+file+"/"] = true
-				fmt.Println("certificate")
+				if dir == "." && file == ".well-known" && fileInfo.IsDir() {
+					pathCache["./"+file+"/"] = true
+					fmt.Println("certificate")
+				}
 			}
 		}
 	}
@@ -176,15 +172,17 @@ func isDir(path string) bool {
 		_, ok := pathCache[path]
 		return ok
 	}
-	if stat, err := os.Stat(path); !os.IsNotExist(err) {
-		return stat.IsDir()
+	stat, err := os.Stat(path)
+	if err != nil {
+		fmt.Println(err)
+		return false
 	}
-	return false
+	return stat.IsDir()
 }
 
 var tagRegexp = regexp.MustCompile("<(\\w+)[^>]*>")
 var entityRegexp = regexp.MustCompile("(#?[A-Za-z0-9]+;)")
-var truncateMap = map[string]bool {
+var truncateMap = map[string]bool{
 	"pre": true, "code": true, "img": true, "table": true, "style": true, "script": true,
 }
 
@@ -272,30 +270,34 @@ func posts() []string {
 }
 
 func loadPost(path string) map[string]string {
-	if stat, e := os.Stat(path); !os.IsNotExist(e) && !stat.IsDir() {
-		data := string(mustReadFile(path))
-		entry := make(map[string]string)
-		content := []string{}
-		metadata := -1
-		lines := regexp.MustCompile("\\r\\n?|\\n").Split(data, -1)
-		for len(lines) > 0 {
-			line := lines[0]
-			lines = lines[1:]
-			if strings.HasPrefix(line, "---") {
-				metadata++
-			} else if metadata == 0 {
-				index := strings.Index(line, ":")
-				if index >= 0 {
-					name := strings.Trim(strings.Trim(line[0:index], " "), "\"")
-					value := strings.Trim(strings.Trim(line[index+1:], " "), "\"")
-					entry[name] = value
+	if exists(path) && !isDir(path) {
+		data, err := ioutil.ReadFile(path)
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			entry := make(map[string]string)
+			content := []string{}
+			metadata := -1
+			lines := regexp.MustCompile("\\r\\n?|\\n").Split(string(data), -1)
+			for len(lines) > 0 {
+				line := lines[0]
+				lines = lines[1:]
+				if strings.HasPrefix(line, "---") {
+					metadata++
+				} else if metadata == 0 {
+					index := strings.Index(line, ":")
+					if index >= 0 {
+						name := strings.Trim(strings.Trim(line[0:index], " "), "\"")
+						value := strings.Trim(strings.Trim(line[index+1:], " "), "\"")
+						entry[name] = value
+					}
+				} else {
+					content = append(content, line)
 				}
-			} else {
-				content = append(content, line)
 			}
+			entry["content"] = strings.Join(content, "\n")
+			return entry
 		}
-		entry["content"] = strings.Join(content, "\n")
-		return entry
 	}
 	return nil
 }
@@ -307,7 +309,7 @@ func renderBlog(files []string, start int) string {
 	for len(files) > 0 && index < start+length {
 		file := files[0]
 		files = files[1:]
-		entry := loadPost("./blog/" + file)
+		entry := loadPost("blog/" + file)
 		if entry != nil && (entry["state"] == "post" || environment != "production") {
 			if index >= start {
 				location := "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
@@ -334,10 +336,14 @@ func renderBlog(files []string, start int) string {
 		}
 	}
 	if len(files) > 0 {
-		template := string(mustReadFile("./stream.html"))
-		context := map[string]interface{} { "url": "/blog?id=" + strconv.Itoa(index) }
-		data := mustache(template, context, nil)
-		output = append(output, data)
+		template, err := ioutil.ReadFile("./stream.html")
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			context := map[string]interface{}{"url": "/blog?id=" + strconv.Itoa(index)}
+			data := mustache(string(template), context, nil)
+			output = append(output, data)
+		}
 	}
 	return strings.Join(output, "\n")
 }
@@ -404,7 +410,7 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 				output = append(output, "<content type='html'>"+content+"</content>")
 				output = append(output, "<link rel='alternate' type='text/html' href='"+url+"' title='"+entry["title"]+"' />")
 				output = append(output, "</entry>")
-				count--;
+				count--
 			}
 		}
 		if len(recent) == 0 {
@@ -435,10 +441,19 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 			for key, value := range entry {
 				context[key] = value
 			}
-			template := string(mustReadFile("./post.html"))
-			return mustache(template, context, func(name string) string {
-				return string(mustReadFile(path.Join("./", name)))
-			})
+			template, err := ioutil.ReadFile("./post.html")
+			if err != nil {
+				fmt.Println(err)
+			} else {
+				return mustache(string(template), context, func(name string) string {
+					data, err := ioutil.ReadFile(path.Join("./", name))
+					if err != nil {
+						fmt.Println(err)
+						return ""
+					}
+					return string(data)
+				})
+			}
 		}
 		return ""
 	})
@@ -494,7 +509,12 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 			contentType := mime.TypeByExtension(extension)
 			if len(contentType) > 0 && strings.Split(contentType, ";")[0] != "text/html" {
 				data := cacheBuffer("default:"+file, func() []byte {
-					return mustReadFile("./" + file)
+					data, err := ioutil.ReadFile("./" + file)
+					if err != nil {
+						fmt.Println(err)
+						return []byte{}
+					}
+					return data
 				})
 				if request.Method != "HEAD" {
 					response.Write(data)
@@ -505,42 +525,52 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 				response.Header().Set("Expires", "-1")
 			} else {
 				data := cacheString("default:"+file, func() string {
-					template := mustReadFile(path.Join("./", file))
-					context := make(map[string]interface{})
-					for key, value := range configuration {
-						context[key] = value
-					}
-					context["feed"] = func() string {
-						if feed, ok := configuration["feed"]; ok && len(feed.(string)) > 0 {
-							return feed.(string);
+					template, err := ioutil.ReadFile(path.Join("./", file))
+					if err != nil {
+						fmt.Println(err)
+					} else {
+						context := make(map[string]interface{})
+						for key, value := range configuration {
+							context[key] = value
 						}
-						return scheme(request) + "://" + request.Host + "/blog/atom.xml"
-					}
-					context["links"] = func() string {
-						list := []string{}
-						for _, link := range configuration["links"].([]interface{}) {
-							name := link.(map[string]interface{})["name"].(string)
-							symbol := link.(map[string]interface{})["symbol"].(string)
-							url := link.(map[string]interface{})["url"].(string)
-							list = append(list, "<a class='icon' target='_blank' href='"+url+"' title='"+name+"'><span class='symbol'>"+symbol+"</span></a>")
+						context["feed"] = func() string {
+							if feed, ok := configuration["feed"]; ok && len(feed.(string)) > 0 {
+								return feed.(string)
+							}
+							return scheme(request) + "://" + request.Host + "/blog/atom.xml"
 						}
-						return strings.Join(list, "\n")
-					}
-					context["tabs"] = func() string {
-						list := []string{}
-						for _, page := range configuration["pages"].([]interface{}) {
-							name := page.(map[string]interface{})["name"].(string)
-							url := page.(map[string]interface{})["url"].(string)
-							list = append(list, "<li class='tab'><a href='"+url+"'>"+name+"</a></li>")
+						context["links"] = func() string {
+							list := []string{}
+							for _, link := range configuration["links"].([]interface{}) {
+								name := link.(map[string]interface{})["name"].(string)
+								symbol := link.(map[string]interface{})["symbol"].(string)
+								url := link.(map[string]interface{})["url"].(string)
+								list = append(list, "<a class='icon' target='_blank' href='"+url+"' title='"+name+"'><span class='symbol'>"+symbol+"</span></a>")
+							}
+							return strings.Join(list, "\n")
 						}
-						return strings.Join(list, "\n")
+						context["tabs"] = func() string {
+							list := []string{}
+							for _, page := range configuration["pages"].([]interface{}) {
+								name := page.(map[string]interface{})["name"].(string)
+								url := page.(map[string]interface{})["url"].(string)
+								list = append(list, "<li class='tab'><a href='"+url+"'>"+name+"</a></li>")
+							}
+							return strings.Join(list, "\n")
+						}
+						context["blog"] = func() string {
+							return renderBlog(posts(), 0)
+						}
+						return mustache(string(template), context, func(name string) string {
+							data, err := ioutil.ReadFile(path.Join("./", name))
+							if err != nil {
+								fmt.Println(err)
+								return ""
+							}
+							return string(data)
+						})
 					}
-					context["blog"] = func() string {
-						return renderBlog(posts(), 0)
-					}
-					return mustache(string(template), context, func(name string) string {
-						return string(mustReadFile(path.Join("./", name)))
-					})
+					return ""
 				})
 				writeString(response, request, "text/html", data)
 			}
@@ -553,11 +583,15 @@ func certHandler(response http.ResponseWriter, request *http.Request) {
 	found := false
 	if exists(".well-known/") && isDir(".well-known/") {
 		if stat, e := os.Stat(file); !os.IsNotExist(e) && !stat.IsDir() {
-			data := mustReadFile(file)
-			response.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			response.Header().Set("Content-Length", strconv.Itoa(len(data)))
-			response.Write(data)
-			found = true
+			data, err := ioutil.ReadFile(file)
+			if err != nil {
+				fmt.Println(err)
+			} else {
+				response.Header().Set("Content-Type", "text/plain; charset=utf-8")
+				response.Header().Set("Content-Length", strconv.Itoa(len(data)))
+				response.Write(data)
+				found = true
+			}
 		}
 	}
 	if !found {
@@ -576,9 +610,15 @@ func (logger loggerHandler) ServeHTTP(response http.ResponseWriter, request *htt
 
 func main() {
 	fmt.Println(runtime.Version())
-	file := mustReadFile("./app.json")
-	if e := json.Unmarshal(file, &configuration); e != nil {
-		panic(e)
+	file, err := ioutil.ReadFile("./app.json")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	err = json.Unmarshal(file, &configuration)
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 	environment = os.Getenv("GO_ENV")
 	fmt.Println(environment)
