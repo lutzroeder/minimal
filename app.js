@@ -342,7 +342,7 @@ var mimeTypeMap = {
 };
 
 function postHandler(request, response) {
-    var pathname = path.normalize(url.parse(request.url, true).pathname.toLowerCase());
+    var pathname = path.normalize(url.parse(request.url, true).pathname);
     var file = pathname.replace(/^\/?/, "");
     var data = cache("post:" + file, function() {
         var entry = loadPost(file + ".html");

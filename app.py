@@ -305,7 +305,7 @@ def atom_handler(request):
 
 def post_handler(request):
     url = urlparse(request.path)
-    filename = os.path.abspath(url.path).lstrip("/").lower()
+    filename = os.path.abspath(url.path).lstrip("/")
     def render_post():
         entry = load_post(filename + ".html")
         if entry:

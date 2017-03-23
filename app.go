@@ -424,7 +424,7 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 }
 
 func postHandler(response http.ResponseWriter, request *http.Request) {
-	file := strings.TrimPrefix(strings.ToLower(path.Clean(request.URL.Path)), "/")
+	file := strings.TrimPrefix(path.Clean(request.URL.Path), "/")
 	data := cacheString("post:"+file, func() string {
 		entry := loadPost(file + ".html")
 		if entry != nil {
