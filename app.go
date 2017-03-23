@@ -34,14 +34,14 @@ var partialRegex = regexp.MustCompile("{{>\\s*([-_/.\\w]+)\\s*}}")
 var replaceRegex = regexp.MustCompile("{{{\\s*([-_/.\\w]+)\\s*}}}")
 var escapeRegex = regexp.MustCompile("{{\\s*([-_/.\\w]+)\\s*}}")
 
-func mustache(template string, context map[string]interface{}, partials func(string) string) string {
+func mustache(template string, view map[string]interface{}, partials func(string) string) string {
 	template = partialRegex.ReplaceAllStringFunc(template, func(match string) string {
 		name := partialRegex.FindStringSubmatch(match)[1]
-		return mustache(partials(name), context, partials)
+		return mustache(partials(name), view, partials)
 	})
 	template = replaceRegex.ReplaceAllStringFunc(template, func(match string) string {
 		name := replaceRegex.FindStringSubmatch(match)[1]
-		if o, ok := context[name]; ok {
+		if o, ok := view[name]; ok {
 			if f, ok := o.(func() string); ok {
 				return f()
 			}
@@ -53,7 +53,7 @@ func mustache(template string, context map[string]interface{}, partials func(str
 	})
 	template = escapeRegex.ReplaceAllStringFunc(template, func(match string) string {
 		name := escapeRegex.FindStringSubmatch(match)[1]
-		if o, ok := context[name]; ok {
+		if o, ok := view[name]; ok {
 			if f, ok := o.(func() string); ok {
 				return escapeHTML(f())
 			}
@@ -340,8 +340,8 @@ func renderBlog(files []string, start int) string {
 		if err != nil {
 			fmt.Println(err)
 		} else {
-			context := map[string]interface{}{"url": "/blog?id=" + strconv.Itoa(index)}
-			data := mustache(string(template), context, nil)
+			view := map[string]interface{}{"url": "/blog?id=" + strconv.Itoa(index)}
+			data := mustache(string(template), view, nil)
 			output = append(output, data)
 		}
 	}
@@ -434,18 +434,18 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 			if _, ok := entry["author"]; !ok {
 				entry["author"] = configuration["name"].(string)
 			}
-			context := make(map[string]interface{})
+			view := make(map[string]interface{})
 			for key, value := range configuration {
-				context[key] = value
+				view[key] = value
 			}
 			for key, value := range entry {
-				context[key] = value
+				view[key] = value
 			}
 			template, err := ioutil.ReadFile("./post.html")
 			if err != nil {
 				fmt.Println(err)
 			} else {
-				return mustache(string(template), context, func(name string) string {
+				return mustache(string(template), view, func(name string) string {
 					data, err := ioutil.ReadFile(name)
 					if err != nil {
 						fmt.Println(err)
@@ -459,15 +459,15 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 	})
 	if len(data) > 0 {
 		writeString(response, request, "text/html", data)
-	} else {
-		extension := path.Ext(file)
-		contentType := mime.TypeByExtension(extension)
-		if len(contentType) > 0 {
-			defaultHandler(response, request)
-		} else {
-			rootHandler(response, request)
-		}
+		return
 	}
+	extension := path.Ext(file)
+	contentType := mime.TypeByExtension(extension)
+	if len(contentType) > 0 {
+		defaultHandler(response, request)
+		return
+	}
+	rootHandler(response, request)
 }
 
 func blogHandler(response http.ResponseWriter, request *http.Request) {
@@ -481,9 +481,9 @@ func blogHandler(response http.ResponseWriter, request *http.Request) {
 			})
 		}
 		writeString(response, request, "text/html", data)
-	} else {
-		rootHandler(response, request)
+		return
 	}
+	rootHandler(response, request)
 }
 
 func defaultHandler(response http.ResponseWriter, request *http.Request) {
@@ -494,109 +494,106 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 	}
 	if strings.HasSuffix(pathname, "/index.html") {
 		http.Redirect(response, request, "/"+strings.TrimLeft(pathname[0:len(pathname)-11], "/"), http.StatusMovedPermanently)
-	} else {
-		file := pathname
-		if strings.HasSuffix(pathname, "/") {
-			file = path.Join(pathname, "index.html")
-		}
-		file = strings.TrimLeft(file, "/")
-		if !exists(file) {
-			http.Redirect(response, request, path.Dir(pathname), http.StatusFound)
-		} else if isDir(file) {
-			http.Redirect(response, request, pathname+"/", http.StatusFound)
-		} else {
-			extension := path.Ext(file)
-			contentType := mime.TypeByExtension(extension)
-			if len(contentType) > 0 && strings.Split(contentType, ";")[0] != "text/html" {
-				data := cacheBuffer("default:"+file, func() []byte {
-					data, err := ioutil.ReadFile(file)
-					if err != nil {
-						fmt.Println(err)
-						return []byte{}
-					}
-					return data
-				})
-				if request.Method != "HEAD" {
-					response.Write(data)
-				}
-				response.Header().Set("Content-Type", contentType)
-				response.Header().Set("Content-Length", strconv.Itoa(len(data)))
-				response.Header().Set("Cache-Control", "private, max-age=0")
-				response.Header().Set("Expires", "-1")
-			} else {
-				data := cacheString("default:"+file, func() string {
-					template, err := ioutil.ReadFile(file)
-					if err != nil {
-						fmt.Println(err)
-					} else {
-						context := make(map[string]interface{})
-						for key, value := range configuration {
-							context[key] = value
-						}
-						context["feed"] = func() string {
-							if feed, ok := configuration["feed"]; ok && len(feed.(string)) > 0 {
-								return feed.(string)
-							}
-							return scheme(request) + "://" + request.Host + "/blog/atom.xml"
-						}
-						context["links"] = func() string {
-							list := []string{}
-							for _, link := range configuration["links"].([]interface{}) {
-								name := link.(map[string]interface{})["name"].(string)
-								symbol := link.(map[string]interface{})["symbol"].(string)
-								url := link.(map[string]interface{})["url"].(string)
-								list = append(list, "<a class='icon' target='_blank' href='"+url+"' title='"+name+"'><span class='symbol'>"+symbol+"</span></a>")
-							}
-							return strings.Join(list, "\n")
-						}
-						context["tabs"] = func() string {
-							list := []string{}
-							for _, page := range configuration["pages"].([]interface{}) {
-								name := page.(map[string]interface{})["name"].(string)
-								url := page.(map[string]interface{})["url"].(string)
-								list = append(list, "<li class='tab'><a href='"+url+"'>"+name+"</a></li>")
-							}
-							return strings.Join(list, "\n")
-						}
-						context["blog"] = func() string {
-							return renderBlog(posts(), 0)
-						}
-						return mustache(string(template), context, func(name string) string {
-							data, err := ioutil.ReadFile(name)
-							if err != nil {
-								fmt.Println(err)
-								return ""
-							}
-							return string(data)
-						})
-					}
-					return ""
-				})
-				writeString(response, request, "text/html", data)
-			}
-		}
+		return
 	}
+	file := pathname
+	if strings.HasSuffix(pathname, "/") {
+		file = path.Join(pathname, "index.html")
+	}
+	file = strings.TrimLeft(file, "/")
+	if !exists(file) {
+		http.Redirect(response, request, path.Dir(pathname), http.StatusFound)
+		return
+	}
+	if isDir(file) {
+		http.Redirect(response, request, pathname+"/", http.StatusFound)
+		return
+	}
+	extension := path.Ext(file)
+	contentType := mime.TypeByExtension(extension)
+	if len(contentType) > 0 && strings.Split(contentType, ";")[0] != "text/html" {
+		buffer := cacheBuffer("default:"+file, func() []byte {
+			data, err := ioutil.ReadFile(file)
+			if err != nil {
+				fmt.Println(err)
+				return []byte{}
+			}
+			return data
+		})
+		if request.Method != "HEAD" {
+			response.Write(buffer)
+		}
+		response.Header().Set("Content-Type", contentType)
+		response.Header().Set("Content-Length", strconv.Itoa(len(buffer)))
+		response.Header().Set("Cache-Control", "private, max-age=0")
+		response.Header().Set("Expires", "-1")
+		return
+	}
+	data := cacheString("default:"+file, func() string {
+		template, err := ioutil.ReadFile(file)
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			view := make(map[string]interface{})
+			for key, value := range configuration {
+				view[key] = value
+			}
+			view["feed"] = func() string {
+				if feed, ok := configuration["feed"]; ok && len(feed.(string)) > 0 {
+					return feed.(string)
+				}
+				return scheme(request) + "://" + request.Host + "/blog/atom.xml"
+			}
+			view["links"] = func() string {
+				list := []string{}
+				for _, link := range configuration["links"].([]interface{}) {
+					name := link.(map[string]interface{})["name"].(string)
+					symbol := link.(map[string]interface{})["symbol"].(string)
+					url := link.(map[string]interface{})["url"].(string)
+					list = append(list, "<a class='icon' target='_blank' href='"+url+"' title='"+name+"'><span class='symbol'>"+symbol+"</span></a>")
+				}
+				return strings.Join(list, "\n")
+			}
+			view["tabs"] = func() string {
+				list := []string{}
+				for _, page := range configuration["pages"].([]interface{}) {
+					name := page.(map[string]interface{})["name"].(string)
+					url := page.(map[string]interface{})["url"].(string)
+					list = append(list, "<li class='tab'><a href='"+url+"'>"+name+"</a></li>")
+				}
+				return strings.Join(list, "\n")
+			}
+			view["blog"] = func() string {
+				return renderBlog(posts(), 0)
+			}
+			return mustache(string(template), view, func(name string) string {
+				data, err := ioutil.ReadFile(name)
+				if err != nil {
+					fmt.Println(err)
+					return ""
+				}
+				return string(data)
+			})
+		}
+		return ""
+	})
+	writeString(response, request, "text/html", data)
 }
 
 func certHandler(response http.ResponseWriter, request *http.Request) {
 	file := strings.TrimLeft(path.Clean(request.URL.Path), "/")
-	found := false
 	if exists(".well-known/") && isDir(".well-known/") {
 		if stat, e := os.Stat(file); !os.IsNotExist(e) && !stat.IsDir() {
 			data, err := ioutil.ReadFile(file)
 			if err != nil {
 				fmt.Println(err)
 			} else {
-				response.Header().Set("Content-Type", "text/plain; charset=utf-8")
-				response.Header().Set("Content-Length", strconv.Itoa(len(data)))
-				response.Write(data)
-				found = true
+				writeString(response, request, "text/plain; charset=utf-8", string(data))
+				return
 			}
 		}
 	}
-	if !found {
-		response.WriteHeader(http.StatusNotFound)
-	}
+	response.WriteHeader(http.StatusNotFound)
 }
 
 type loggerHandler struct {
@@ -644,5 +641,5 @@ func main() {
 	http.HandleFunc("/", defaultHandler)
 	port := 8080
 	fmt.Println("http://localhost:" + strconv.Itoa(port))
-	http.ListenAndServe(":8080", loggerHandler{http.DefaultServeMux})
+	http.ListenAndServe(":" + strconv.Itoa(port), loggerHandler{http.DefaultServeMux})
 }

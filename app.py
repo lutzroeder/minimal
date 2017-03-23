@@ -28,18 +28,18 @@ entity_map = {
 def escape_html(text):
     return "".join(entity_map.get(c, c) for c in text)
 
-def mustache(template, context, partials):
+def mustache(template, view, partials):
     def replace_partial(match):
         name = match.group(1)
         if callable(partials):
-            return mustache(partials(name), context, partials)
+            return mustache(partials(name), view, partials)
         return match.group(0)
     template = re.sub(r"\{\{>\s*([-_/.\w]+)\s*\}\}", replace_partial, template)
     def replace(match):
         name = match.group(1)
         value = match.group(0)
-        if name in context:
-            value = context[name]
+        if name in view:
+            value = view[name]
             if callable(value):
                 value = value()
         return value
@@ -47,8 +47,8 @@ def mustache(template, context, partials):
     def replace_escape(match):
         name = match.group(1)
         value = match.group(0)
-        if name in context:
-            value = context[name]
+        if name in view:
+            value = view[name]
             if callable(value):
                 value = value()
             value = escape_html(value)
@@ -239,8 +239,8 @@ def render_blog(files, start):
             index += 1
     if len(files) > 0:
         template = read_file("./stream.html")
-        context = { "url": "/blog?id=" + str(index) }
-        data = mustache(template, context, None)
+        view = { "url": "/blog?id=" + str(index) }
+        data = mustache(template, view, None)
         output.append(data)
     return "\n".join(output)
 
@@ -309,24 +309,24 @@ def post_handler(request):
     def render_post():
         entry = load_post(filename + ".html")
         if entry:
-            context = configuration.copy()
-            context.update(entry)
-            if not "author" in context:
-                context["author"] = context["name"]
+            if not "author" in entry:
+                entry["author"] = configuration["name"]
             if "date" in entry:
-                context["date"] = format_user_date(entry["date"])
+                entry["date"] = format_user_date(entry["date"])
+            view = configuration.copy()
+            view.update(entry)
             template = read_file("./post.html")
-            return mustache(template, context, lambda name: read_file(name))
+            return mustache(template, view, lambda name: read_file(name))
         return ""
     data = cache("post:"+ filename, render_post)
     if len(data) > 0:
         write_string(request, "text/html", data)
-    else:
-        extension = os.path.splitext(filename)
-        if extension in mimetypes.types_map:
-            default_handler(request)
-        else:
-            root_handler(request)
+        return
+    extension = os.path.splitext(filename)
+    if extension in mimetypes.types_map:
+        default_handler(request)
+        return
+    root_handler(request)
 
 def blog_handler(request):
     url = urlparse(request.path)
@@ -339,26 +339,19 @@ def blog_handler(request):
         if start < len(files):
             data = cache("blog:" + key, lambda: render_blog(files, start))
         write_string(request, "text/html", data)
-    else:
-        root_handler(request)
+        return
+    root_handler(request)
 
 def cert_handler(request):
     url = urlparse(request.path)
     filename = os.path.abspath(url.path)
-    found = False
     if exists(".well-known/") and isdir(".well-known/"):
         if os.path.exists(filename) and os.path.isfile(filename):
             data = read_file(filename)
-            request.send_response(200)
-            request.send_header("Content-Type", "text/plain; charset=utf-8")
-            request.send_header("Content-Length", len(data))
-            request.end_headers()
-            if request.command != "HEAD":
-                request.wfile.write(data)
-            found = True
-    if not found:
-        request.send_response(404)
-        request.end_headers()
+            return write_string(request, "text/plain; charset=utf-8", data)
+            return
+    request.send_response(404)
+    request.end_headers()
 
 def default_handler(request):
     url = urlparse(request.path)
@@ -367,48 +360,49 @@ def default_handler(request):
         pathname += "/"
     if pathname.endswith("/index.html"):
         redirect(request, 301, "/" + pathname[0:len(pathname) - 11].lstrip("/"))
-    else:
-        filename = pathname
-        if pathname.endswith("/"):
-            filename = os.path.join(pathname, "index.html")
-        filename = filename.lstrip("/")
-        if not exists(filename):
-            redirect(request, 302, os.path.dirname(pathname))
-        elif isdir(filename):
-            redirect(request, 302, pathname + "/")
-        else:
-            extension = os.path.splitext(filename)[1]
-            content_type = mimetypes.types_map[extension]
-            if content_type and content_type != "text/html":
-                def content():
-                    with open(os.path.join("./", filename), "rb") as binary:
-                        return binary.read()
-                data = cache("default:" + filename, content)
-                request.send_response(200)
-                request.send_header("Content-Type", content_type)
-                request.send_header("Content-Length", len(data))
-                request.send_header("Cache-Control", "private, max-age=0")
-                request.send_header("Expires", -1)
-                request.end_headers()
-                if request.command != "HEAD":
-                    request.wfile.write(data)
-            else:
-                def content():
-                    template = read_file(os.path.join("./", filename))
-                    context = configuration.copy()
-                    context["feed"] = lambda: configuration["feed"] if \
-                        ("feed" in configuration and len(configuration["feed"]) > 0) else \
-                        scheme(request) + "://" + request.headers.get("host") + "/blog/atom.xml"
-                    context["blog"] = lambda: render_blog(posts(), 0)
-                    context["links"] = lambda: "\n".join( \
-                        "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + link["symbol"] + "</span></a>" \
-                        for link in configuration["links"])
-                    context["tabs"] = lambda: "\n".join( \
-                        "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>" \
-                        for page in configuration["pages"]) 
-                    return mustache(template, context, lambda name: read_file(name))
-                data = cache("default:" + filename, content)
-                write_string(request, "text/html", data)
+        return
+    filename = pathname
+    if pathname.endswith("/"):
+        filename = os.path.join(pathname, "index.html")
+    filename = filename.lstrip("/")
+    if not exists(filename):
+        redirect(request, 302, os.path.dirname(pathname))
+        return
+    if isdir(filename):
+        redirect(request, 302, pathname + "/")
+        return
+    extension = os.path.splitext(filename)[1]
+    content_type = mimetypes.types_map[extension]
+    if content_type and content_type != "text/html":
+        def content():
+            with open(os.path.join("./", filename), "rb") as binary:
+                return binary.read()
+        buffer = cache("default:" + filename, content)
+        request.send_response(200)
+        request.send_header("Content-Type", content_type)
+        request.send_header("Content-Length", len(buffer))
+        request.send_header("Cache-Control", "private, max-age=0")
+        request.send_header("Expires", -1)
+        request.end_headers()
+        if request.command != "HEAD":
+            request.wfile.write(buffer)
+        return
+    def content():
+        template = read_file(os.path.join("./", filename))
+        view = configuration.copy()
+        view["feed"] = lambda: configuration["feed"] if \
+            ("feed" in configuration and len(configuration["feed"]) > 0) else \
+            scheme(request) + "://" + request.headers.get("host") + "/blog/atom.xml"
+        view["blog"] = lambda: render_blog(posts(), 0)
+        view["links"] = lambda: "\n".join( \
+            "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + link["symbol"] + "</span></a>" \
+            for link in configuration["links"])
+        view["tabs"] = lambda: "\n".join( \
+            "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>" \
+            for page in configuration["pages"]) 
+        return mustache(template, view, lambda name: read_file(name))
+    data = cache("default:" + filename, content)
+    write_string(request, "text/html", data)
 
 def root_handler(request):
     request.send_response(301)

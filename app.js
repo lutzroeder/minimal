@@ -17,16 +17,16 @@ function escapeHtml(text) {
     });
 }
 
-function mustache(template, context, partials) {
+function mustache(template, view, partials) {
     template = template.replace(/\{\{>\s*([-_\/\.\w]+)\s*\}\}/gm, function (match, name) {
-        return mustache(typeof partials === "function" ? partials(name) : partials[name], context, partials);
+        return mustache(typeof partials === "function" ? partials(name) : partials[name], view, partials);
     });
     template = template.replace(/\{\{\{\s*([-_\/\.\w]+)\s*\}\}\}/gm, function (match, name) {
-        var value = context[name];
+        var value = view[name];
         return typeof value === "function" ? value() : value;
     });
     template = template.replace(/\{\{\s*([-_\/\.\w]+)\s*\}\}/gm, function (match, name) {
-        var value = context[name];
+        var value = view[name];
         return escapeHtml(typeof value === "function" ? value() : value);
     });
     return template;
@@ -146,7 +146,7 @@ function truncate(text, length) {
             index++;
             var entity = text.substring(index).match("(#?[A-Za-z0-9]+;)");
             if (entity) {
-                index += match[0].length;
+                index += entity[0].length;
             }
             count++;
         }
@@ -258,8 +258,8 @@ function renderBlog(files, start) {
     }
     if (files.length > 0) {
         var template = fs.readFileSync("stream.html", "utf-8");
-        var context = { "url": "/blog?id=" + index.toString() };
-        var data = mustache(template, context, null);
+        var view = { "url": "/blog?id=" + index.toString() };
+        var data = mustache(template, view, null);
         output.push(data);
     }
     return output.join("\n");
@@ -349,9 +349,9 @@ function postHandler(request, response) {
         if (entry) {
             entry["date"] = formatUserDate(entry["date"]);
             entry["author"] = entry["author"] || configuration["name"];
-            var context = Object.assign(configuration, entry);
+            var view = Object.assign(configuration, entry);
             var template = fs.readFileSync("post.html", "utf-8");
-            return mustache(template, context, function(name) {
+            return mustache(template, view, function(name) {
                 return fs.readFileSync(name, "utf-8");
             });
         }
@@ -359,17 +359,15 @@ function postHandler(request, response) {
     });
     if (data) {
         writeString(request, response, "text/html", data);
+        return;
     }
-    else {
-        var extension = path.extname(file)
-        var contentType = mimeTypeMap[extension] 
-        if (contentType) {
-            defaultHandler(request, response);
-        }
-        else {
-            rootHandler(request, response)
-        }
+    var extension = path.extname(file)
+    var contentType = mimeTypeMap[extension] 
+    if (contentType) {
+        defaultHandler(request, response);
+        return;
     }
+    rootHandler(request, response)
 }
 
 function blogHandler(request, response) {
@@ -385,30 +383,22 @@ function blogHandler(request, response) {
             });
         }
         writeString(request, response, "text/html", data);
+        return;
     }
-    else {
-        rootHandler(request, response)
-    }
+    rootHandler(request, response)
 }
 
 function certHandler(request, response) {
     var file = path.normalize(url.parse(request.url, true).pathname).replace(/^\/?/, "");
-    var found = false
     if (exists(".well-known/") && isDirectory(".well-known/")) {
         if (fs.existsSync(file) && fs.statSync(file).isFile) {
             var data = fs.readFileSync(file, "utf-8");
-            response.writeHead(200, {
-                "Content-Type": "text/plain; charset=utf-8", 
-                "Content-Length": Buffer.byteLength(data) });
-            response.write(data);
-            response.end();
-            found = true;
+            writeString(request, respnse, "text/plain; charset=utf-8", data);
+            return
         }
     }
-    if (!found) {
-        response.writeHead(404)
-        response.end();
-    }
+    response.writeHead(404)
+    response.end();
 }
 
 function defaultHandler(request, response) {
@@ -416,75 +406,73 @@ function defaultHandler(request, response) {
     if (pathname.endsWith("/index.html"))
     {
         redirect(response, 301, "/" + pathname.substring(0, pathname.length - 11).replace(/^\/?/, ""));
+        return;
     }
-    else {
-        var file = (pathname.endsWith("/") ? path.join(pathname, "index.html") : pathname).replace(/^\/?/, "");
-        if (!exists(file)) {
-            redirect(response, 302, path.dirname(pathname));
-        }
-        else if (isDirectory(file)) {
-            redirect(response, 302, pathname + "/");
-        }
-        else {
-            var extension = path.extname(file);
-            var contentType = mimeTypeMap[extension];
-            if (contentType) {
-                var buffer = cache("default:" + file, function() {
-                    try {
-                        var size = fs.statSync(file).size;
-                        var buffer = new Buffer(size)
-                        var descriptor = fs.openSync(file, "r");
-                        fs.readSync(descriptor, buffer, 0, buffer.length, 0);
-                        fs.closeSync(descriptor);
-                        return buffer;
-                    }
-                    catch (error) {
-                        console.log(error);
-                    }
-                    return new Buffer(0);
-                });
-                response.writeHead(200, {
-                    "Content-Type": contentType,
-                    "Content-Length": buffer.length,
-                    "Cache-Control": "private, max-age=0",
-                    "Expires": -1 
-                });
-                if (request.method !== "HEAD") {
-                    response.write(buffer, "binary");
-                }
-                response.end();
-            }
-            else {
-                var data = cache("default:" + file, function() {
-                    var template = fs.readFileSync(file, "utf-8");
-                    var context = Object.assign({ }, configuration);
-                    context["feed"] = function() {
-                        if (configuration["feed"] && configuration["feed"].length > 0) {
-                            return configuration["feed"];              
-                        }
-                        return scheme(request) + "://" + request.headers.host + "/blog/atom.xml";
-                    };
-                    context["blog"] = function() {
-                        return renderBlog(posts(), 0);
-                    };
-                    context["links"] = function() {
-                        return configuration["links"].map(function (link) {
-                            return "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + link.symbol + "</span></a>";
-                        }).join("\n");
-                    };
-                    context["tabs"] = function() {
-                        return configuration["pages"].map(function (page) {
-                            return "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>";
-                        }).join("\n");
-                    };
-                    return mustache(template, context, function(name) {
-                        return fs.readFileSync(name, "utf-8");
-                    });
-                })
-                writeString(request, response, "text/html", data);
-            }
-        }
+    var file = (pathname.endsWith("/") ? path.join(pathname, "index.html") : pathname).replace(/^\/?/, "");
+    if (!exists(file)) {
+        redirect(response, 302, path.dirname(pathname));
+        return;
     }
+    if (isDirectory(file)) {
+        redirect(response, 302, pathname + "/");
+        return;
+    }
+    var extension = path.extname(file);
+    var contentType = mimeTypeMap[extension];
+    if (contentType) {
+        var buffer = cache("default:" + file, function() {
+            try {
+                var size = fs.statSync(file).size;
+                var buffer = new Buffer(size)
+                var descriptor = fs.openSync(file, "r");
+                fs.readSync(descriptor, buffer, 0, buffer.length, 0);
+                fs.closeSync(descriptor);
+                return buffer;
+            }
+            catch (error) {
+                console.log(error);
+            }
+            return new Buffer(0);
+        });
+        response.writeHead(200, {
+            "Content-Type": contentType,
+            "Content-Length": buffer.length,
+            "Cache-Control": "private, max-age=0",
+            "Expires": -1 
+        });
+        if (request.method !== "HEAD") {
+            response.write(buffer, "binary");
+        }
+        response.end();
+        return;
+    }
+    var data = cache("default:" + file, function() {
+        var template = fs.readFileSync(file, "utf-8");
+        var view = Object.assign({ }, configuration);
+        view["feed"] = function() {
+            if (configuration["feed"] && configuration["feed"].length > 0) {
+                return configuration["feed"];              
+            }
+            return scheme(request) + "://" + request.headers.host + "/blog/atom.xml";
+        };
+        view["blog"] = function() {
+            return renderBlog(posts(), 0);
+        };
+        view["links"] = function() {
+            return configuration["links"].map(function (link) {
+                return "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + link.symbol + "</span></a>";
+            }).join("\n");
+        };
+        view["tabs"] = function() {
+            return configuration["pages"].map(function (page) {
+                return "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>";
+            }).join("\n");
+        };
+        return mustache(template, view, function(name) {
+            return fs.readFileSync(name, "utf-8");
+        });
+    })
+    writeString(request, response, "text/html", data);
 }
 
 function Router() {
@@ -527,17 +515,17 @@ Router.prototype.handle = function (request, response) {
             }
         }
     }
-    this.defaultHandler(request, response);
 };
 
 Router.prototype.get = function (path, handler) {
     this.route(path).handlers["GET"] = handler;
 };
 
-Router.prototype.default = function (handler) {
-    this.defaultHandler = handler;
-};
-
+console.log(process.title + " " + process.version);
+var configuration = JSON.parse(fs.readFileSync("./app.json", "utf-8"));
+var environment = process.env.NODE_ENV;
+console.log(environment);
+initPathCache(".");
 var router = new Router();
 router.get("/.git*", rootHandler);
 router.get("/admin*", rootHandler);
@@ -550,13 +538,6 @@ router.get("/blog/*", postHandler);
 router.get("/blog", blogHandler);
 router.get("/.well-known/acme-challenge/*", certHandler);
 router.get("/*", defaultHandler);
-router.default(rootHandler);
-
-console.log(process.title + " " + process.version);
-var configuration = JSON.parse(fs.readFileSync("./app.json", "utf-8"));
-var environment = process.env.NODE_ENV;
-console.log(environment);
-initPathCache(".");
 var server = http.createServer(function (request, response) {
     console.log(request.method + " " + request.url);
     router.handle(request, response);
