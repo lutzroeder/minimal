@@ -475,18 +475,28 @@ function defaultHandler(request, response) {
     writeString(request, response, "text/html", data);
 }
 
-function Router() {
+function Router(configuration) {
     this.routes = [];
+    if (configuration["redirects"]) {
+        for (var i = 0; i < configuration["redirects"].length; i++) {
+            var redirect = configuration["redirects"][i]
+            var target = redirect["target"];
+            this.get(redirect["pattern"], function (request, response) {
+                response.writeHead(301, { "Location": target });
+                response.end();
+            });
+        }
+    }
 }
 
-Router.prototype.route = function (path) {
+Router.prototype.route = function (pattern) {
     var route = this.routes.find(function (route) {
         return route.path === path;
     });
     if (!route) {
         route = {
-            path: path,
-            regexp: new RegExp("^" + path.replace("*", "(.*)") + "$", "i"),
+            pattern: pattern,
+            regexp: new RegExp("^" + pattern.replace("*", "(.*)") + "$", "i"),
             handlers: {}
         };
         this.routes.push(route);
@@ -517,8 +527,8 @@ Router.prototype.handle = function (request, response) {
     }
 };
 
-Router.prototype.get = function (path, handler) {
-    this.route(path).handlers["GET"] = handler;
+Router.prototype.get = function (pattern, handler) {
+    this.route(pattern).handlers["GET"] = handler;
 };
 
 console.log(process.title + " " + process.version);
@@ -526,13 +536,17 @@ var configuration = JSON.parse(fs.readFileSync("./app.json", "utf-8"));
 var environment = process.env.NODE_ENV;
 console.log(environment);
 initPathCache(".");
-var router = new Router();
-router.get("/.git*", rootHandler);
+var router = new Router(configuration);
+router.get("/.git/?*", rootHandler)
+router.get("/.vscode/?*", rootHandler);
 router.get("/admin*", rootHandler);
 router.get("/app.*", rootHandler);
-router.get("/*.html", rootHandler);
-router.get("/*.css", rootHandler);
+router.get("/header.html", rootHandler);
+router.get("/meta.html", rootHandler);
 router.get("/package.json", rootHandler);
+router.get("/post.html", rootHandler);
+router.get("/post.css", rootHandler);
+router.get("/site.css", rootHandler);
 router.get("/blog/atom.xml", atomHandler);
 router.get("/blog/*", postHandler);
 router.get("/blog", blogHandler);

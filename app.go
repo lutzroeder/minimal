@@ -487,9 +487,9 @@ func blogHandler(response http.ResponseWriter, request *http.Request) {
 }
 
 func defaultHandler(response http.ResponseWriter, request *http.Request) {
-	url := request.URL.Path
-	pathname := strings.ToLower(path.Clean(request.URL.Path))
-	if pathname != "/" && strings.HasSuffix(url, "/") {
+	urlpath := request.URL.Path
+	pathname := strings.ToLower(path.Clean(urlpath))
+	if pathname != "/" && strings.HasSuffix(urlpath, "/") {
 		pathname += "/"
 	}
 	if strings.HasSuffix(pathname, "/index.html") {
@@ -596,13 +596,74 @@ func certHandler(response http.ResponseWriter, request *http.Request) {
 	response.WriteHeader(http.StatusNotFound)
 }
 
-type loggerHandler struct {
-	handler http.Handler
+type router struct {
+	routes []*route
 }
 
-func (logger loggerHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
+type route struct {
+	pattern string
+	regexp *regexp.Regexp
+	handlers map[string]interface{}
+}
+
+func newRouter(redirects map[string]interface{}) *router {
+	this := &router{}
+	this.routes = make([]*route, 0)
+	if redirects, ok := configuration["redirects"]; ok {
+		for _, redirect := range redirects.([]interface{}) {
+			pattern := redirect.(map[string]interface{})["pattern"].(string)
+			target := redirect.(map[string]interface{})["target"].(string)
+			this.Get(pattern, target);
+		}
+	}
+	return this
+}
+
+func (this *router) Get(pattern string, handler interface{}) {
+	this.route(pattern).handlers["GET"] = handler;
+}
+
+func (this *router) route(pattern string) *route {
+	for _, route := range this.routes {
+		if pattern == route.pattern {
+			return route
+		}
+	}
+	route := &route{}
+	route.pattern = pattern 
+	route.regexp = regexp.MustCompile("^" + strings.Replace(pattern, "*", "(.*)", -1) + "$")
+	route.handlers = make(map[string]interface{})
+	this.routes = append(this.routes, route)
+	return route
+}
+
+func (this *router) ServeHTTP(response http.ResponseWriter, request *http.Request) {
 	fmt.Println(request.Method + " " + request.RequestURI)
-	logger.handler.ServeHTTP(response, request)
+	urlpath := request.URL.Path
+	pathname := strings.ToLower(path.Clean(urlpath))
+	if pathname != "/" && strings.HasSuffix(urlpath, "/") {
+		pathname += "/"
+	}
+	for _, route := range this.routes {
+		if route.regexp.MatchString(pathname) {
+			method := strings.ToUpper(request.Method)
+			if method == "HEAD" {
+				if _, ok := route.handlers["HEAD"]; !ok {
+					method = "GET"
+				}
+			}
+			if handler, ok := route.handlers[method]; ok {
+				if callback, ok := handler.(func(response http.ResponseWriter, request *http.Request)); ok {
+					callback(response, request)
+					return 
+				}
+				if redirect, ok := handler.(string); ok {
+					http.Redirect(response, request, redirect, http.StatusMovedPermanently)
+					return
+				}
+			}
+		}
+	}
 }
 
 func main() {
@@ -620,26 +681,23 @@ func main() {
 	environment = os.Getenv("GO_ENV")
 	fmt.Println(environment)
 	initPathCache(".")
-	http.HandleFunc("/.git", rootHandler)
-	http.HandleFunc("/admin", rootHandler)
-	http.HandleFunc("/admin.cfg", rootHandler)
-	http.HandleFunc("/app.go", rootHandler)
-	http.HandleFunc("/app.js", rootHandler)
-	http.HandleFunc("/app.json", rootHandler)
-	http.HandleFunc("/app.py", rootHandler)
-	http.HandleFunc("/header.html", rootHandler)
-	http.HandleFunc("/meta.html", rootHandler)
-	http.HandleFunc("/package.json", rootHandler)
-	http.HandleFunc("/post.css", rootHandler)
-	http.HandleFunc("/post.html", rootHandler)
-	http.HandleFunc("/site.css", rootHandler)
-	http.HandleFunc("/stream.html", rootHandler)
-	http.HandleFunc("/blog/atom.xml", atomHandler)
-	http.HandleFunc("/blog/", postHandler)
-	http.HandleFunc("/blog", blogHandler)
-	http.HandleFunc("/.well-known/acme-challenge/", certHandler)
-	http.HandleFunc("/", defaultHandler)
+	router := newRouter(configuration)
+	router.Get("/.git/?*", rootHandler)
+	router.Get("/.vscode/?*", rootHandler)
+	router.Get("/admin*", rootHandler)
+	router.Get("/app.*", rootHandler)
+	router.Get("/header.html", rootHandler)
+	router.Get("/meta.html", rootHandler)
+	router.Get("/package.json", rootHandler)
+	router.Get("/post.html", rootHandler)
+	router.Get("/post.css", rootHandler)
+	router.Get("/site.css", rootHandler)
+	router.Get("/blog/atom.xml", atomHandler)
+	router.Get("/blog/*", postHandler)
+	router.Get("/blog", blogHandler)
+	router.Get("/.well-known/acme-challenge/*", certHandler)
+	router.Get("/*", defaultHandler)
 	port := 8080
 	fmt.Println("http://localhost:" + strconv.Itoa(port))
-	http.ListenAndServe(":" + strconv.Itoa(port), loggerHandler{http.DefaultServeMux})
+	http.ListenAndServe(":" + strconv.Itoa(port), router)
 }

@@ -410,16 +410,19 @@ def root_handler(request):
     request.end_headers()
 
 class Router(object):
-    def __init__(self):
+    def __init__(self, configuration):
         self.routes = []
-    def get(self, path, handler):
-        self.route(path)["handlers"]["GET"] = handler
-    def route(self, path):
-        route = next((route for route in self.routes if route["path"] == path), None)
+        if "redirects" in configuration:
+            for redirect in configuration["redirects"]:
+                self.get(redirect["pattern"], redirect["target"])
+    def get(self, pattern, handler):
+        self.route(pattern)["handlers"]["GET"] = handler
+    def route(self, pattern):
+        route = next((route for route in self.routes if route["pattern"] == pattern), None)
         if not route:
             route = {
-                "path": path,
-                "regexp": re.compile("^" + path.replace("*", "(.*)") + "$"),
+                "pattern": pattern,
+                "regexp": re.compile("^" + pattern.replace("*", "(.*)") + "$"),
                 "handlers": {}
             }
             self.routes.append(route)
@@ -432,8 +435,12 @@ class Router(object):
                 if method == "HEAD" and not "HEAD" in route["handlers"]:
                     method = "GET"
                 handler = route["handlers"][method]
-                if handler:
+                if callable(handler): 
                     handler(request)
+                else:
+                    request.send_response(301)
+                    request.send_header("Location", handler)
+                    request.end_headers()
                 return
 
 class HTTPRequestHandler(BaseHTTPRequestHandler):
@@ -452,13 +459,17 @@ with open("./app.json") as configurationFile:
 environment = os.getenv("PYTHON_ENV")
 print(environment)
 init_path_cache(".")
-router = Router()
-router.get("/.git*", root_handler)
+router = Router(configuration)
+router.get("/.git/?*", root_handler)
+router.get("/.vscode/?*", root_handler)
 router.get("/admin*", root_handler)
-router.get("/app", root_handler)
+router.get("/app.*", root_handler)
+router.get("/header.html", root_handler)
+router.get("/meta.html", root_handler)
 router.get("/package.json", root_handler)
-router.get("/*.css", root_handler)
-router.get("/*.html", root_handler)
+router.get("/post.html", root_handler)
+router.get("/post.css", root_handler)
+router.get("/site.css", root_handler)
 router.get("/blog/atom.xml", atom_handler)
 router.get("/blog/*", post_handler)
 router.get("/blog", blog_handler)
