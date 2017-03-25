@@ -1,22 +1,27 @@
 {
     "version": "0.2.0",
     "configurations": [
-
         {
-            "name": "Node",
+            "name": "node",
             "type": "node",
             "request": "launch",
-            "program": "${workspaceRoot}/app.js"
+            "program": "${workspaceRoot}/app.js",
+            "env": {
+                "NODE_ENV": "development"
+            }
         },
         {
-            "name": "Go",
+            "name": "go",
             "type": "go",
             "request": "launch",
             "mode": "debug",
-            "program": "${workspaceRoot}/app.go"
+            "program": "${workspaceRoot}/app.go",
+            "env": {
+                "GO_ENV": "development"
+            }
         },
         {
-            "name": "Python",
+            "name": "python",
             "type": "python",
             "request": "launch",
             "program": "${workspaceRoot}/app.py",
@@ -24,7 +29,24 @@
                 "WaitOnAbnormalExit",
                 "WaitOnNormalExit",
                 "RedirectOutput"
-            ]
+            ],
+            "env": {
+                "PYTHON_ENV": "development"
+            }
+        },
+        {
+            "name": "dotnet",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "dotnet_build",
+            "program": "${workspaceRoot}/.vscode/out/dotnet/bin/netcoreapp1.1/app.dll",
+            "args": [],
+            "cwd": "${workspaceRoot}",
+            "stopAtEntry": false,
+            "internalConsoleOptions": "openOnSessionStart",
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+            }
         }
     ]
 }

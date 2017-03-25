@@ -8,6 +8,13 @@ source "${configuration}"
 server_install() {
     server_uninstall
 
+    echo "$(tput bold)apt-get update$(tput sgr0)"
+    if [ ${runtime} = "dotnet" ]; then
+        sudo sh -c 'echo "deb [arch=amd64] https://apt-mo.trafficmanager.net/repos/dotnet-release/ xenial main" > /etc/apt/sources.list.d/dotnetdev.list'
+        sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 417A0893
+    elif [ ${runtime} = "node" ]; then
+        curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
+    fi
     sudo apt-get update
 
     if [ ${runtime} = "go" ]; then 
@@ -16,9 +23,11 @@ server_install() {
     elif [ ${runtime} = "python" ]; then
         echo "$(tput bold)apt-get install python$(tput sgr0)"
         sudo apt-get install --yes python python-dateutil
+    elif [ ${runtime} = "dotnet" ]; then
+        echo "$(tput bold)apt-get install dotnet-dev-1.0.1$(tput sgr0)"
+        sudo apt-get install --yes dotnet-dev-1.0.1
     else
         echo "$(tput bold)apt-get install nodejs$(tput sgr0)"
-        curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
         sudo apt-get install --yes nodejs
     fi
 
@@ -27,12 +36,10 @@ server_install() {
 
     echo "$(tput bold)configure reverse proxy$(tput sgr0)"
     sudo systemctl stop nginx.service
-
 cat << EOF >> "${site}.conf"
 server {
     listen 80;
 EOF
-
     if [ -n "${domain}" ]; then
         if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
 ssl=$(cat << EOF
@@ -55,7 +62,6 @@ ${ssl}
 EOF
         fi
     fi
-
 cat << EOF >> "${site}.conf"
     gzip on;
     gzip_proxied any;
@@ -90,13 +96,16 @@ EOF
     echo "$(tput bold)configure ${site}.service$(tput sgr0)"
     if [ ${runtime} = "go" ]; then 
         command="$(which go) run $(pwd)/app.go"
-        environment="GO_ENV"
+        environment="GO_ENV=production"
     elif [ ${runtime} = "python" ]; then
         command="$(which python) $(pwd)/app.py"
-        environment="PYTHON_ENV"
+        environment="PYTHON_ENV=production"
+    elif [ ${runtime} = "dotnet" ]; then
+        command="$(which dotnet) exec .vscode/out/dotnet/bin/netcoreapp1.1/app.dll"
+        environment="ASPNETCORE_ENVIRONMENT=Production"
     else
         command="$(which node) $(pwd)/app.js"
-        environment="NODE_ENV"
+        environment="NODE_ENV=production"
     fi
 cat > "${site}.service" << EOF
 [Unit]
@@ -104,7 +113,7 @@ Description=${site}.service
 [Service]
 WorkingDirectory=$(pwd)
 ExecStart=${command}
-Environment=${environment}=production
+Environment=${environment}
 Restart=always
 RestartSec=10
 StandardOutput=syslog
@@ -124,13 +133,11 @@ EOF
 
 server_uninstall() {
     server_stop
-
     if [ -f "/etc/systemd/system/${site}.service" ] && [ $(systemctl is-enabled ${site}.service) = "enabled" ]; then
         echo "$(tput bold)disable ${site}.service$(tput sgr0)"
         sudo systemctl disable "${site}.service"
         sudo rm "/etc/systemd/system/${site}.service"
     fi
-
     if [ -f "/etc/nginx/sites-available/${site}.conf" ]; then
         echo "$(tput bold)configure reverse proxy$(tput sgr0)"
         sudo systemctl stop nginx.service
@@ -143,6 +150,14 @@ server_uninstall() {
 }
 
 server_start() {
+    if [ ${runtime} = "dotnet" ]; then
+        echo "$(tput bold)dotnet build$(tput sgr0)"
+        dotnet restore && dotnet build
+        if [ $? -ne 0 ]; then
+            echo "dotnet restore && dotnet build failed."
+            return
+        fi
+    fi
     echo "$(tput bold)start ${site}.service$(tput sgr0)"
     sudo systemctl start ${site}.service
     sleep 2
@@ -222,7 +237,12 @@ client_start() {
     elif [ ${1:-${runtime}} = "python" ]; then
         sleep 0.5 && git web--browse http://localhost:8080 & PYTHON_ENV=${PYTHON_ENV:-development} python app.py
     elif [ ${1:-${runtime}} = "dotnet" ]; then
-        sleep 5 && git web--browse http://localhost:8080 & dotnet restore & ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development} dotnet run
+        dotnet restore > /dev/null && dotnet build > /dev/null
+        if [ $? -ne 0 ]; then
+            echo "dotnet restore && dotnet build failed."
+            return
+        fi
+        sleep 1 && git web--browse http://localhost:8080 & ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development} dotnet exec .vscode/out/dotnet/bin/netcoreapp1.1/app.dll
     else
         sleep 0.5 && git web--browse http://localhost:8080 & NODE_ENV=${NODE_ENV:-development} node app.js
     fi
@@ -266,6 +286,14 @@ client_test() {
     curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_node.xml
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
+    echo "$(tput bold)go$(tput sgr0)"
+    go build -o .vscode/out/go/app app.go
+    GO_ENV=production .vscode/out/go/app & pid=$!
+    sleep 0.5
+    curl -s http://localhost:8080/ > ${output}/root_go.html
+    curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_go.xml
+    kill -9 ${pid}
+    wait ${pid} 2>/dev/null
     echo "$(tput bold)python$(tput sgr0)"
     PYTHON_ENV=production python ./app.py & pid=$!
     sleep 0.5
@@ -273,20 +301,25 @@ client_test() {
     curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_python.xml
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
-    echo "$(tput bold)go$(tput sgr0)"
-    go build -o ./app ./app.go
-    GO_ENV=production ./app & pid=$!
-    sleep 0.5
-    curl -s http://localhost:8080/ > ${output}/root_go.html
-    curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_go.xml
+    echo "$(tput bold)dotnet$(tput sgr0)"
+    dotnet restore > /dev/null && dotnet build > /dev/null
+    if [ $? -ne 0 ]; then
+        echo "dotnet restore && dotnet build failed."
+        return
+    fi
+    ASPNETCORE_ENVIRONMENT=Production dotnet exec .vscode/out/dotnet/bin/netcoreapp1.1/app.dll & pid=$!
+    sleep 1
+    curl -s http://localhost:8080/ > ${output}/root_dotnet.html
+    curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_dotnet.xml
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
-    rm ./app
     echo "$(tput bold)compare$(tput sgr0)"
     cmp ${output}/root_node.html ${output}/root_go.html
     cmp ${output}/root_node.html ${output}/root_python.html
+    cmp ${output}/root_node.html ${output}/root_dotnet.html
     cmp ${output}/atom_node.xml ${output}/atom_go.xml
     cmp ${output}/atom_node.xml ${output}/atom_python.xml
+    cmp ${output}/atom_node.xml ${output}/atom_dotnet.xml
 }
 
 client_console() {

@@ -1,0 +1,16 @@
+{
+    "version": "0.1.0",
+    "tasks": [
+        {
+            "taskName": "dotnet_build",
+            "command": "dotnet",
+            "isShellCommand": true,
+            "isBuildCommand": true,
+            "suppressTaskName": true,
+            "args": [
+                "build", "${workspaceRoot}/app.csproj"
+            ],
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}
