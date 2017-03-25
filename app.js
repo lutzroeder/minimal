@@ -342,7 +342,7 @@ var mimeTypeMap = {
 };
 
 function postHandler(request, response) {
-    var pathname = path.normalize(url.parse(request.url, true).pathname);
+    var pathname = url.parse(request.url, true).pathname;
     var file = pathname.replace(/^\/?/, "");
     var data = cache("post:" + file, function() {
         var entry = loadPost(file + ".html");
@@ -389,7 +389,7 @@ function blogHandler(request, response) {
 }
 
 function certHandler(request, response) {
-    var file = path.normalize(url.parse(request.url, true).pathname).replace(/^\/?/, "");
+    var file = url.parse(request.url, true).pathname.replace(/^\/?/, "");
     if (exists(".well-known/") && isDirectory(".well-known/")) {
         if (fs.existsSync(file) && fs.statSync(file).isFile) {
             var data = fs.readFileSync(file, "utf-8");
@@ -402,13 +402,13 @@ function certHandler(request, response) {
 }
 
 function defaultHandler(request, response) {
-    var pathname = path.normalize(url.parse(request.url, true).pathname.toLowerCase());
+    var pathname = url.parse(request.url, true).pathname.toLowerCase();
     if (pathname.endsWith("/index.html"))
     {
         redirect(response, 301, "/" + pathname.substring(0, pathname.length - 11).replace(/^\/?/, ""));
         return;
     }
-    var file = (pathname.endsWith("/") ? path.join(pathname, "index.html") : pathname).replace(/^\/?/, "");
+    var file = (pathname.endsWith("/") ? pathname + "index.html" : pathname).replace(/^\/?/, "");
     if (!exists(file)) {
         redirect(response, 302, path.dirname(pathname));
         return;
@@ -505,7 +505,7 @@ Router.prototype.route = function (pattern) {
 };
 
 Router.prototype.handle = function (request, response) {
-    var pathname = path.normalize(url.parse(request.url, true).pathname);
+    var pathname = url.parse(request.url, true).pathname;
     for (var i = 0; i < this.routes.length; i++) {
         var route = this.routes[i];
         if (pathname.match(route.regexp) !== null) {
