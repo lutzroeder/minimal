@@ -475,7 +475,8 @@ router.get("/blog/*", post_handler)
 router.get("/blog", blog_handler)
 router.get("/.well-known/acme-challenge/*", cert_handler)
 router.get("/*", default_handler)
+host = "localhost"
 port = 8080
-print("http://localhost:" + str(port))
-server = HTTPServer(("", port), HTTPRequestHandler)
+print("http://" + host + ":" + str(port))
+server = HTTPServer((host, port), HTTPRequestHandler)
 server.serve_forever()

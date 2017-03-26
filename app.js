@@ -531,7 +531,7 @@ Router.prototype.get = function (pattern, handler) {
     this.route(pattern).handlers["GET"] = handler;
 };
 
-console.log(process.title + " " + process.version);
+console.log("node " + process.version);
 var configuration = JSON.parse(fs.readFileSync("./app.json", "utf-8"));
 var environment = process.env.NODE_ENV;
 console.log(environment);
