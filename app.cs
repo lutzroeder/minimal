@@ -191,7 +191,7 @@ class Program
     static string Truncate(string text, int length)
     {
         var closeTags = new SortedDictionary<int, string>();
-        var ellipsis = "";
+        var ellipsis = string.Empty;
         var count = 0;
         var index = 0;
         while (count < length && index < text.Length)
@@ -269,7 +269,7 @@ class Program
         {
             output.Add(pair.Value);
         }
-        return string.Join("", output);
+        return string.Join(string.Empty, output);
     }
 
     static Dictionary<string,string> LoadPost(string file)
@@ -312,7 +312,7 @@ class Program
     static Queue<string> Posts()
     {
         var posts = (List<string>) Cache("blog:files", delegate () {
-            var list = new List<string>(Directory.GetFileSystemEntries("blog/", "*.html").Select(file => Path.GetFileName(file)));
+            var list = new List<string>(Directory.GetFiles("blog/", "*.html").Select(file => Path.GetFileName(file)));
             list.Sort();
             list.Reverse();
             return list;
@@ -396,7 +396,7 @@ class Program
             output.Add("<icon>" + host + "/favicon.ico</icon>");
             var index = output.Count;
             string recent = string.Empty;
-            output.Add("");
+            output.Add(string.Empty);
             output.Add("<author><name>" + configuration["name"] + "</name></author>");
             output.Add("<link rel='alternate' type='text/html' href='" + host + "/' />");
             output.Add("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />");
@@ -418,7 +418,8 @@ class Program
                     output.Add("<published>" + date + "</published>");
                     var updated = entry.ContainsKey("updated") ? FormatDate(DateTime.Parse(entry["updated"])) : date;
                     output.Add("<updated>" + updated + "</updated>");
-                    if (string.IsNullOrEmpty(recent) || recent.CompareTo(updated) < 0)  {
+                    if (string.IsNullOrEmpty(recent) || recent.CompareTo(updated) < 0)
+                    {
                         recent = updated;
                     }
                     output.Add("<title type='text'>" + entry["title"] + "</title>");
@@ -499,7 +500,7 @@ class Program
             {
                 var key = "/blog?id=" + id.ToString();
                 var files = Posts();
-                var data = "";
+                var data = string.Empty;
                 if (id < files.Count)
                 {
                     data = CacheString("blog:" + key, delegate() {
@@ -519,7 +520,7 @@ class Program
         {
             if (File.Exists(file))
             {
-                var data = File.ReadAllText(file);;
+                var data = File.ReadAllText(file);
                 return WriteStringAsync(context, "text/plain; charset=utf-8", data);
             }
         }
@@ -604,7 +605,7 @@ class Program
     {
         public static object Parse(string json)
         {
-            JObject root = JObject.Parse(json);
+            JToken root = JToken.Parse(json);
             return Convert(root);
         }
 
@@ -613,19 +614,9 @@ class Program
             switch (token)
             {
                 case JObject obj:
-                    Dictionary<string, object> dictionary = new Dictionary<string, object>();
-                    foreach (JProperty property in obj.Properties())
-                    {
-                        dictionary[property.Name] = Convert(property.Value);
-                    }
-                    return dictionary;
+                    return new Dictionary<string, object>(obj.Properties().ToDictionary(pair => pair.Name, pair => Convert(pair.Value)));
                 case JArray array:
-                    List<object> list = new List<object>();
-                    foreach (JToken item in array)
-                    {
-                        list.Add(Convert(item));
-                    }
-                    return list;
+                    return new List<object>(array.Select(item => Convert(item)));
                 case JValue value:
                     return value.Value;
             }
@@ -657,7 +648,7 @@ class Program
             this.GetRoute(pattern).handlers["GET"] = handler;
         }
 
-        private Route GetRoute(string pattern)
+        Route GetRoute(string pattern)
         {
             Route route = this.routes.Find(delegate(Route item) {
                 return item.Pattern == pattern;
@@ -704,7 +695,7 @@ class Program
 
     static void Main(string[] args)
     {
-        string version = Path.GetFileName(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location)).Replace("netcoreapp", "");
+        string version = Path.GetFileName(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location)).Replace("netcoreapp", string.Empty);
         Console.WriteLine("dotnetcore " + version);
         configuration = (IDictionary<string, object>) JsonReader.Parse(File.ReadAllText("app.json"));
         Router router = new Router(configuration);
