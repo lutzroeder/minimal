@@ -95,7 +95,7 @@ EOF
 
     echo "$(tput bold)configure ${site}.service$(tput sgr0)"
     if [ ${runtime} = "go" ]; then 
-        command="$(which go) run $(pwd)/app.go"
+        command="$(pwd)/.vscode/out/go/app"
         environment="GO_ENV=production"
     elif [ ${runtime} = "python" ]; then
         command="$(which python) $(pwd)/app.py"
@@ -150,7 +150,13 @@ server_uninstall() {
 }
 
 server_start() {
-    if [ ${runtime} = "dotnet" ]; then
+    if [ ${runtime} = "go" ]; then
+        echo "$(tput bold)go build$(tput sgr0)"
+        go build -o .vscode/out/go/app app.go
+        if [ $? -ne 0 ]; then
+            return
+        fi
+    elif [ ${runtime} = "dotnet" ]; then
         echo "$(tput bold)dotnet build$(tput sgr0)"
         dotnet restore && dotnet build
         if [ $? -ne 0 ]; then
