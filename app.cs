@@ -20,8 +20,8 @@ class Program
     static IDictionary<string, object> configuration;
 
     static Dictionary<string,string> entityMap = new Dictionary<string,string>() {
-        { "&", "&amp;" }, { "<", "&lt;" }, { ">", "&gt;" }, { "\"", "&quot;" },
-        { "'", "&#39;" }, { "/", "&#x2F;" }, { "`", "&#x60;" }, { "=", "&#x3D;" }
+        ["&"] = "&amp;", ["<"] = "&lt;", [">"] = "&gt;", ["\""] = "&quot;",
+        ["'"] = "&#39;", ["/"] = "&#x2F;", ["`"] = "&#x60;", ["="] = "&#x3D;"
     };
     static Regex entityRegex = new Regex("[&<>\"\'`=\\/]");
 
@@ -359,7 +359,7 @@ class Program
         if (files.Count > 0)
         {
             var template = File.ReadAllText("stream.html");
-            var view = new Dictionary<string, object>() { { "url", "/blog?id=" + index.ToString() } };
+            var view = new Dictionary<string, object>() { ["url"] = "/blog?id=" + index.ToString() };
             var data = Mustache(template, view, null);
             output.Add(data);
         }
@@ -439,14 +439,14 @@ class Program
     }
 
     static Dictionary<string,string> mimeTypeMap = new Dictionary<string,string>() {
-        { ".js", "text/javascript" },
-        { ".css", "text/css" },
-        { ".png", "image/png" },
-        { ".gif", "image/gif" },
-        { ".jpg", "image/jpeg" },
-        { ".ico", "image/x-icon" },
-        { ".zip", "application/zip" },
-        { ".json", "application/json" },
+        [".js"] = "text/javascript",
+        [".css"] = "text/css",
+        [".png"] = "image/png",
+        [".gif"] = "image/gif",
+        [".jpg"] = "image/jpeg",
+        [".ico"] = "image/x-icon",
+        [".zip"] = "application/zip",
+        [".json"] = "application/json",
     };
 
     static Task PostHandler(HttpContext context)
