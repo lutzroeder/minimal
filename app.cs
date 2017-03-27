@@ -311,7 +311,7 @@ class Program
 
     static Queue<string> Posts()
     {
-        var posts = (List<string>) Cache("blog:files", delegate () {
+        var posts = (List<string>) Cache("blog:files", delegate() {
             var list = new List<string>(Directory.GetFiles("blog/", "*.html").Select(file => Path.GetFileName(file)));
             list.Sort();
             list.Reverse();
@@ -386,7 +386,7 @@ class Program
     static Task AtomHandler(HttpContext context)
     {
         var host = context.Request.Scheme + "://" + context.Request.Host;
-        var data = CacheString("atom:" + host + "/blog/atom.xml", delegate () {
+        var data = CacheString("atom:" + host + "/blog/atom.xml", delegate() {
             var count = 10;
             var output = new List<string>();
             output.Add("<?xml version='1.0' encoding='UTF-8'?>");
@@ -593,7 +593,7 @@ class Program
             view["blog"] = (Func<string>) delegate() {
                 return RenderBlog(Posts(), 0);
             };
-            return Mustache(template, view, delegate (string name) {
+            return Mustache(template, view, delegate(string name) {
                 return File.ReadAllText(name);
             });
         });
@@ -635,7 +635,7 @@ class Program
                 foreach (IDictionary<string, object> redirect in (IEnumerable<object>) configuration["redirects"])
                 {
                     string target = (string) redirect["target"];
-                    this.Get((string) redirect["pattern"], delegate (HttpContext context) {
+                    this.Get((string) redirect["pattern"], delegate(HttpContext context) {
                         context.Response.Redirect(target, true);
                         return Task.CompletedTask;
                     });
@@ -719,7 +719,7 @@ class Program
         IWebHostBuilder webHostBuilder = new WebHostBuilder().UseKestrel()
             .UseSetting(WebHostDefaults.ServerUrlsKey, url)
             .Configure(delegate(IApplicationBuilder applicationBuilder) {
-                applicationBuilder.Run(delegate(HttpContext context){
+                applicationBuilder.Run(delegate(HttpContext context) {
                     Console.WriteLine(context.Request.Method + " " + context.Request.Path.Value);
                     return router.Handle(context);
                 });
