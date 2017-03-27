@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -716,20 +716,17 @@ class Program
         router.Get("/*", DefaultHandler);
         int port = 8080;
         string url = "http://localhost:" + port.ToString();
-        IWebHostBuilder webHostBuilder = new WebHostBuilder().UseKestrel()
-            .UseSetting(WebHostDefaults.ServerUrlsKey, url)
-            .Configure(delegate(IApplicationBuilder applicationBuilder) {
-                applicationBuilder.Run(delegate(HttpContext context) {
+        IWebHost host = new WebHostBuilder().UseKestrel().UseUrls(url)
+            .Configure(app => { app.Run((context) => {
                     Console.WriteLine(context.Request.Method + " " + context.Request.Path.Value);
                     return router.Handle(context);
                 });
-            }); 
-        IWebHost webHost = webHostBuilder.Build();
-        environment = webHost.Services.GetRequiredService<IHostingEnvironment>();
+            }).Build();
+        environment = host.Services.GetRequiredService<IHostingEnvironment>();
         Console.WriteLine(environment.EnvironmentName.ToLower());
         InitPathCache(".");
         Console.WriteLine(url);
-        webHost.Start();
+        host.Start();
         System.Threading.Thread.Sleep(Timeout.Infinite);
     }
 }
