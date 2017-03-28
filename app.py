@@ -79,7 +79,7 @@ def format_date(date):
 
 def format_user_date(text):
     date = dateutil.parser.parse(text)
-    return date.strftime("%b %-d, %Y").replace(" 0", " ")
+    return date.strftime("%b %d, %Y").replace(" 0", " ")
 
 cache_data = {}
 
@@ -304,8 +304,7 @@ def atom_handler(request):
     write_string(request, "application/atom+xml", data)
 
 def post_handler(request):
-    url = urlparse(request.path)
-    filename = os.path.abspath(url.path).lstrip("/")
+    filename = urlparse(request.path).path.lstrip("/")
     def render_post():
         entry = load_post(filename + ".html")
         if entry:
@@ -343,8 +342,7 @@ def blog_handler(request):
     root_handler(request)
 
 def cert_handler(request):
-    url = urlparse(request.path)
-    filename = os.path.abspath(url.path)
+    filename = urlparse(request.path).path
     if exists(".well-known/") and isdir(".well-known/"):
         if os.path.exists(filename) and os.path.isfile(filename):
             data = read_file(filename)
@@ -354,10 +352,7 @@ def cert_handler(request):
     request.end_headers()
 
 def default_handler(request):
-    url = urlparse(request.path)
-    pathname = os.path.abspath(url.path).lower()
-    if pathname != "/" and url.path.endswith("/"):
-        pathname += "/"
+    pathname = urlparse(request.path).path.lower()
     if pathname.endswith("/index.html"):
         redirect(request, 301, "/" + pathname[0:len(pathname) - 11].lstrip("/"))
         return
