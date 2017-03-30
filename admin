@@ -10,31 +10,35 @@ server_install() {
 
     echo "$(tput bold)apt-get update$(tput sgr0)"
     if [ ${runtime} = "dotnet" ]; then
-        sudo sh -c 'echo "deb [arch=amd64] https://apt-mo.trafficmanager.net/repos/dotnet-release/ xenial main" > /etc/apt/sources.list.d/dotnetdev.list'
-        sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 417A0893
+        if [ -z "$(which dotonet)" ]; then
+            sudo sh -c 'echo "deb [arch=amd64] https://apt-mo.trafficmanager.net/repos/dotnet-release/ xenial main" > /etc/apt/sources.list.d/dotnetdev.list'
+            sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 417A0893
+        fi
     elif [ ${runtime} = "node" ]; then
-        curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
+        if [ -z "$(which node)" ]; then
+            curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
+        fi
     fi
-    sudo apt-get update
+    sudo apt-get -qq update
 
     if [ ${runtime} = "go" ]; then 
         echo "$(tput bold)apt-get install golang$(tput sgr0)"
-        sudo apt-get install --yes golang
+        sudo apt-get -qq install --yes golang
     elif [ ${runtime} = "python" ]; then
         echo "$(tput bold)apt-get install python$(tput sgr0)"
-        sudo apt-get install --yes python python-dateutil
+        sudo apt-get -qq install --yes python python-dateutil
     elif [ ${runtime} = "dotnet" ]; then
         echo "$(tput bold)apt-get install dotnet-dev-1.0.1$(tput sgr0)"
-        sudo apt-get install --yes dotnet-dev-1.0.1
+        sudo apt-get -qq install --yes dotnet-dev-1.0.1
     else
         echo "$(tput bold)apt-get install nodejs$(tput sgr0)"
-        sudo apt-get install --yes nodejs
+        sudo apt-get -qq install --yes nodejs
     fi
 
     echo "$(tput bold)apt-get install nginx$(tput sgr0)"
-    sudo apt-get install --yes nginx
+    sudo apt-get -qq install --yes nginx
 
-    echo "$(tput bold)configure reverse proxy$(tput sgr0)"
+    echo "$(tput bold)install nginx.service$(tput sgr0)"
     sudo systemctl stop nginx.service
 cat << EOF >> "${site}.conf"
 server {
@@ -50,14 +54,24 @@ ssl=$(cat << EOF
     ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
 EOF
 )
-        cat << EOF >> "${site}.conf"
+cat << EOF >> "${site}.conf"
 ${ssl}
     server_name ${domain};
-    return 301 \$scheme://www.${domain}\$request_uri;
+    return 301 https://www.${domain}\$request_uri;
 }
 server {
     listen 80;
+    server_name www.${domain};
+    return 301 https://www.${domain}\$request_uri;
+}
+server {
 ${ssl}
+    server_name www.${domain};
+EOF
+        else
+cat << EOF >> "${site}.conf"
+server {
+    listen 80
     server_name www.${domain};
 EOF
         fi
@@ -85,15 +99,61 @@ cat << EOF >> "${site}.conf"
     }
 }
 EOF
-    cat "${site}.conf"
     sudo cp "${site}.conf" "/etc/nginx/sites-available/${site}.conf"
     rm "${site}.conf"
     sudo rm -f "/etc/nginx/sites-enabled/default"
     sudo ln -f -s "/etc/nginx/sites-available/${site}.conf" "/etc/nginx/sites-enabled/${site}.conf"
     sudo systemctl start nginx.service
-    sudo systemctl status nginx.service --no-pager --lines=1000 --full
+    if [ $(systemctl is-active "nginx.service") != "active" ]; then
+        sudo systemctl status nginx.service --no-pager --lines=25 --full
+        echo "ERROR: ngnix.service is not active."
+        return
+    fi
 
-    echo "$(tput bold)configure ${site}.service$(tput sgr0)"
+    if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
+        echo "$(tput bold)install ${site}-cert.service$(tput sgr0)"
+cat > "${site}-cert.service" << EOF
+[Unit]
+Description=${site}-cert.service
+[Service]
+Type=oneshot
+WorkingDirectory=$(pwd)
+ExecStart=/bin/bash $(pwd)/admin cert
+User=$(whoami)
+Group=$(whoami)
+SyslogIdentifier=${site}-cert.service
+EOF
+        sudo cp "${site}-cert.service" "/etc/systemd/system/${site}-cert.service"
+        rm "${site}-cert.service"
+        sudo systemctl enable "${site}-cert.service"
+        if [ $(systemctl is-enabled "${site}-cert.service") != "static" ]; then
+            sudo systemctl status "${site}-cert.service" --no-pager --lines=25 --full
+            echo "ERROR: ${site}-cert.service is not static."
+            return
+        fi
+
+        echo "$(tput bold)install ${site}-cert.timer$(tput sgr0)"
+cat > "${site}-cert.timer" << EOF
+[Unit]
+Description=${site}-cert.timer
+[Timer]
+OnCalendar=Mon *-*-* 00:00:00
+Persistent=true 
+[Install]
+WantedBy=timers.target
+EOF
+        sudo cp "${site}-cert.timer" "/etc/systemd/system/${site}-cert.timer"
+        rm "${site}-cert.timer"
+        sudo systemctl enable "${site}-cert.timer"
+        sudo systemctl start "${site}-cert.timer"
+        if [ $(systemctl is-active "${site}-cert.timer") != "active" ]; then
+            sudo systemctl status "${site}-cert.timer" --no-pager --lines=25 --full
+            echo "ERROR: ${site}-cert.timer is not active."
+            return
+        fi
+    fi
+
+    echo "$(tput bold)install ${site}.service$(tput sgr0)"
     if [ ${runtime} = "go" ]; then 
         command="$(pwd)/.vscode/out/go/app"
         environment="GO_ENV=production"
@@ -116,55 +176,101 @@ ExecStart=${command}
 Environment=${environment}
 Restart=always
 RestartSec=10
-StandardOutput=syslog
-StandardError=syslog
-SyslogIdentifier=${site}.service
 User=$(whoami)
 Group=$(whoami)
+SyslogIdentifier=${site}.service
 [Install]
 WantedBy=multi-user.target
 EOF
-    cat "${site}.service"
     sudo cp "${site}.service" "/etc/systemd/system/${site}.service"
     rm "${site}.service"
-    echo "$(tput bold)enable ${site}.service$(tput sgr0)"
-    sudo systemctl enable ${site}.service
+    sudo systemctl enable "${site}.service"
+    if [ $(systemctl is-enabled "${site}.service") != "enabled" ]; then
+        sudo systemctl status "${site}.service" --no-pager --lines=25 --full
+        echo "ERROR: ${site}.service is not enabled."
+        return
+    fi
+
 }
 
 server_uninstall() {
     server_stop
-    if [ -f "/etc/systemd/system/${site}.service" ] && [ $(systemctl is-enabled ${site}.service) = "enabled" ]; then
-        echo "$(tput bold)disable ${site}.service$(tput sgr0)"
-        sudo systemctl disable "${site}.service"
+    if [ -f "/etc/systemd/system/${site}-cert.timer" ]; then
+        echo "$(tput bold)uninstall ${site}-cert.timer$(tput sgr0)"
+        if [ $(systemctl is-active "${site}-cert.timer") = "active" ]; then
+            sudo systemctl stop "${site}-cert.timer"
+            if [ $(systemctl is-active "${site}-cert.timer") != "inactive" ]; then
+                sudo systemctl status "${site}-cert.timer" --no-pager --lines=25 --full
+                echo "ERROR: ${site}-cert.timer is not inactive."
+                return
+            fi
+        fi
+        if [ $(systemctl is-enabled ${site}-cert.timer) = "enabled" ]; then
+            sudo systemctl disable "${site}-cert.timer"
+            if [ $(systemctl is-enabled "${site}-cert.timer") != "disabled" ]; then
+                sudo systemctl status "${site}-cert.timer" --no-pager --lines=25 --full
+                echo "ERROR: ${site}-cert.timer is not disabled."
+                return
+            fi
+        fi
+        sudo rm "/etc/systemd/system/${site}-cert.timer"
+    fi
+    if [ -f "/etc/systemd/system/${site}-cert.service" ]; then
+        echo "$(tput bold)uninstall ${site}-cert.service$(tput sgr0)"
+        if [ $(systemctl is-active "${site}-cert.service") = "active" ]; then
+            sudo systemctl stop "${site}-cert.service"
+            if [ $(systemctl is-active "${site}-cert.service") != "inactive" ]; then
+                sudo systemctl status "${site}-cert.service" --no-pager --lines=25 --full
+                echo "ERROR: ${site}-cert.service is not inactive."
+                return
+            fi
+        fi
+        if [ $(systemctl is-enabled ${site}-cert.service) = "static" ]; then
+            sudo systemctl disable "${site}-cert.service"
+        fi
+        sudo rm "/etc/systemd/system/${site}-cert.service"
+    fi
+    if [ -f "/etc/systemd/system/${site}.service" ]; then
+        echo "$(tput bold)uninstall ${site}.service$(tput sgr0)"
+        if [ $(systemctl is-enabled ${site}.service) = "enabled" ]; then
+            sudo systemctl disable "${site}.service"
+            if [ $(systemctl is-enabled "${site}.service") != "disabled" ]; then
+                sudo systemctl status "${site}.service" --no-pager --lines=25 --full
+                echo "ERROR: ${site}.service is not disabled."
+                return
+            fi
+        fi
         sudo rm "/etc/systemd/system/${site}.service"
     fi
     if [ -f "/etc/nginx/sites-available/${site}.conf" ]; then
-        echo "$(tput bold)configure reverse proxy$(tput sgr0)"
+        echo "$(tput bold)uninstall nginx.service$(tput sgr0)"
         sudo systemctl stop nginx.service
         sudo rm "/etc/nginx/sites-enabled/${site}.conf"
         sudo rm "/etc/nginx/sites-available/${site}.conf"
         sudo ln -f -s "/etc/nginx/sites-available/default" "/etc/nginx/sites-enabled/default"
         sudo systemctl start nginx.service
-        sudo systemctl status nginx.service --no-pager --lines=1000 --full
+        if [ $(systemctl is-active "nginx.service") != "active" ]; then
+            sudo systemctl status ngnix.service --no-pager --lines=25 --full
+            echo "ERROR: ngnix.service is not active."
+            return
+        fi
     fi
 }
 
 server_start() {
+    echo "$(tput bold)start ${site}.service$(tput sgr0)"
     if [ ${runtime} = "go" ]; then
-        echo "$(tput bold)go build$(tput sgr0)"
         go build -o .vscode/out/go/app app.go
         if [ $? -ne 0 ]; then
             return
         fi
     elif [ ${runtime} = "dotnet" ]; then
-        echo "$(tput bold)dotnet build$(tput sgr0)"
         dotnet restore && dotnet build
         if [ $? -ne 0 ]; then
-            echo "dotnet restore && dotnet build failed."
+            echo "ERROR: dotnet restore && dotnet build failed."
             return
         fi
     fi
-    echo "$(tput bold)start ${site}.service$(tput sgr0)"
     sudo systemctl start ${site}.service
     sleep 2
     sudo systemctl status ${site}.service  --no-pager --lines=1000 --full
@@ -174,21 +280,29 @@ server_stop() {
     if [ $(systemctl is-active "${site}.service") = "active" ]; then
         echo "$(tput bold)stop ${site}.service$(tput sgr0)"
         sudo systemctl stop "${site}.service"
-        sudo systemctl status ${site}.service  --no-pager --lines=1000 --full
+        if [ $(systemctl is-active "${site}.service") = "active" ]; then
+            sudo systemctl stop "${site}.service"
+            if [ $(systemctl is-active "${site}.service") != "inactive" ]; then
+                sudo systemctl status "${site}.service" --no-pager --lines=25 --full
+                echo "ERROR: ${site}.service is not inactive."
+                return
+            fi
+        fi
     fi
 }
 
 server_cert() {
     if [ -z ${domain} ] || [ -z ${email} ]; then
-        echo "Update 'domain' and 'email' in $(tput smul)${configuration}$(tput sgr0)."
+        echo "ERROR: Update 'domain' and 'email' in $(tput smul)${configuration}$(tput sgr0)."
         return
     fi
 
     echo "$(tput bold)apt-get install letsencrypt$(tput sgr0)"
-    sudo apt-get install --yes letsencrypt
+    sudo apt-get -qq update
+    sudo apt-get -qq install --yes letsencrypt
 
-    mkdir ./.well-known
     server_stop
+    mkdir ./.well-known
     server_start
 
     if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
@@ -201,8 +315,8 @@ server_cert() {
         rm letsencrypt.log
     fi
 
-    rm -R ./.well-known
     server_stop
+    rm -R ./.well-known
     server_start
 
     echo "$(tput bold)reload nginx.service$(tput sgr0)"
@@ -314,7 +428,7 @@ client_test() {
         return
     fi
     ASPNETCORE_ENVIRONMENT=Production dotnet exec .vscode/out/dotnet/bin/netcoreapp1.1/app.dll & pid=$!
-    sleep 1
+    sleep 0.5
     curl -s http://localhost:8080/ > ${output}/root_dotnet.html
     curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_dotnet.xml
     kill -9 ${pid}
