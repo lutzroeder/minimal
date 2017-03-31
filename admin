@@ -103,9 +103,9 @@ EOF
     rm "${site}.conf"
     sudo rm -f "/etc/nginx/sites-enabled/default"
     sudo ln -f -s "/etc/nginx/sites-available/${site}.conf" "/etc/nginx/sites-enabled/${site}.conf"
-    sudo systemctl start nginx.service
+    sudo systemctl start "nginx.service"
     if [ $(systemctl is-active "nginx.service") != "active" ]; then
-        sudo systemctl status nginx.service --no-pager --lines=25 --full
+        sudo systemctl status "nginx.service" --no-pager --lines=25 --full
         echo "ERROR: ngnix.service is not active."
         return
     fi
@@ -125,12 +125,6 @@ SyslogIdentifier=${site}-cert.service
 EOF
         sudo cp "${site}-cert.service" "/etc/systemd/system/${site}-cert.service"
         rm "${site}-cert.service"
-        sudo systemctl enable "${site}-cert.service"
-        if [ $(systemctl is-enabled "${site}-cert.service") != "static" ]; then
-            sudo systemctl status "${site}-cert.service" --no-pager --lines=25 --full
-            echo "ERROR: ${site}-cert.service is not static."
-            return
-        fi
 
         echo "$(tput bold)install ${site}-cert.timer$(tput sgr0)"
 cat > "${site}-cert.timer" << EOF
@@ -138,7 +132,8 @@ cat > "${site}-cert.timer" << EOF
 Description=${site}-cert.timer
 [Timer]
 OnCalendar=Mon *-*-* 00:00:00
-Persistent=true 
+Persistent=true
+Unit=${site}-cert.service
 [Install]
 WantedBy=timers.target
 EOF
@@ -217,17 +212,6 @@ server_uninstall() {
     fi
     if [ -f "/etc/systemd/system/${site}-cert.service" ]; then
         echo "$(tput bold)uninstall ${site}-cert.service$(tput sgr0)"
-        if [ $(systemctl is-active "${site}-cert.service") = "active" ]; then
-            sudo systemctl stop "${site}-cert.service"
-            if [ $(systemctl is-active "${site}-cert.service") != "inactive" ]; then
-                sudo systemctl status "${site}-cert.service" --no-pager --lines=25 --full
-                echo "ERROR: ${site}-cert.service is not inactive."
-                return
-            fi
-        fi
-        if [ $(systemctl is-enabled ${site}-cert.service) = "static" ]; then
-            sudo systemctl disable "${site}-cert.service"
-        fi
         sudo rm "/etc/systemd/system/${site}-cert.service"
     fi
     if [ -f "/etc/systemd/system/${site}.service" ]; then
@@ -244,11 +228,11 @@ server_uninstall() {
     fi
     if [ -f "/etc/nginx/sites-available/${site}.conf" ]; then
         echo "$(tput bold)uninstall nginx.service$(tput sgr0)"
-        sudo systemctl stop nginx.service
+        sudo systemctl stop "nginx.service"
         sudo rm "/etc/nginx/sites-enabled/${site}.conf"
         sudo rm "/etc/nginx/sites-available/${site}.conf"
         sudo ln -f -s "/etc/nginx/sites-available/default" "/etc/nginx/sites-enabled/default"
-        sudo systemctl start nginx.service
+        sudo systemctl start "nginx.service"
         if [ $(systemctl is-active "nginx.service") != "active" ]; then
             sudo systemctl status ngnix.service --no-pager --lines=25 --full
             echo "ERROR: ngnix.service is not active."
@@ -320,9 +304,12 @@ server_cert() {
     server_start
 
     echo "$(tput bold)reload nginx.service$(tput sgr0)"
-    sudo systemctl stop nginx.service
-    sudo systemctl start nginx.service
-    sudo systemctl status nginx.service --no-pager --lines=1000 --full
+    sudo systemctl stop "nginx.service"
+    sudo systemctl start "nginx.service"
+    if [ $(systemctl is-active "nginx.service") != "active" ]; then
+        sudo systemctl status "nginx.service" --no-pager --lines=25 --full
+        echo "ERROR: nginx.service is not active."
+    fi
 }
 
 server_status() {
