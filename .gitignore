@@ -1,7 +1,7 @@
+/.vscode/out
 /app
 /debug
 *.pyc
-.vscode/out
 .DS_Store
 .DS_Store?
 ._*
