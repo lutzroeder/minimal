@@ -56,14 +56,12 @@ class Program
             object section;
             if (view.TryGetValue(name, out section))
             {
-                IEnumerable<object> list = section as IEnumerable<object>;
-                if (list != null)
+                switch (section)
                 {
-                    return string.Join("", list.Select(item => Mustache(content, Merge(view, (Dictionary<string, object>) item), partials)));
-                }
-                if (section is bool && (bool)section)
-                {
-                    return Mustache(content, view, partials);
+                    case IEnumerable<object> list:
+                        return string.Join("", list.Select(item => Mustache(content, Merge(view, (Dictionary<string, object>) item), partials)));
+                    case bool value:
+                        return value ? Mustache(content, view, partials) : "";
                 }
             }
             return "";
@@ -77,13 +75,12 @@ class Program
             object value;
             if (view.TryGetValue(name, out value))
             {
-                if (value is Func<string>)
+                switch (value)
                 {
-                    return ((Func<string>)value)();
-                }
-                if (value is string)
-                {
-                    return (string) value;
+                    case Func<string> callback:
+                        return callback();
+                    case string content:
+                        return content;
                 }
             }
             return match.Groups[0].Value;
@@ -93,13 +90,12 @@ class Program
             object value;
             if (view.TryGetValue(name, out value))
             {
-                if (value is Func<string>)
+                switch (value)
                 {
-                    return EscapeHtml(((Func<string>)value)());
-                }
-                if (value is string)
-                {
-                    return EscapeHtml((string) value);
+                    case Func<string> callback:
+                        return EscapeHtml(callback());
+                    case string content:
+                        return EscapeHtml(content);
                 }
             }
             return match.Groups[0].Value;
