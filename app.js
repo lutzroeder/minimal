@@ -17,15 +17,34 @@ function escapeHtml(text) {
     });
 }
 
+function merge() {
+    var target = {};
+    for (var i = 0; i < arguments.length; i++) {
+        target = Object.assign(target, arguments[i]);
+    }
+    return target;
+}
 function mustache(template, view, partials) {
-    template = template.replace(/\{\{>\s*([-_\/\.\w]+)\s*\}\}/gm, function (match, name) {
+    template = template.replace(/{{#\s*([-_\/\.\w]+)\s*}}\s?([\s\S]*){{\/\1}}\s?/gm, function (match, name, content) {
+        if (name in view) {
+            var section = view[name];
+            if (Array.isArray(section) && section.length > 0) {
+                return section.map(item => mustache(content, merge(view, item), partials)).join("");
+            }
+            if (typeof(section) === "boolean" && section) {
+                return mustache(content, view, partials);
+            }
+        }
+        return "";
+    });
+    template = template.replace(/{{>\s*([-_\/\.\w]+)\s*}}/gm, function (match, name) {
         return mustache(typeof partials === "function" ? partials(name) : partials[name], view, partials);
     });
-    template = template.replace(/\{\{\{\s*([-_\/\.\w]+)\s*\}\}\}/gm, function (match, name) {
+    template = template.replace(/{{{\s*([-_\/\.\w]+)\s*}}}/gm, function (match, name) {
         var value = view[name];
         return typeof value === "function" ? value() : value;
     });
-    template = template.replace(/\{\{\s*([-_\/\.\w]+)\s*\}\}/gm, function (match, name) {
+    template = template.replace(/{{\s*([-_\/\.\w]+)\s*}}/gm, function (match, name) {
         var value = view[name];
         return escapeHtml(typeof value === "function" ? value() : value);
     });
@@ -185,9 +204,7 @@ function truncate(text, length) {
 
 function posts() {
     return cache("blog:files", function() {
-        return fs.readdirSync("./blog/").filter(function (file) {
-            return path.extname(file) === ".html"; }
-        ).sort().reverse();
+        return fs.readdirSync("./blog/").filter(file => path.extname(file) === ".html").sort().reverse();
     }).slice(0);
 }
 
@@ -227,7 +244,7 @@ function loadPost(file) {
 }
 
 function renderBlog(files, start) {
-    var output = [];
+    var view = { "entries": [] }
     var length = 10;
     var index = 0;
     while (files.length > 0 && index < (start + length)) {
@@ -235,34 +252,24 @@ function renderBlog(files, start) {
         var entry = loadPost("blog/" + file);
         if (entry && (entry["state"] === "post" || environment !== "production")) {
             if (index >= start) {
-                var location = "/blog/" + path.basename(file, ".html");
+                entry["url"] = "/blog/" + path.basename(file, ".html");
                 entry["date"] = formatUserDate(entry["date"]);
-                var post = [];
-                post.push("<div class='item'>");
-                post.push("<div class='date'>" + entry["date"] + "</div>");
-                post.push("<h1><a href='" + location + "'>" + entry["title"] + "</a></h1>");
-                post.push("<div class='content'>")
                 var content = entry["content"];
                 content = content.replace(/\s\s/g, " ");
                 var truncated = truncate(content, 250);
-                post.push(truncated);
-                post.push("</div>");
-                if (truncated != content) {
-                    post.push("<div class='more'><a href='" + location + "'>" + "Read more&hellip;" + "</a></div>");
-                }
-                post.push("</div>");
-                output.push(post.join("\n") + "\n");
+                entry["content"] = truncated;
+                entry["more"] = truncated != content;
+                view["entries"].push(entry);
             }
             index++;
         }
     }
+    view["placeholder"] = []
     if (files.length > 0) {
-        var template = fs.readFileSync("stream.html", "utf-8");
-        var view = { "url": "/blog?id=" + index.toString() };
-        var data = mustache(template, view, null);
-        output.push(data);
+        view["placeholder"].push({ "url": "/blog?id=" + index.toString() });
     }
-    return output.join("\n");
+    var template = fs.readFileSync("stream.html", "utf-8");
+    return mustache(template, view, null);
 }
 
 function writeString(request, response, contentType, data) {
@@ -349,7 +356,7 @@ function postHandler(request, response) {
         if (entry) {
             entry["date"] = formatUserDate(entry["date"]);
             entry["author"] = entry["author"] || configuration["name"];
-            var view = Object.assign(configuration, entry);
+            var view = merge(configuration, entry);
             var template = fs.readFileSync("post.html", "utf-8");
             return mustache(template, view, function(name) {
                 return fs.readFileSync(name, "utf-8");
@@ -448,25 +455,15 @@ function defaultHandler(request, response) {
     }
     var data = cache("default:" + file, function() {
         var template = fs.readFileSync(file, "utf-8");
-        var view = Object.assign({ }, configuration);
+        var view = merge(configuration);
         view["feed"] = function() {
             if (configuration["feed"] && configuration["feed"].length > 0) {
-                return configuration["feed"];              
+                return configuration["feed"];
             }
             return scheme(request) + "://" + request.headers.host + "/blog/atom.xml";
         };
         view["blog"] = function() {
             return renderBlog(posts(), 0);
-        };
-        view["links"] = function() {
-            return configuration["links"].map(function (link) {
-                return "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + link.symbol + "</span></a>";
-            }).join("\n");
-        };
-        view["tabs"] = function() {
-            return configuration["pages"].map(function (page) {
-                return "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>";
-            }).join("\n");
         };
         return mustache(template, view, function(name) {
             return fs.readFileSync(name, "utf-8");
@@ -490,9 +487,7 @@ function Router(configuration) {
 }
 
 Router.prototype.route = function (pattern) {
-    var route = this.routes.find(function (route) {
-        return route.path === path;
-    });
+    var route = this.routes.find(route => route.path === path);
     if (!route) {
         route = {
             pattern: pattern,

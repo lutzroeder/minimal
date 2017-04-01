@@ -30,11 +30,49 @@ func escapeHTML(text string) string {
 	return entityMap.Replace(text)
 }
 
+func merge(maps... map[string]interface{}) map[string]interface{} {
+	target := make(map[string]interface{})
+	for _, obj := range maps {
+		for key, value := range obj {
+			target[key] = value
+		}
+	}
+	return target
+}
+
+var sectionRegex = regexp.MustCompile("{{#\\s*([-_\\/\\.\\w]+)\\s*}}\\s?")
 var partialRegex = regexp.MustCompile("{{>\\s*([-_/.\\w]+)\\s*}}")
 var replaceRegex = regexp.MustCompile("{{{\\s*([-_/.\\w]+)\\s*}}}")
 var escapeRegex = regexp.MustCompile("{{\\s*([-_/.\\w]+)\\s*}}")
 
 func mustache(template string, view map[string]interface{}, partials func(string) string) string {
+	for index := 0; index < len(template); {
+		if match := sectionRegex.FindStringIndex(template[index:]); match != nil {
+			name := sectionRegex.FindStringSubmatch(template[index+match[0]:index+match[1]])[1]
+			start := index + match[0]
+			index += match[1]
+			if match := regexp.MustCompile("{{\\/\\s*" + name + "\\s*}}\\s?").FindStringIndex(template[index:]); match != nil {
+				content := template[index:index+match[0]]
+				if o, ok := view[name]; ok {
+					if list, ok := o.([]interface{}); ok {
+						output := []string{}
+						for _, item := range list {
+							context := merge(view, item.(map[string]interface{}))
+							output = append(output, mustache(content, context, partials))
+						}
+						content = strings.Join(output, "")
+					}
+					if value, ok := o.(bool); ok && !value {
+						content = ""
+					}
+					template = template[0:start] + content + template[index+match[1]:]
+					index = start
+				}
+			}
+		} else {
+			index = len(template)
+		}
+	}
 	template = partialRegex.ReplaceAllStringFunc(template, func(match string) string {
 		name := partialRegex.FindStringSubmatch(match)[1]
 		return mustache(partials(name), view, partials)
@@ -269,13 +307,13 @@ func posts() []string {
 	}).([]string)...)
 }
 
-func loadPost(path string) map[string]string {
+func loadPost(path string) map[string]interface{} {
 	if exists(path) && !isDir(path) {
 		data, err := ioutil.ReadFile(path)
 		if err != nil {
 			fmt.Println(err)
 		} else {
-			entry := make(map[string]string)
+			entry := make(map[string]interface{})
 			content := []string{}
 			metadata := -1
 			lines := regexp.MustCompile("\\r\\n?|\\n").Split(string(data), -1)
@@ -303,7 +341,8 @@ func loadPost(path string) map[string]string {
 }
 
 func renderBlog(files []string, start int) string {
-	output := []string{}
+	var entries []interface{}
+	view := make(map[string]interface{}) 
 	length := 10
 	index := 0
 	for len(files) > 0 && index < start+length {
@@ -312,40 +351,32 @@ func renderBlog(files []string, start int) string {
 		entry := loadPost("blog/" + file)
 		if entry != nil && (entry["state"] == "post" || environment != "production") {
 			if index >= start {
-				location := "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
+				entry["url"] = "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
 				if date, ok := entry["date"]; ok {
-					entry["date"] = formatUserDate(date)
+					entry["date"] = formatUserDate(date.(string))
 				}
-				post := []string{}
-				post = append(post, "<div class='item'>")
-				post = append(post, "<div class='date'>"+entry["date"]+"</div>")
-				post = append(post, "<h1><a href='"+location+"'>"+entry["title"]+"</a></h1>")
-				post = append(post, "<div class='content'>")
-				content := entry["content"]
+				content := entry["content"].(string)
 				content = regexp.MustCompile("\\s\\s").ReplaceAllString(content, " ")
 				truncated := truncate(content, 250)
-				post = append(post, truncated)
-				post = append(post, "</div>")
-				if truncated != content {
-					post = append(post, "<div class='more'><a href='"+location+"'>"+"Read more&hellip;"+"</a></div>")
-				}
-				post = append(post, "</div>")
-				output = append(output, strings.Join(post, "\n")+"\n")
+				entry["content"] = truncated
+				entry["more"] = truncated != content
+				entries = append(entries, entry)
 			}
 			index++
 		}
 	}
+	view["entries"] = entries
+	var placeholder []interface{}
 	if len(files) > 0 {
-		template, err := ioutil.ReadFile("./stream.html")
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			view := map[string]interface{}{"url": "/blog?id=" + strconv.Itoa(index)}
-			data := mustache(string(template), view, nil)
-			output = append(output, data)
-		}
+		placeholder = append(placeholder, map[string]interface{}{"url": "/blog?id=" + strconv.Itoa(index)})
 	}
-	return strings.Join(output, "\n")
+	view["placeholder"] = placeholder
+	template, err := ioutil.ReadFile("./stream.html")
+	if err != nil {
+		fmt.Println(err)
+		return ""
+	}
+	return mustache(string(template), view, nil)
 }
 
 func writeString(response http.ResponseWriter, request *http.Request, contentType string, text string) {
@@ -386,18 +417,18 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 				output = append(output, "<entry>")
 				output = append(output, "<id>"+url+"</id>")
 				if author, ok := entry["author"]; ok && author != configuration["name"].(string) {
-					output = append(output, "<author><name>"+author+"</name></author>")
+					output = append(output, "<author><name>"+author.(string)+"</name></author>")
 				}
 				date := ""
 				if value, ok := entry["date"]; ok {
-					if time, err := time.Parse("2006-01-02 15:04:05 -07:00", value); err == nil {
+					if time, err := time.Parse("2006-01-02 15:04:05 -07:00", value.(string)); err == nil {
 						date = formatDate(time)
 					}
 				}
 				output = append(output, "<published>"+date+"</published>")
 				updated := date
 				if value, ok := entry["updated"]; ok {
-					if time, err := time.Parse("2006-01-02 15:04:05 -07:00", value); err == nil {
+					if time, err := time.Parse("2006-01-02 15:04:05 -07:00", value.(string)); err == nil {
 						updated = formatDate(time)
 					}
 				}
@@ -405,10 +436,11 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 				if len(recent) == 0 || recent < updated {
 					recent = updated
 				}
-				output = append(output, "<title type='text'>"+entry["title"]+"</title>")
-				content := escapeHTML(truncate(entry["content"], 4000))
+				output = append(output, "<title type='text'>"+entry["title"].(string)+"</title>")
+				content := entry["content"].(string)
+				content = escapeHTML(truncate(content, 4000))
 				output = append(output, "<content type='html'>"+content+"</content>")
-				output = append(output, "<link rel='alternate' type='text/html' href='"+url+"' title='"+entry["title"]+"' />")
+				output = append(output, "<link rel='alternate' type='text/html' href='"+url+"' title='"+entry["title"].(string)+"' />")
 				output = append(output, "</entry>")
 				count--
 			}
@@ -429,18 +461,12 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 		entry := loadPost(file + ".html")
 		if entry != nil {
 			if date, ok := entry["date"]; ok {
-				entry["date"] = formatUserDate(date)
+				entry["date"] = formatUserDate(date.(string))
 			}
 			if _, ok := entry["author"]; !ok {
 				entry["author"] = configuration["name"].(string)
 			}
-			view := make(map[string]interface{})
-			for key, value := range configuration {
-				view[key] = value
-			}
-			for key, value := range entry {
-				view[key] = value
-			}
+			view := merge(configuration, entry)
 			template, err := ioutil.ReadFile("./post.html")
 			if err != nil {
 				fmt.Println(err)
@@ -534,34 +560,12 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 		if err != nil {
 			fmt.Println(err)
 		} else {
-			view := make(map[string]interface{})
-			for key, value := range configuration {
-				view[key] = value
-			}
+			view := merge(configuration)
 			view["feed"] = func() string {
 				if feed, ok := configuration["feed"]; ok && len(feed.(string)) > 0 {
 					return feed.(string)
 				}
 				return scheme(request) + "://" + request.Host + "/blog/atom.xml"
-			}
-			view["links"] = func() string {
-				list := []string{}
-				for _, link := range configuration["links"].([]interface{}) {
-					name := link.(map[string]interface{})["name"].(string)
-					symbol := link.(map[string]interface{})["symbol"].(string)
-					url := link.(map[string]interface{})["url"].(string)
-					list = append(list, "<a class='icon' target='_blank' href='"+url+"' title='"+name+"'><span class='symbol'>"+symbol+"</span></a>")
-				}
-				return strings.Join(list, "\n")
-			}
-			view["tabs"] = func() string {
-				list := []string{}
-				for _, page := range configuration["pages"].([]interface{}) {
-					name := page.(map[string]interface{})["name"].(string)
-					url := page.(map[string]interface{})["url"].(string)
-					list = append(list, "<li class='tab'><a href='"+url+"'>"+name+"</a></li>")
-				}
-				return strings.Join(list, "\n")
 			}
 			view["blog"] = func() string {
 				return renderBlog(posts(), 0)

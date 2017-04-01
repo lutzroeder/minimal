@@ -13,10 +13,12 @@ import dateutil.tz
 
 if sys.version_info[0] > 2:
     from urllib.parse import urlparse
+    from urllib.parse import parse_qs
     from http.server import HTTPServer
     from http.server import BaseHTTPRequestHandler
 else:
     from urlparse import urlparse
+    from urlparse import parse_qs
     from BaseHTTPServer import HTTPServer
     from BaseHTTPServer import BaseHTTPRequestHandler
 
@@ -28,13 +30,30 @@ entity_map = {
 def escape_html(text):
     return "".join(entity_map.get(c, c) for c in text)
 
+def merge(maps):
+    target = {}
+    for map in maps:
+        target.update(map)
+    return target
+
 def mustache(template, view, partials):
+    def replace_section(match):
+        name = match.group(1)
+        content = match.group(2)
+        if name in view:
+            section = view[name]
+            if isinstance(section, list) and len(section) > 0:
+                return "".join(mustache(content, merge([ view, item ]), partials) for item in section);
+            if isinstance(section, bool) and section:
+                return mustache(content, view, partials)
+        return ""
+    template = re.sub(r"{{#\s*([-_\/\.\w]+)\s*}}\s?([\s\S]*){{\/\1}}\s?", replace_section, template)
     def replace_partial(match):
         name = match.group(1)
         if callable(partials):
             return mustache(partials(name), view, partials)
         return match.group(0)
-    template = re.sub(r"\{\{>\s*([-_/.\w]+)\s*\}\}", replace_partial, template)
+    template = re.sub(r"{{>\s*([-_/.\w]+)\s*}}", replace_partial, template)
     def replace(match):
         name = match.group(1)
         value = match.group(0)
@@ -43,7 +62,7 @@ def mustache(template, view, partials):
             if callable(value):
                 value = value()
         return value
-    template = re.sub(r"\{\{\{\s*([-_/.\w]+)\s*\}\}\}", replace, template)
+    template = re.sub(r"{{{\s*([-_/.\w]+)\s*}}}", replace, template)
     def replace_escape(match):
         name = match.group(1)
         value = match.group(0)
@@ -53,7 +72,7 @@ def mustache(template, view, partials):
                 value = value()
             value = escape_html(value)
         return value
-    template = re.sub(r"\{\{\s*([-_/.\w]+)\s*\}\}", replace_escape, template)
+    template = re.sub(r"{{\s*([-_/.\w]+)\s*}}", replace_escape, template)
     return template
 
 def read_file(path):
@@ -210,7 +229,7 @@ def load_post(path):
     return None
 
 def render_blog(files, start):
-    output = []
+    view = { "entries": [] }
     length = 10
     index = 0
     while len(files) > 0 and index < start + length:
@@ -218,31 +237,21 @@ def render_blog(files, start):
         entry = load_post("blog/" + filename)
         if entry and (entry["state"] == "post" or environment != "production"):
             if index >= start:
-                location = "/blog/" + os.path.splitext(filename)[0]
+                entry["url"] = "/blog/" + os.path.splitext(filename)[0]
                 if "date" in entry:
                     entry["date"] = format_user_date(entry["date"])
-                post = []
-                post.append("<div class='item'>")
-                post.append("<div class='date'>" + entry["date"] + "</div>")
-                post.append("<h1><a href='" + location + "'>" + entry["title"] + "</a></h1>")
-                post.append("<div class='content'>")
                 content = entry["content"]
                 content = re.sub(r"\s\s", " ", content)
                 truncated = truncate(content, 250)
-                post.append(truncated)
-                post.append("</div>")
-                if truncated != content:
-                    post.append("<div class='more'><a href='" + location + "'>" + \
-                        "Read more&hellip;" + "</a></div>")
-                post.append("</div>")
-                output.append("\n".join(post) + "\n")
+                entry["content"] = truncated
+                entry["more"] = truncated != content
+                view["entries"].append(entry)
             index += 1
+    view["placeholder"] = []
     if len(files) > 0:
-        template = read_file("./stream.html")
-        view = { "url": "/blog?id=" + str(index) }
-        data = mustache(template, view, None)
-        output.append(data)
-    return "\n".join(output)
+        view["placeholder"].append({ "url": "/blog?id=" + str(index) })
+    template = read_file("./stream.html")
+    return mustache(template, view, None)
 
 def write_string(request, content_type, data):
     encoded = data.encode("utf-8")
@@ -312,8 +321,7 @@ def post_handler(request):
                 entry["author"] = configuration["name"]
             if "date" in entry:
                 entry["date"] = format_user_date(entry["date"])
-            view = configuration.copy()
-            view.update(entry)
+            view = merge([ configuration, entry ])
             template = read_file("./post.html")
             return mustache(template, view, lambda name: read_file(name))
         return ""
@@ -329,7 +337,7 @@ def post_handler(request):
 
 def blog_handler(request):
     url = urlparse(request.path)
-    query = urlparse.parse_qs(url.query)
+    query = parse_qs(url.query)
     if "id" in query:
         start = int(query["id"][0])
         key = "/blog?id=" + query["id"][0]
@@ -384,17 +392,11 @@ def default_handler(request):
         return
     def content():
         template = read_file(os.path.join("./", filename))
-        view = configuration.copy()
+        view = merge([ configuration ])
         view["feed"] = lambda: configuration["feed"] if \
             ("feed" in configuration and len(configuration["feed"]) > 0) else \
             scheme(request) + "://" + request.headers.get("host") + "/blog/atom.xml"
         view["blog"] = lambda: render_blog(posts(), 0)
-        view["links"] = lambda: "\n".join( \
-            "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + link["symbol"] + "</span></a>" \
-            for link in configuration["links"])
-        view["tabs"] = lambda: "\n".join( \
-            "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>" \
-            for page in configuration["pages"]) 
         return mustache(template, view, lambda name: read_file(name))
     data = cache("default:" + filename, content)
     write_string(request, "text/html", data)

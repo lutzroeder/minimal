@@ -27,23 +27,55 @@ class Program
 
     static string EscapeHtml(string text)
     {
-        return entityRegex.Replace(text, delegate(Match match) {
-            return entityMap[match.Groups[0].Value];
-        });
+        return entityRegex.Replace(text, (match) => entityMap[match.Groups[0].Value]);
     }
 
+    static IDictionary<string, object> Merge(params IDictionary<string, object>[] maps)
+    {
+        var target = new Dictionary<string, object>();
+        foreach (IDictionary<string, object> map in maps)
+        {
+            foreach (KeyValuePair<string, object> pair in map)
+            {
+                target[pair.Key] = pair.Value;
+            }
+        }
+        return target;
+    }
+
+    static Regex sectionRegex = new Regex(@"{{#\s*([-_\/\.\w]+)\s*}}\s?([\s\S]*){{\/\1}}\s?");
     static Regex partialRegex = new Regex(@"\{\{>\s*([-_/.\w]+)\s*\}\}");
     static Regex replaceRegex = new Regex(@"{{{\s*([-_/.\w]+)\s*}}}");
     static Regex escapeRegex = new Regex(@"{{\s*([-_/.\w]+)\s*}}");
 
-    static string Mustache(string template, Dictionary<string, object> view, Func<string, string> partials)
+    static string Mustache(string template, IDictionary<string, object> view, Func<string, string> partials)
     {
+        template = sectionRegex.Replace(template, delegate(Match match) {
+            string name = match.Groups[1].Value;
+            string content = match.Groups[2].Value;
+            object section;
+            if (view.TryGetValue(name, out section))
+            {
+                IEnumerable<object> list = section as IEnumerable<object>;
+                if (list != null)
+                {
+                    return string.Join("", list.Select(item => Mustache(content, Merge(view, (Dictionary<string, object>) item), partials)));
+                }
+                if (section is bool && (bool)section)
+                {
+                    return Mustache(content, view, partials);
+                }
+            }
+            return "";
+        });
         template = partialRegex.Replace(template, delegate(Match match) {
-            return Mustache(partials(match.Groups[1].Value), view, partials);
+            string name = match.Groups[1].Value;
+            return Mustache(partials(name), view, partials);
         });
         template = replaceRegex.Replace(template, delegate(Match match) {
+            string name = match.Groups[1].Value;
             object value;
-            if (view.TryGetValue(match.Groups[1].Value, out value))
+            if (view.TryGetValue(name, out value))
             {
                 if (value is Func<string>)
                 {
@@ -57,8 +89,9 @@ class Program
             return match.Groups[0].Value;
         });
         template = escapeRegex.Replace(template, delegate(Match match) {
+            string name = match.Groups[1].Value;
             object value;
-            if (view.TryGetValue(match.Groups[1].Value, out value))
+            if (view.TryGetValue(name, out value))
             {
                 if (value is Func<string>)
                 {
@@ -118,16 +151,12 @@ class Program
 
     static string CacheString(string key, Func<string> callback)
     {
-        return (string) Cache(key, delegate() {
-            return (string) callback();
-        });
+        return (string) Cache(key, () => (string) callback());
     }
 
     static byte[] CacheBuffer(string key, Func<byte[]> callback)
     {
-        return (byte[]) Cache(key, delegate() {
-            return (byte[]) callback();
-        });
+        return (byte[]) Cache(key, () => (byte[]) callback());
     }
 
     static HashSet<string> pathCache = new HashSet<string>();
@@ -272,13 +301,13 @@ class Program
         return string.Join(string.Empty, output);
     }
 
-    static Dictionary<string,string> LoadPost(string file)
+    static Dictionary<string, object> LoadPost(string file)
     {
         if (Exists(file) && !IsDirectory(file))
         {
             var data = File.ReadAllText(file);
             var lines = new Queue<string>(new Regex("\\r\\n?|\\n").Split(data));
-            var entry = new Dictionary<string, string>();
+            var entry = new Dictionary<string, object>();
             var content = new List<string>();
             int metadata = -1;
             while (lines.Count > 0)
@@ -322,48 +351,39 @@ class Program
 
     static string RenderBlog(Queue<string> files, int start)
     {
-        var output = new List<string>();
+        var entries = new List<object>();
+        var view = new Dictionary<string, object>() { ["entries"] = entries };
         int length = 10;
         int index = 0;
         while (files.Count > 0 && index < (start + length))
         {
             string file = files.Dequeue();
             var entry = LoadPost("blog/" + file);
-            if (entry != null && (entry["state"] == "post" || !environment.IsProduction()))
+            if (entry != null && (((string)entry["state"]) == "post" || !environment.IsProduction()))
             {
                 if (index >= start)
                 {
-                    var location = "/blog/" + Path.GetFileNameWithoutExtension(file);
-                    entry["date"] = FormatUserDate(entry["date"]);
+                    entry["url"] = "/blog/" + Path.GetFileNameWithoutExtension(file);
+                    entry["date"] = FormatUserDate((string) entry["date"]);
                     var post = new List<string>();
-                    post.Add("<div class='item'>");
-                    post.Add("<div class='date'>" + entry["date"] + "</div>");
-                    post.Add("<h1><a href='" + location + "'>" + entry["title"] + "</a></h1>");
-                    post.Add("<div class='content'>");
-                    var content = entry["content"];
+                    var content = (string) entry["content"];
                     content = new Regex("\\s\\s").Replace(content, " ");
                     var truncated = Truncate(content, 250);
-                    post.Add(truncated);
-                    post.Add("</div>");
-                    if (truncated != content)
-                    {
-                        post.Add("<div class='more'><a href='" + location + "'>" + "Read more&hellip;" + "</a></div>");
-                    }
-                    post.Add("</div>");
-                    output.Add(string.Join("\n", post) + "\n");
+                    entry["content"] = truncated;
+                    entry["more"] = truncated != content;
+                    entries.Add(entry);
                 }
                 index++;
             }
-
         }
+        var placeholder = new List<object>();
+        view["placeholder"] = placeholder;
         if (files.Count > 0)
         {
-            var template = File.ReadAllText("stream.html");
-            var view = new Dictionary<string, object>() { ["url"] = "/blog?id=" + index.ToString() };
-            var data = Mustache(template, view, null);
-            output.Add(data);
+            placeholder.Add(new Dictionary<string, object>() { ["url"] = "/blog?id=" + index.ToString() });
         }
-        return string.Join("\n", output);
+        var template = File.ReadAllText("stream.html");
+        return Mustache(template, view, null);
     }
 
     static Task WriteStringAsync(HttpContext context, string contentType, string data)
@@ -405,25 +425,26 @@ class Program
             {
                 string file = files.Dequeue();
                 var entry = LoadPost("blog/" + file);
-                if (entry != null && (entry["state"] == "post" || !environment.IsProduction()))
+                if (entry != null && (((string)entry["state"]) == "post" || !environment.IsProduction()))
                 {
                     var url = host + "/blog/" + Path.GetFileNameWithoutExtension(file);
                     output.Add("<entry>");
                     output.Add("<id>" + url + "</id>");
-                    if (entry.ContainsKey("author") && (entry["author"] != ((string) configuration["name"]))) 
+                    if (entry.ContainsKey("author") && (entry["author"] != configuration["name"])) 
                     {
-                        output.Add("<author><name>" + entry["author"] + "</name></author>");
+                        output.Add("<author><name>" + (string) entry["author"] + "</name></author>");
                     }
-                    var date = FormatDate(DateTime.Parse(entry["date"]));
+                    var date = FormatDate(DateTime.Parse((string) entry["date"]));
                     output.Add("<published>" + date + "</published>");
-                    var updated = entry.ContainsKey("updated") ? FormatDate(DateTime.Parse(entry["updated"])) : date;
+                    var updated = entry.ContainsKey("updated") ? FormatDate(DateTime.Parse((string)entry["updated"])) : date;
                     output.Add("<updated>" + updated + "</updated>");
                     if (string.IsNullOrEmpty(recent) || recent.CompareTo(updated) < 0)
                     {
                         recent = updated;
                     }
                     output.Add("<title type='text'>" + entry["title"] + "</title>");
-                    var content = EscapeHtml(Truncate(entry["content"], 10000));
+                    var content = (string) entry["content"];
+                    content = EscapeHtml(Truncate(content, 10000));
                     output.Add("<content type='html'>" + content + "</content>");
                     output.Add("<link rel='alternate' type='text/html' href='" + url + "' title='" + entry["title"] + "' />");
                     output.Add("</entry>");
@@ -457,24 +478,14 @@ class Program
             var entry = LoadPost(file + ".html");
             if (entry != null)
             {
-                entry["date"] = FormatUserDate(entry["date"]);
+                entry["date"] = FormatUserDate((string)entry["date"]);
                 if (!entry.ContainsKey("author"))
                 {
                     entry["author"] = (string) configuration["name"];
                 }
-                var view = new Dictionary<string, object>();
-                foreach (KeyValuePair<string, object> pair in configuration)
-                {
-                    view[pair.Key] = pair.Value;
-                }
-                foreach (KeyValuePair<string, string> pair in entry)
-                {
-                    view[pair.Key] = pair.Value;
-                }
+                var view = Merge(configuration, entry);
                 var template = File.ReadAllText("post.html");
-                return Mustache(template, view, delegate(string name) {
-                    return File.ReadAllText(name);
-                });
+                return Mustache(template, view, (name) => File.ReadAllText(name));
             }
             return string.Empty;
         });
@@ -503,9 +514,7 @@ class Program
                 var data = string.Empty;
                 if (id < files.Count)
                 {
-                    data = CacheString("blog:" + key, delegate() {
-                        return RenderBlog(files, id);
-                    });
+                    data = CacheString("blog:" + key, () => RenderBlog(files, id));
                 }
                 return WriteStringAsync(context, "text/html", data);
             }
@@ -556,9 +565,7 @@ class Program
         string contentType;
         if (mimeTypeMap.TryGetValue(extension, out contentType))
         {
-            byte[] buffer = CacheBuffer("default:" + file, delegate() {
-                return File.ReadAllBytes(file);
-            });
+            byte[] buffer = CacheBuffer("default:" + file, () => File.ReadAllBytes(file));
             context.Response.ContentType = contentType;
             context.Response.ContentLength = buffer.Length;
             if (context.Request.Method != "HEAD")
@@ -569,33 +576,13 @@ class Program
         }
         string data = CacheString("default:" + file, delegate() {
             string template = File.ReadAllText(file);
-            var view = new Dictionary<string, object>();
-            foreach (KeyValuePair<string, object> pair in configuration)
-            {
-                view[pair.Key] = pair.Value;
-            }
+            var view = Merge(configuration);
             view["feed"] = (Func<string>) delegate() {
                 string feed = (string) configuration["feed"];
                 return (!string.IsNullOrEmpty(feed)) ? feed : context.Request.Scheme + "://" + context.Request.Host + "/blog/atom.xml";
             };
-            view["links"] = (Func<string>) delegate() {
-                return string.Join("\n", ((IEnumerable<object>) configuration["links"]).Select(delegate(object obj) {
-                    IDictionary<string, object> link = (IDictionary<string, object>) obj;
-                    return "<a class='icon' target='_blank' href='" + link["url"] + "' title='" + link["name"] + "'><span class='symbol'>" + link["symbol"] + "</span></a>";
-                }));
-            };
-            view["tabs"] = (Func<string>) delegate() {
-                return string.Join("\n", ((IEnumerable<object>) configuration["pages"]).Select(delegate(object obj) {
-                    IDictionary<string, object> page = (IDictionary<string, object>) obj;
-                    return "<li class='tab'><a href='" + page["url"] + "'>" + page["name"] + "</a></li>";
-                }));
-            };
-            view["blog"] = (Func<string>) delegate() {
-                return RenderBlog(Posts(), 0);
-            };
-            return Mustache(template, view, delegate(string name) {
-                return File.ReadAllText(name);
-            });
+            view["blog"] = (Func<string>) (() => RenderBlog(Posts(), 0));
+            return Mustache(template, view, (name) => File.ReadAllText(name));
         });
         return WriteStringAsync(context, "text/html", data);
     }
@@ -650,9 +637,7 @@ class Program
 
         Route GetRoute(string pattern)
         {
-            Route route = this.routes.Find(delegate(Route item) {
-                return item.Pattern == pattern;
-            });
+            Route route = this.routes.Find(item => item.Pattern == pattern);
             if (route == null)
             {
                 route = new Route();
@@ -718,7 +703,7 @@ class Program
         string url = "http://localhost:" + port.ToString();
         IWebHost host = new WebHostBuilder().UseKestrel().UseUrls(url)
             .Configure(app => { app.Run((context) => {
-                    Console.WriteLine(context.Request.Method + " " + context.Request.Path.Value);
+                    Console.WriteLine(context.Request.Method + " " + context.Request.Path.Value + context.Request.QueryString);
                     return router.Handle(context);
                 });
             }).Build();
