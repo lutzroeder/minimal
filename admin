@@ -106,7 +106,7 @@ EOF
     sudo systemctl start "nginx.service"
     if [ $(systemctl is-active "nginx.service") != "active" ]; then
         sudo systemctl status "nginx.service" --no-pager --lines=25 --full
-        echo "ERROR: ngnix.service is not active."
+        echo "$(tput bold)$(tput setaf 1)ngnix.service is not active.$(tput sgr0)"
         return
     fi
 
@@ -143,7 +143,7 @@ EOF
         sudo systemctl start "${site}-cert.timer"
         if [ $(systemctl is-active "${site}-cert.timer") != "active" ]; then
             sudo systemctl status "${site}-cert.timer" --no-pager --lines=25 --full
-            echo "ERROR: ${site}-cert.timer is not active."
+            echo "$(tput bold)$(tput setaf 1)${site}-cert.timer is not active.$(tput sgr0)"
             return
         fi
     fi
@@ -182,7 +182,7 @@ EOF
     sudo systemctl enable "${site}.service"
     if [ $(systemctl is-enabled "${site}.service") != "enabled" ]; then
         sudo systemctl status "${site}.service" --no-pager --lines=25 --full
-        echo "ERROR: ${site}.service is not enabled."
+        echo "$(tput bold)$(tput setaf 1)${site}.service is not enabled.$(tput sgr0)"
         return
     fi
 
@@ -196,7 +196,7 @@ server_uninstall() {
             sudo systemctl stop "${site}-cert.timer"
             if [ $(systemctl is-active "${site}-cert.timer") != "inactive" ]; then
                 sudo systemctl status "${site}-cert.timer" --no-pager --lines=25 --full
-                echo "ERROR: ${site}-cert.timer is not inactive."
+                echo "$(tput bold)$(tput setaf 1)${site}-cert.timer is not inactive.$(tput sgr0)"
                 return
             fi
         fi
@@ -204,7 +204,7 @@ server_uninstall() {
             sudo systemctl disable "${site}-cert.timer"
             if [ $(systemctl is-enabled "${site}-cert.timer") != "disabled" ]; then
                 sudo systemctl status "${site}-cert.timer" --no-pager --lines=25 --full
-                echo "ERROR: ${site}-cert.timer is not disabled."
+                echo "$(tput bold)$(tput setaf 1)${site}-cert.timer is not disabled.$(tput sgr0)"
                 return
             fi
         fi
@@ -220,7 +220,7 @@ server_uninstall() {
             sudo systemctl disable "${site}.service"
             if [ $(systemctl is-enabled "${site}.service") != "disabled" ]; then
                 sudo systemctl status "${site}.service" --no-pager --lines=25 --full
-                echo "ERROR: ${site}.service is not disabled."
+                echo "$(tput bold)$(tput setaf 1)${site}.service is not disabled.$(tput sgr0)"
                 return
             fi
         fi
@@ -235,7 +235,7 @@ server_uninstall() {
         sudo systemctl start "nginx.service"
         if [ $(systemctl is-active "nginx.service") != "active" ]; then
             sudo systemctl status ngnix.service --no-pager --lines=25 --full
-            echo "ERROR: ngnix.service is not active."
+            echo "$(tput bold)$(tput setaf 1)ngnix.service is not active.$(tput sgr0)"
             return
         fi
     fi
@@ -251,13 +251,17 @@ server_start() {
     elif [ ${runtime} = "dotnet" ]; then
         dotnet restore && dotnet build
         if [ $? -ne 0 ]; then
-            echo "ERROR: dotnet restore && dotnet build failed."
+            echo "$(tput bold)$(tput setaf 1)dotnet restore && dotnet build failed.$(tput sgr0)"
             return
         fi
     fi
     sudo systemctl start ${site}.service
     sleep 2
     sudo systemctl status ${site}.service  --no-pager --lines=1000 --full
+    if [ $(systemctl is-active "${site}.service") != "active" ]; then
+        echo "$(tput bold)$(tput setaf 1)${site}.service is not active.$(tput sgr0)"
+        return
+    fi
 }
 
 server_stop() {
@@ -268,7 +272,7 @@ server_stop() {
             sudo systemctl stop "${site}.service"
             if [ $(systemctl is-active "${site}.service") != "inactive" ]; then
                 sudo systemctl status "${site}.service" --no-pager --lines=25 --full
-                echo "ERROR: ${site}.service is not inactive."
+                echo "$(tput bold)$(tput setaf 1)${site}.service is not inactive.$(tput sgr0)"
                 return
             fi
         fi
@@ -277,7 +281,7 @@ server_stop() {
 
 server_cert() {
     if [ -z ${domain} ] || [ -z ${email} ]; then
-        echo "ERROR: Update 'domain' and 'email' in $(tput smul)${configuration}$(tput sgr0)."
+        echo "$(tput bold)$(tput setaf 1)Update 'domain' and 'email' in $(tput smul)${configuration}$(tput sgr0)."
         return
     fi
 
@@ -308,7 +312,7 @@ server_cert() {
     sudo systemctl start "nginx.service"
     if [ $(systemctl is-active "nginx.service") != "active" ]; then
         sudo systemctl status "nginx.service" --no-pager --lines=25 --full
-        echo "ERROR: nginx.service is not active."
+        echo "$(tput bold)$(tput setaf 1)nginx.service is not active.$(tput sgr0)"
     fi
 }
 
@@ -346,7 +350,7 @@ client_start() {
     elif [ ${1:-${runtime}} = "dotnet" ]; then
         dotnet restore > /dev/null && dotnet build > /dev/null
         if [ $? -ne 0 ]; then
-            echo "dotnet restore && dotnet build failed."
+            echo "$(tput bold)$(tput setaf 1)dotnet restore && dotnet build failed.$(tput sgr0)"
             return
         fi
         sleep 1 && git web--browse http://localhost:8080 & ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development} dotnet exec .vscode/out/dotnet/bin/netcoreapp1.1/app.dll
@@ -411,7 +415,7 @@ client_test() {
     echo "$(tput bold)dotnet$(tput sgr0)"
     dotnet restore > /dev/null && dotnet build > /dev/null
     if [ $? -ne 0 ]; then
-        echo "dotnet restore && dotnet build failed."
+        echo "$(tput bold)$(tput setaf 1)dotnet restore && dotnet build failed.$(tput sgr0)"
         return
     fi
     ASPNETCORE_ENVIRONMENT=Production dotnet exec .vscode/out/dotnet/bin/netcoreapp1.1/app.dll & pid=$!
@@ -434,7 +438,7 @@ client_console() {
 }
 
 description() {
-    echo;
+    echo
     echo "  This script automates common tasks to run this website."
     echo "  It can be configured via $(tput smul)${configuration}$(tput sgr0) and provides two sets of commmands,"
     echo "  one for local development and another for running the website on an"
@@ -487,11 +491,11 @@ client() {
             description;
             echo "Usage: $(tput bold)$(basename "$0")$(tput sgr0) <client-command>"
             echo
-            echo "  $(tput bold)start$(tput sgr0)      Start web server locally and open web browser"
-            echo "  $(tput bold)push$(tput sgr0)       Amend last commit or add new commit, then push changes"
-            echo "  $(tput bold)update$(tput sgr0)     Run push command and update server"
-            echo "  $(tput bold)status$(tput sgr0)     Show server log"
-            echo "  $(tput bold)console$(tput sgr0)    Connect via SSH to server"
+            echo "    $(tput bold)start$(tput sgr0)      Start web server locally and open web browser"
+            echo "    $(tput bold)push$(tput sgr0)       Amend last commit or add new commit, then push changes"
+            echo "    $(tput bold)update$(tput sgr0)     Run push command and update server"
+            echo "    $(tput bold)status$(tput sgr0)     Show server log"
+            echo "    $(tput bold)console$(tput sgr0)    Connect via SSH to server"
             echo;
         ;;
     esac
