@@ -127,7 +127,7 @@ function isDirectory(path) {
     return fs.statSync(path).isDirectory();
 }
 
-var truncateMap = { "pre": true, "code": true, "img": true, "table": true, "style": true, "script": true }
+var truncateMap = { "pre": true, "code": true, "img": true, "table": true, "style": true, "script": true, "h2": true, "h3": true }
 
 function truncate(text, length) {
     var closeTags = {};

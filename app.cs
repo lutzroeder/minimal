@@ -209,8 +209,8 @@ class Program
     static Regex tagRegexp = new Regex("<(\\w+)[^>]*>");
     static Regex entityRegexp = new Regex("(#?[A-Za-z0-9]+;)");
     static Regex breakRegexp = new Regex(" |<|&");
-    static HashSet<string> truncateMap = new HashSet<string>() { 
-        "pre", "code", "img", "table", "style", "script" 
+    static HashSet<string> truncateMap = new HashSet<string>() {
+        "pre", "code", "img", "table", "style", "script", "h2", "h3"
     };
 
     static string Truncate(string text, int length)

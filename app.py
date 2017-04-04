@@ -152,7 +152,7 @@ def posts():
 tag_regexp = re.compile(r"<(\w+)[^>]*>")
 entity_regexp = re.compile(r"(#?[A-Za-z0-9]+;)")
 break_regexp = re.compile(r" |<|&")
-truncate_map = { "pre": True, "code": True, "img": True, "table": True, "style": True, "script": True }
+truncate_map = { "pre": True, "code": True, "img": True, "table": True, "style": True, "script": True, "h2": True, "h3": True }
 
 def truncate(text, length):
     close_tags = {}

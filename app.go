@@ -221,7 +221,7 @@ func isDir(path string) bool {
 var tagRegexp = regexp.MustCompile("<(\\w+)[^>]*>")
 var entityRegexp = regexp.MustCompile("(#?[A-Za-z0-9]+;)")
 var truncateMap = map[string]bool{
-	"pre": true, "code": true, "img": true, "table": true, "style": true, "script": true,
+	"pre": true, "code": true, "img": true, "table": true, "style": true, "script": true, "h2": true, "h3": true,
 }
 
 func truncate(text string, length int) string {
