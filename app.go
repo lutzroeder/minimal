@@ -611,44 +611,44 @@ type route struct {
 }
 
 func newRouter(redirects map[string]interface{}) *router {
-	this := &router{}
-	this.routes = make([]*route, 0)
+	router := &router{make([]*route, 0)}
 	if redirects, ok := configuration["redirects"]; ok {
 		for _, redirect := range redirects.([]interface{}) {
 			pattern := redirect.(map[string]interface{})["pattern"].(string)
 			target := redirect.(map[string]interface{})["target"].(string)
-			this.Get(pattern, target);
+			router.Get(pattern, target);
 		}
 	}
-	return this
+	return router
 }
 
-func (this *router) Get(pattern string, handler interface{}) {
-	this.route(pattern).handlers["GET"] = handler;
+func (router *router) Get(pattern string, handler interface{}) {
+	router.route(pattern).handlers["GET"] = handler;
 }
 
-func (this *router) route(pattern string) *route {
-	for _, route := range this.routes {
+func (router *router) route(pattern string) *route {
+	for _, route := range router.routes {
 		if pattern == route.pattern {
 			return route
 		}
 	}
-	route := &route{}
-	route.pattern = pattern 
-	route.regexp = regexp.MustCompile("^" + strings.Replace(pattern, "*", "(.*)", -1) + "$")
-	route.handlers = make(map[string]interface{})
-	this.routes = append(this.routes, route)
+	route := &route{
+		pattern,
+		regexp.MustCompile("^" + strings.Replace(pattern, "*", "(.*)", -1) + "$"),
+		make(map[string]interface{}),
+	}
+	router.routes = append(router.routes, route)
 	return route
 }
 
-func (this *router) ServeHTTP(response http.ResponseWriter, request *http.Request) {
+func (router *router) ServeHTTP(response http.ResponseWriter, request *http.Request) {
 	fmt.Println(request.Method + " " + request.RequestURI)
 	urlpath := request.URL.Path
 	pathname := strings.ToLower(path.Clean(urlpath))
 	if pathname != "/" && strings.HasSuffix(urlpath, "/") {
 		pathname += "/"
 	}
-	for _, route := range this.routes {
+	for _, route := range router.routes {
 		if route.regexp.MatchString(pathname) {
 			method := strings.ToUpper(request.Method)
 			if method == "HEAD" {
