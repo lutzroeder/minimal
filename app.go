@@ -55,10 +55,10 @@ func mustache(template string, view map[string]interface{}, partials func(string
 				content := template[index:index+match[0]]
 				if o, ok := view[name]; ok {
 					if list, ok := o.([]interface{}); ok {
-						output := []string{}
-						for _, item := range list {
+						output := make([]string, len(list))
+						for index, item := range list {
 							context := merge(view, item.(map[string]interface{}))
-							output = append(output, mustache(content, context, partials))
+							output[index] = mustache(content, context, partials)
 						}
 						content = strings.Join(output, "")
 					}
@@ -396,17 +396,19 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 	data := cacheString("atom:"+host+"/blog/atom.xml", func() string {
 		count := 10
 		output := []string{}
-		output = append(output, "<?xml version='1.0' encoding='UTF-8'?>")
-		output = append(output, "<feed xmlns='http://www.w3.org/2005/Atom'>")
-		output = append(output, "<title>"+configuration["name"].(string)+"</title>")
-		output = append(output, "<id>"+host+"/</id>")
-		output = append(output, "<icon>"+host+"/favicon.ico</icon>")
+		output = append(output,
+			"<?xml version='1.0' encoding='UTF-8'?>",
+			"<feed xmlns='http://www.w3.org/2005/Atom'>",
+			"<title>"+configuration["name"].(string)+"</title>",
+			"<id>"+host+"/</id>",
+			"<icon>"+host+"/favicon.ico</icon>")
 		index := len(output)
 		recent := ""
-		output = append(output, "")
-		output = append(output, "<author><name>"+configuration["name"].(string)+"</name></author>")
-		output = append(output, "<link rel='alternate' type='text/html' href='"+host+"/' />")
-		output = append(output, "<link rel='self' type='application/atom+xml' href='"+host+"/blog/atom.xml' />")
+		output = append(output, 
+			"",
+			"<author><name>"+configuration["name"].(string)+"</name></author>",
+			"<link rel='alternate' type='text/html' href='"+host+"/' />",
+			"<link rel='self' type='application/atom+xml' href='"+host+"/blog/atom.xml' />")
 		files := posts()
 		for len(files) > 0 && count > 0 {
 			file := files[0]
@@ -414,8 +416,9 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 			entry := loadPost("blog/" + file)
 			if entry != nil && (entry["state"] == "post" || environment != "production") {
 				url := host + "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
-				output = append(output, "<entry>")
-				output = append(output, "<id>"+url+"</id>")
+				output = append(output, 
+					"<entry>",
+					"<id>"+url+"</id>")
 				if author, ok := entry["author"]; ok && author != configuration["name"].(string) {
 					output = append(output, "<author><name>"+author.(string)+"</name></author>")
 				}
@@ -425,23 +428,24 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 						date = formatDate(time)
 					}
 				}
-				output = append(output, "<published>"+date+"</published>")
 				updated := date
 				if value, ok := entry["updated"]; ok {
 					if time, err := time.Parse("2006-01-02 15:04:05 -07:00", value.(string)); err == nil {
 						updated = formatDate(time)
 					}
 				}
-				output = append(output, "<updated>"+updated+"</updated>")
 				if len(recent) == 0 || recent < updated {
 					recent = updated
 				}
-				output = append(output, "<title type='text'>"+entry["title"].(string)+"</title>")
 				content := entry["content"].(string)
 				content = escapeHTML(truncate(content, 4000))
-				output = append(output, "<content type='html'>"+content+"</content>")
-				output = append(output, "<link rel='alternate' type='text/html' href='"+url+"' title='"+entry["title"].(string)+"' />")
-				output = append(output, "</entry>")
+				output = append(output,
+					"<published>"+date+"</published>",
+					"<updated>"+updated+"</updated>",
+					"<title type='text'>"+entry["title"].(string)+"</title>",
+					"<content type='html'>"+content+"</content>",
+					"<link rel='alternate' type='text/html' href='"+url+"' title='"+entry["title"].(string)+"' />",
+					"</entry>")
 				count--
 			}
 		}
