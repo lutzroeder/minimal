@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -11,7 +10,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 
 class Program
@@ -676,7 +674,7 @@ class Program
 
     static void Main(string[] args)
     {
-        string version = Path.GetFileName(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location)).Replace("netcoreapp", string.Empty);
+        string version = Path.GetFileName(AppContext.BaseDirectory).Replace("netcoreapp", string.Empty);
         Console.WriteLine("dotnetcore " + version);
         configuration = (IDictionary<string, object>) JsonReader.Parse(File.ReadAllText("app.json"));
         Router router = new Router(configuration);
@@ -703,7 +701,7 @@ class Program
                     return router.Handle(context);
                 });
             }).Build();
-        environment = host.Services.GetRequiredService<IHostingEnvironment>();
+        environment = (IHostingEnvironment) host.Services.GetService(typeof(IHostingEnvironment));
         Console.WriteLine(environment.EnvironmentName.ToLower());
         InitPathCache(".");
         Console.WriteLine(url);
