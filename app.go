@@ -53,18 +53,20 @@ func mustache(template string, view map[string]interface{}, partials func(string
 			index += match[1]
 			if match := regexp.MustCompile("{{\\/\\s*" + name + "\\s*}}\\s?").FindStringIndex(template[index:]); match != nil {
 				content := template[index:index+match[0]]
-				if o, ok := view[name]; ok {
-					if list, ok := o.([]interface{}); ok {
-						output := make([]string, len(list))
-						for index, item := range list {
+				if value, ok := view[name]; ok {
+					switch value := value.(type) {
+					case []interface{}:
+						output := make([]string, len(value))
+						for index, item := range value {
 							context := merge(view, item.(map[string]interface{}))
 							output[index] = mustache(content, context, partials)
 						}
 						content = strings.Join(output, "")
-					}
-					if value, ok := o.(bool); ok && !value {
-						content = ""
-					}
+					case bool:
+						if !value {
+							content = ""
+						}
+					} 
 					template = template[0:start] + content + template[index+match[1]:]
 					index = start
 				}
@@ -79,24 +81,24 @@ func mustache(template string, view map[string]interface{}, partials func(string
 	})
 	template = replaceRegex.ReplaceAllStringFunc(template, func(match string) string {
 		name := replaceRegex.FindStringSubmatch(match)[1]
-		if o, ok := view[name]; ok {
-			if f, ok := o.(func() string); ok {
-				return f()
-			}
-			if v, ok := o.(string); ok {
-				return v
+		if value, ok := view[name]; ok {
+			switch value := value.(type) {
+			case func() string:
+				return value();
+			case string:
+				return value;
 			}
 		}
 		return match
 	})
 	template = escapeRegex.ReplaceAllStringFunc(template, func(match string) string {
 		name := escapeRegex.FindStringSubmatch(match)[1]
-		if o, ok := view[name]; ok {
-			if f, ok := o.(func() string); ok {
-				return escapeHTML(f())
-			}
-			if v, ok := o.(string); ok {
-				return escapeHTML(v)
+		if value, ok := view[name]; ok {
+			switch value := value.(type) {
+			case func() string:
+				return escapeHTML(value());
+			case string:
+				return escapeHTML(value);
 			}
 		}
 		return match
@@ -341,7 +343,7 @@ func loadPost(path string) map[string]interface{} {
 }
 
 func renderBlog(files []string, start int) string {
-	var entries []interface{}
+	entries := make([]interface{}, 0)
 	view := make(map[string]interface{}) 
 	length := 10
 	index := 0
@@ -366,7 +368,7 @@ func renderBlog(files []string, start int) string {
 		}
 	}
 	view["entries"] = entries
-	var placeholder []interface{}
+	placeholder := make([]interface{}, 0)
 	if len(files) > 0 {
 		placeholder = append(placeholder, map[string]interface{}{"url": "/blog?id=" + strconv.Itoa(index)})
 	}
@@ -614,7 +616,7 @@ type route struct {
 	handlers map[string]interface{}
 }
 
-func newRouter(redirects map[string]interface{}) *router {
+func newRouter(configuration map[string]interface{}) *router {
 	router := &router{make([]*route, 0)}
 	if redirects, ok := configuration["redirects"]; ok {
 		for _, redirect := range redirects.([]interface{}) {
