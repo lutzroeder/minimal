@@ -419,9 +419,9 @@ class Program
                 if (entry != null && (((string)entry["state"]) == "post" || !environment.IsProduction()))
                 {
                     entry["url"] = host + "/blog/" + Path.GetFileNameWithoutExtension(file);
-                    if (entry.ContainsKey("author") && entry["author"] == configuration["name"]) 
+                    if (!entry.ContainsKey("author") || entry["author"] == configuration["name"]) 
                     {
-                        entry.Remove("author");
+                        entry["author"] = false;
                     }
                     var date = FormatDate(DateTime.Parse((string) entry["date"]));
                     var updated = entry.ContainsKey("updated") ? FormatDate(DateTime.Parse((string)entry["updated"])) : date;

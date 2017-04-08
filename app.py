@@ -280,8 +280,8 @@ def atom_handler(request):
             entry = load_post("blog/" + filename)
             if entry and (entry["state"] == "post" or environment != "production"):
                 entry["url"] = host + "/blog/" + os.path.splitext(filename)[0]
-                if "author" in entry and entry["author"] == configuration["name"]:
-                    del entry["author"]
+                if not "author" in entry or entry["author"] == configuration["name"]:
+                    entry["author"] = False
                 entry["date"] = format_date(dateutil.parser.parse(entry["date"]))
                 entry["updated"] = format_date(dateutil.parser.parse(entry["updated"])) if "updated" in entry else entry["date"];
                 if not "updated" in feed or feed["updated"] < entry["updated"]:

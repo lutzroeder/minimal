@@ -305,8 +305,8 @@ function atomHandler(request, response) {
             var entry = loadPost("blog/" + file);
             if (entry && (entry["state"] === "post" || environment !== "production")) {
                 entry["url"] = host + "/blog/" + path.basename(file, ".html"); 
-                if (entry["author"] && entry["author"] === configuration["name"]) {
-                    delete entry["author"];
+                if (!entry["author"] || entry["author"] === configuration["name"]) {
+                    entry["author"] = false;
                 }
                 entry["date"] = formatDate(new Date(entry["date"]));
                 entry["updated"] = entry["updated"] ? formatDate(new Date(entry["updated"])) : entry["date"];

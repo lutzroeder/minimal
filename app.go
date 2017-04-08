@@ -395,34 +395,25 @@ func rootHandler(response http.ResponseWriter, request *http.Request) {
 
 func atomHandler(response http.ResponseWriter, request *http.Request) {
 	host := scheme(request) + "://" + request.Host
-	data := cacheString("atom:"+host+"/blog/atom.xml", func() string {
+	url := host+"/blog/atom.xml"
+	data := cacheString("atom:"+url, func() string {
 		count := 10
-		output := []string{}
-		output = append(output,
-			"<?xml version='1.0' encoding='UTF-8'?>",
-			"<feed xmlns='http://www.w3.org/2005/Atom'>",
-			"<title>"+configuration["name"].(string)+"</title>",
-			"<id>"+host+"/</id>",
-			"<icon>"+host+"/favicon.ico</icon>")
-		index := len(output)
-		recent := ""
-		output = append(output, 
-			"",
-			"<author><name>"+configuration["name"].(string)+"</name></author>",
-			"<link rel='alternate' type='text/html' href='"+host+"/' />",
-			"<link rel='self' type='application/atom+xml' href='"+host+"/blog/atom.xml' />")
+		entries := make([]interface{}, 0)
+		feed := map[string]interface{}{
+			"name": configuration["name"],
+			"author": configuration["name"],
+			"host": host,
+			"url": url,
+		}
 		files := posts()
 		for len(files) > 0 && count > 0 {
 			file := files[0]
 			files = files[1:]
 			entry := loadPost("blog/" + file)
 			if entry != nil && (entry["state"] == "post" || environment != "production") {
-				url := host + "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
-				output = append(output, 
-					"<entry>",
-					"<id>"+url+"</id>")
-				if author, ok := entry["author"]; ok && author != configuration["name"].(string) {
-					output = append(output, "<author><name>"+author.(string)+"</name></author>")
+				entry["url"] = host + "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
+				if author, ok := entry["author"]; !ok || author.(string) == configuration["name"].(string) {
+					entry["author"] = false
 				}
 				date := ""
 				if value, ok := entry["date"]; ok {
@@ -436,27 +427,27 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 						updated = formatDate(time)
 					}
 				}
-				if len(recent) == 0 || recent < updated {
-					recent = updated
+				entry["date"] = date;
+				entry["updated"] = updated;
+				if recent, ok := feed["updated"]; !ok || recent.(string) < updated {
+					feed["updated"] = updated;
 				}
-				content := entry["content"].(string)
-				content = escapeHTML(truncate(content, 4000))
-				output = append(output,
-					"<published>"+date+"</published>",
-					"<updated>"+updated+"</updated>",
-					"<title type='text'>"+entry["title"].(string)+"</title>",
-					"<content type='html'>"+content+"</content>",
-					"<link rel='alternate' type='text/html' href='"+url+"' title='"+entry["title"].(string)+"' />",
-					"</entry>")
+				entry["content"] = escapeHTML(truncate(entry["content"].(string), 4000))
+				entries = append(entries, entry)
 				count--
 			}
 		}
-		if len(recent) == 0 {
-			recent = formatDate(time.Now())
+		if _, ok := feed["updated"]; !ok {
+			feed["updated"] = formatDate(time.Now())
 		}
-		output[index] = "<updated>" + recent + "</updated>"
-		output = append(output, "</feed>")
-		return strings.Join(output, "\n")
+		feed["entries"] = entries
+		template, err := ioutil.ReadFile("./atom.xml")
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			return mustache(string(template), feed, nil)
+		}
+		return ""
 	})
 	writeString(response, request, "application/atom+xml", data)
 }
@@ -696,6 +687,7 @@ func main() {
 	router.Get("/.vscode/?*", rootHandler)
 	router.Get("/admin*", rootHandler)
 	router.Get("/app.*", rootHandler)
+	router.Get("/atom.xml", rootHandler)
 	router.Get("/header.html", rootHandler)
 	router.Get("/meta.html", rootHandler)
 	router.Get("/package.json", rootHandler)
