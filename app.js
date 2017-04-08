@@ -289,50 +289,40 @@ function rootHandler(request, response) {
 
 function atomHandler(request, response) {
     var host = scheme(request) + "://" + request.headers.host;
-    var data = cache("atom:" + host + "/blog/atom.xml", function () {
+    var url = host + "/blog/atom.xml";
+    var data = cache("atom:" + url, function () {
         var count = 10;
-        var output = [];
-        output.push("<?xml version='1.0' encoding='UTF-8'?>");
-        output.push("<feed xmlns='http://www.w3.org/2005/Atom'>");
-        output.push("<title>" + configuration["name"] + "</title>");
-        output.push("<id>" + host + "/</id>");
-        output.push("<icon>" + host + "/favicon.ico</icon>");
-        var index = output.length;
-        var recent = null;
-        output.push("");
-        output.push("<author><name>" + configuration["name"] + "</name></author>");
-        output.push("<link rel='alternate' type='text/html' href='" + host + "/' />");
-        output.push("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />");
+        var feed = {
+            "name": configuration["name"],
+            "author": configuration["name"],
+            "host": host,
+            "url": url,
+            "entries": [] 
+        };
         var files = posts();
         while (files.length > 0 && count > 0) {
             var file = files.shift();
             var entry = loadPost("blog/" + file);
             if (entry && (entry["state"] === "post" || environment !== "production")) {
-                var url = host + "/blog/" + path.basename(file, ".html");
-                output.push("<entry>");
-                output.push("<id>" + url + "</id>");
-                if (entry["author"] && entry["author"] !== configuration["name"]) {
-                    output.push("<author><name>" + entry["author"] + "</name></author>");
+                entry["url"] = host + "/blog/" + path.basename(file, ".html"); 
+                if (entry["author"] && entry["author"] === configuration["name"]) {
+                    delete entry["author"];
                 }
-                var date = formatDate(new Date(entry["date"]));
-                output.push("<published>" + date + "</published>");
-                var updated = entry["updated"] ? formatDate(new Date(entry["updated"])) : date;
-                output.push("<updated>" + updated + "</updated>");
-                if (!recent || recent < updated) {
-                    recent = updated;
+                entry["date"] = formatDate(new Date(entry["date"]));
+                entry["updated"] = entry["updated"] ? formatDate(new Date(entry["updated"])) : entry["date"];
+                if (!feed["updated"] || feed["updated"] < entry["updated"]) {
+                    feed["updated"] = entry["updated"];
                 }
-                output.push("<title type='text'>" + entry["title"] + "</title>");
-                var content = escapeHtml(truncate(entry["content"], 10000));
-                output.push("<content type='html'>" + content + "</content>");
-                output.push("<link rel='alternate' type='text/html' href='" + url + "' title='" + entry["title"] + "' />");
-                output.push("</entry>");
+                entry["content"] = escapeHtml(truncate(entry["content"], 10000));
+                feed["entries"].push(entry);
                 count--;
             }
         }
-        recent = recent ? recent : formatDate(new Date());
-        output[index] = "<updated>" + recent + "</updated>";
-        output.push("</feed>");
-        return output.join("\n");
+        if (!feed["updated"]) {
+            feed["updated"] = formatDate(new Date());
+        }
+        var template = fs.readFileSync("atom.xml", "utf-8");
+        return mustache(template, feed, null);
     });
     writeString(request, response, "application/atom+xml", data);
 }
@@ -536,6 +526,7 @@ router.get("/.git/?*", rootHandler)
 router.get("/.vscode/?*", rootHandler);
 router.get("/admin*", rootHandler);
 router.get("/app.*", rootHandler);
+router.get("/atom.xml", rootHandler);
 router.get("/header.html", rootHandler);
 router.get("/meta.html", rootHandler);
 router.get("/package.json", rootHandler);

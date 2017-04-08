@@ -400,20 +400,17 @@ class Program
     static Task AtomHandler(HttpContext context)
     {
         var host = context.Request.Scheme + "://" + context.Request.Host;
-        var data = CacheString("atom:" + host + "/blog/atom.xml", delegate() {
+        var url = host + "/blog/atom.xml";
+        var data = CacheString("atom:" + url, delegate() {
             var count = 10;
-            var output = new List<string>();
-            output.Add("<?xml version='1.0' encoding='UTF-8'?>");
-            output.Add("<feed xmlns='http://www.w3.org/2005/Atom'>");
-            output.Add("<title>" + configuration["name"] + "</title>");
-            output.Add("<id>" + host + "/</id>");
-            output.Add("<icon>" + host + "/favicon.ico</icon>");
-            var index = output.Count;
-            string recent = string.Empty;
-            output.Add(string.Empty);
-            output.Add("<author><name>" + configuration["name"] + "</name></author>");
-            output.Add("<link rel='alternate' type='text/html' href='" + host + "/' />");
-            output.Add("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />");
+            var entries = new List<object>();
+            var feed = new Dictionary<string, object>() {
+                ["name"] = configuration["name"],
+                ["author"] = configuration["name"],
+                ["host"] = host,
+                ["url"] = url,
+                ["entries"] = entries
+            };
             var files = Posts();
             while (files.Count > 0 && count > 0) 
             {
@@ -421,34 +418,30 @@ class Program
                 var entry = LoadPost("blog/" + file);
                 if (entry != null && (((string)entry["state"]) == "post" || !environment.IsProduction()))
                 {
-                    var url = host + "/blog/" + Path.GetFileNameWithoutExtension(file);
-                    output.Add("<entry>");
-                    output.Add("<id>" + url + "</id>");
-                    if (entry.ContainsKey("author") && (entry["author"] != configuration["name"])) 
+                    entry["url"] = host + "/blog/" + Path.GetFileNameWithoutExtension(file);
+                    if (entry.ContainsKey("author") && entry["author"] == configuration["name"]) 
                     {
-                        output.Add("<author><name>" + (string) entry["author"] + "</name></author>");
+                        entry.Remove("author");
                     }
                     var date = FormatDate(DateTime.Parse((string) entry["date"]));
-                    output.Add("<published>" + date + "</published>");
                     var updated = entry.ContainsKey("updated") ? FormatDate(DateTime.Parse((string)entry["updated"])) : date;
-                    output.Add("<updated>" + updated + "</updated>");
-                    if (string.IsNullOrEmpty(recent) || recent.CompareTo(updated) < 0)
+                    entry["date"] = date;
+                    entry["updated"] = updated;
+                    if (!feed.ContainsKey("updated") || (feed["updated"] as string).CompareTo(updated) < 0)
                     {
-                        recent = updated;
+                        feed["updated"] = updated;
                     }
-                    output.Add("<title type='text'>" + entry["title"] + "</title>");
-                    var content = (string) entry["content"];
-                    content = EscapeHtml(Truncate(content, 10000));
-                    output.Add("<content type='html'>" + content + "</content>");
-                    output.Add("<link rel='alternate' type='text/html' href='" + url + "' title='" + entry["title"] + "' />");
-                    output.Add("</entry>");
+                    entry["content"] = EscapeHtml(Truncate((string)entry["content"], 10000));
+                    entries.Add(entry);
                     count--;
                 }
             }
-            recent = !string.IsNullOrEmpty(recent) ? recent : FormatDate(DateTime.Now);
-            output[index] = "<updated>" + recent + "</updated>";
-            output.Add("</feed>");
-            return string.Join("\n", output);
+            if (!feed.ContainsKey("updated"))
+            {
+                feed["updated"] = FormatDate(DateTime.Now);
+            }
+            var template = File.ReadAllText("atom.xml");
+            return Mustache(template, feed, null);
         });
         return WriteStringAsync(context, "application/atom+xml", data);
     }
@@ -682,6 +675,7 @@ class Program
         router.Get("/.vscode/?*", RootHandler);
         router.Get("/admin*", RootHandler);
         router.Get("/app.*", RootHandler);
+        router.Get("/atom.xml", RootHandler);
         router.Get("/header.html", RootHandler);
         router.Get("/meta.html", RootHandler);
         router.Get("/package.json", RootHandler);

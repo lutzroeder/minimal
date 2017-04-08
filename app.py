@@ -264,52 +264,36 @@ def write_string(request, content_type, data):
 
 def atom_handler(request):
     host = scheme(request) + "://" + request.headers.get("host")
+    url = host + "/blog/atom.xml"
     def render_feed():
         count = 10
-        output = []
-        output.append("<?xml version='1.0' encoding='UTF-8'?>")
-        output.append("<feed xmlns='http://www.w3.org/2005/Atom'>")
-        output.append("<title>" + configuration["name"] + "</title>")
-        output.append("<id>" + host + "/</id>")
-        output.append("<icon>" + host + "/favicon.ico</icon>")
-        index = len(output)
-        recent = ""
-        output.append("")
-        output.append("<author><name>" + configuration["name"] + "</name></author>")
-        output.append("<link rel='alternate' type='text/html' href='" + host + "/' />")
-        output.append("<link rel='self' type='application/atom+xml' href='" + host + "/blog/atom.xml' />")
+        feed = {
+            "name": configuration["name"],
+            "author": configuration["name"],
+            "host": host,
+            "url": url,
+            "entries": [] 
+        }
         files = posts()
         while len(files) > 0 and count > 0:
             filename = files.pop(0)
             entry = load_post("blog/" + filename)
             if entry and (entry["state"] == "post" or environment != "production"):
-                url = host + "/blog/" + os.path.splitext(filename)[0]
-                output.append("<entry>")
-                output.append("<id>" + url + "</id>")
-                if "author" in entry and entry["author"] != configuration["name"]:
-                    output.append("<author><name>" + entry["author"] + "</name></author>")
-                date = ""
-                if "date" in entry:
-                    date = format_date(dateutil.parser.parse(entry["date"]))
-                output.append("<published>" + date + "</published>")
-                updated = date
-                if "updated" in entry:
-                    updated = format_date(dateutil.parser.parse(entry["updated"]))
-                output.append("<updated>" + updated + "</updated>")
-                if len(recent) == 0 or recent < updated:
-                    recent = updated
-                output.append("<title type='text'>" + entry["title"] + "</title>")
-                content = escape_html(truncate(entry["content"], 10000))
-                output.append("<content type='html'>" + content + "</content>")
-                output.append("<link rel='alternate' type='text/html' href='" + url + "' title='" + entry["title"] + "' />")
-                output.append("</entry>")
+                entry["url"] = host + "/blog/" + os.path.splitext(filename)[0]
+                if "author" in entry and entry["author"] == configuration["name"]:
+                    del entry["author"]
+                entry["date"] = format_date(dateutil.parser.parse(entry["date"]))
+                entry["updated"] = format_date(dateutil.parser.parse(entry["updated"])) if "updated" in entry else entry["date"];
+                if not "updated" in feed or feed["updated"] < entry["updated"]:
+                    feed["updated"] = entry["updated"]
+                entry["content"] = escape_html(truncate(entry["content"], 10000));
+                feed["entries"].append(entry)
                 count -= 1
-        if len(recent) == 0:
-            recent = format_date(datetime.datetime.now())
-        output[index] = "<updated>" + recent + "</updated>"
-        output.append("</feed>")
-        return "\n".join(output)
-    data = cache("atom:" + host + "/blog/atom.xml", render_feed)
+        if not "updated" in feed:
+            feed["updated"] = format_date(datetime.datetime.now())
+        template = read_file("./atom.xml")
+        return mustache(template, feed, None)
+    data = cache("atom:" + url, render_feed)
     write_string(request, "application/atom+xml", data)
 
 def post_handler(request):
@@ -461,6 +445,7 @@ router.get("/.git/?*", root_handler)
 router.get("/.vscode/?*", root_handler)
 router.get("/admin*", root_handler)
 router.get("/app.*", root_handler)
+router.get("/atom.xml", root_handler)
 router.get("/header.html", root_handler)
 router.get("/meta.html", root_handler)
 router.get("/package.json", root_handler)
