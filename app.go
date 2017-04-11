@@ -30,7 +30,7 @@ func escapeHTML(text string) string {
 	return entityMap.Replace(text)
 }
 
-func merge(maps... map[string]interface{}) map[string]interface{} {
+func merge(maps ...map[string]interface{}) map[string]interface{} {
 	target := make(map[string]interface{})
 	for _, obj := range maps {
 		for key, value := range obj {
@@ -48,11 +48,11 @@ var escapeRegex = regexp.MustCompile("{{\\s*([-_/.\\w]+)\\s*}}")
 func mustache(template string, view map[string]interface{}, partials func(string) string) string {
 	for index := 0; index < len(template); {
 		if match := sectionRegex.FindStringIndex(template[index:]); match != nil {
-			name := sectionRegex.FindStringSubmatch(template[index+match[0]:index+match[1]])[1]
+			name := sectionRegex.FindStringSubmatch(template[index+match[0] : index+match[1]])[1]
 			start := index + match[0]
 			index += match[1]
 			if match := regexp.MustCompile("{{\\/\\s*" + name + "\\s*}}\\s?").FindStringIndex(template[index:]); match != nil {
-				content := template[index:index+match[0]]
+				content := template[index : index+match[0]]
 				if value, ok := view[name]; ok {
 					switch value := value.(type) {
 					case []interface{}:
@@ -66,7 +66,7 @@ func mustache(template string, view map[string]interface{}, partials func(string
 						if !value {
 							content = ""
 						}
-					} 
+					}
 					template = template[0:start] + content + template[index+match[1]:]
 					index = start
 				}
@@ -84,9 +84,9 @@ func mustache(template string, view map[string]interface{}, partials func(string
 		if value, ok := view[name]; ok {
 			switch value := value.(type) {
 			case func() string:
-				return value();
+				return value()
 			case string:
-				return value;
+				return value
 			}
 		}
 		return match
@@ -96,9 +96,9 @@ func mustache(template string, view map[string]interface{}, partials func(string
 		if value, ok := view[name]; ok {
 			switch value := value.(type) {
 			case func() string:
-				return escapeHTML(value());
+				return escapeHTML(value())
 			case string:
-				return escapeHTML(value);
+				return escapeHTML(value)
 			}
 		}
 		return match
@@ -344,7 +344,7 @@ func loadPost(path string) map[string]interface{} {
 
 func renderBlog(files []string, start int) string {
 	entries := make([]interface{}, 0)
-	view := make(map[string]interface{}) 
+	view := make(map[string]interface{})
 	length := 10
 	index := 0
 	for len(files) > 0 && index < start+length {
@@ -395,15 +395,15 @@ func rootHandler(response http.ResponseWriter, request *http.Request) {
 
 func atomHandler(response http.ResponseWriter, request *http.Request) {
 	host := scheme(request) + "://" + request.Host
-	url := host+"/blog/atom.xml"
+	url := host + "/blog/atom.xml"
 	data := cacheString("atom:"+url, func() string {
 		count := 10
 		entries := make([]interface{}, 0)
 		feed := map[string]interface{}{
-			"name": configuration["name"],
+			"name":   configuration["name"],
 			"author": configuration["name"],
-			"host": host,
-			"url": url,
+			"host":   host,
+			"url":    url,
 		}
 		files := posts()
 		for len(files) > 0 && count > 0 {
@@ -427,10 +427,10 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 						updated = formatDate(time)
 					}
 				}
-				entry["date"] = date;
-				entry["updated"] = updated;
+				entry["date"] = date
+				entry["updated"] = updated
 				if recent, ok := feed["updated"]; !ok || recent.(string) < updated {
-					feed["updated"] = updated;
+					feed["updated"] = updated
 				}
 				entry["content"] = escapeHTML(truncate(entry["content"].(string), 4000))
 				entries = append(entries, entry)
@@ -602,8 +602,8 @@ type router struct {
 }
 
 type route struct {
-	pattern string
-	regexp *regexp.Regexp
+	pattern  string
+	regexp   *regexp.Regexp
 	handlers map[string]interface{}
 }
 
@@ -613,14 +613,14 @@ func newRouter(configuration map[string]interface{}) *router {
 		for _, redirect := range redirects.([]interface{}) {
 			pattern := redirect.(map[string]interface{})["pattern"].(string)
 			target := redirect.(map[string]interface{})["target"].(string)
-			router.Get(pattern, target);
+			router.Get(pattern, target)
 		}
 	}
 	return router
 }
 
 func (router *router) Get(pattern string, handler interface{}) {
-	router.route(pattern).handlers["GET"] = handler;
+	router.route(pattern).handlers["GET"] = handler
 }
 
 func (router *router) route(pattern string) *route {
@@ -656,7 +656,7 @@ func (router *router) ServeHTTP(response http.ResponseWriter, request *http.Requ
 			if handler, ok := route.handlers[method]; ok {
 				if callback, ok := handler.(func(response http.ResponseWriter, request *http.Request)); ok {
 					callback(response, request)
-					return 
+					return
 				}
 				if redirect, ok := handler.(string); ok {
 					http.Redirect(response, request, redirect, http.StatusMovedPermanently)
@@ -701,5 +701,5 @@ func main() {
 	router.Get("/*", defaultHandler)
 	port := 8080
 	fmt.Println("http://localhost:" + strconv.Itoa(port))
-	http.ListenAndServe(":" + strconv.Itoa(port), router)
+	http.ListenAndServe(":"+strconv.Itoa(port), router)
 }
