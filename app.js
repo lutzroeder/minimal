@@ -67,7 +67,7 @@ function redirect(response, status, location) {
 }
 
 function formatDate(date) {
-    return date.toISOString().replace(/\.[0-9]*Z/, "Z")
+    return date.toISOString().replace(/\.[0-9]*Z/, "Z");
 }
 
 function formatUserDate(text) {
@@ -88,7 +88,7 @@ function cache(key, callback) {
     return callback();
 }
 
-var pathCache = {}
+var pathCache = {};
 
 function initPathCache(directory) {
     if (environment === "production") {
@@ -127,11 +127,11 @@ function isDirectory(path) {
     return fs.statSync(path).isDirectory();
 }
 
-var truncateMap = { "pre": true, "code": true, "img": true, "table": true, "style": true, "script": true, "h2": true, "h3": true }
+var truncateMap = { "pre": true, "code": true, "img": true, "table": true, "style": true, "script": true, "h2": true, "h3": true };
 
 function truncate(text, length) {
     var closeTags = {};
-    var ellipsis = ""
+    var ellipsis = "";
     var count = 0;
     var index = 0;
     while (count < length && index < text.length) {
@@ -150,7 +150,7 @@ function truncate(text, length) {
                     }
                     index += match[0].length;
                     var closeTagRegExp = new RegExp("(</" + tag + "\\s*>)", "i");
-                    var end = text.substring(index).search(closeTagRegExp)
+                    var end = text.substring(index).search(closeTagRegExp);
                     if (end != -1) {
                         closeTags[index + end] = "</" + tag + ">";
                     }
@@ -174,12 +174,12 @@ function truncate(text, length) {
                 index++;
                 count++;
             }
-            var skip = text.substring(index).search(" |<|&")
+            var skip = text.substring(index).search(" |<|&");
             if (skip == -1) {
                 skip = text.length - index;
             }
             if (count + skip > length) {
-                ellipsis = "&hellip;"
+                ellipsis = "&hellip;";
             }
             if (count + skip - 15 > length) {
                 skip = length - count;
@@ -221,7 +221,7 @@ function loadPost(file) {
                 if (line.startsWith("---")) {
                     metadata++;
                 }
-                else if (metadata == 0) {
+                else if (metadata === 0) {
                     var index = line.indexOf(":");
                     if (index >= 0) {
                         var name = line.slice(0, index).trim();
@@ -264,7 +264,7 @@ function renderBlog(files, start) {
             index++;
         }
     }
-    view["placeholder"] = []
+    view["placeholder"] = [];
     if (files.length > 0) {
         view["placeholder"].push({ "url": "/blog?id=" + index.toString() });
     }
@@ -358,13 +358,13 @@ function postHandler(request, response) {
         writeString(request, response, "text/html", data);
         return;
     }
-    var extension = path.extname(file)
-    var contentType = mimeTypeMap[extension] 
+    var extension = path.extname(file);
+    var contentType = mimeTypeMap[extension] ;
     if (contentType) {
         defaultHandler(request, response);
         return;
     }
-    rootHandler(request, response)
+    rootHandler(request, response);
 }
 
 function blogHandler(request, response) {
@@ -382,7 +382,7 @@ function blogHandler(request, response) {
         writeString(request, response, "text/html", data);
         return;
     }
-    rootHandler(request, response)
+    rootHandler(request, response);
 }
 
 function certHandler(request, response) {
@@ -391,10 +391,10 @@ function certHandler(request, response) {
         if (fs.existsSync(file) && fs.statSync(file).isFile) {
             var data = fs.readFileSync(file, "utf-8");
             writeString(request, respnse, "text/plain; charset=utf-8", data);
-            return
+            return;
         }
     }
-    response.writeHead(404)
+    response.writeHead(404);
     response.end();
 }
 
@@ -420,7 +420,7 @@ function defaultHandler(request, response) {
         var buffer = cache("default:" + file, function() {
             try {
                 var size = fs.statSync(file).size;
-                var buffer = new Buffer(size)
+                var buffer = new Buffer(size);
                 var descriptor = fs.openSync(file, "r");
                 fs.readSync(descriptor, buffer, 0, buffer.length, 0);
                 fs.closeSync(descriptor);
@@ -458,7 +458,7 @@ function defaultHandler(request, response) {
         return mustache(template, view, function(name) {
             return fs.readFileSync(name, "utf-8");
         });
-    })
+    });
     writeString(request, response, "text/html", data);
 }
 
