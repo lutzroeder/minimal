@@ -349,7 +349,11 @@ server_test() {
 
 client_start() {
     if [ ${1:-${runtime}} = "go" ]; then 
-        sleep 1 && git web--browse http://localhost:8080 & GO_ENV=${GO_ENV:-development} go run app.go
+        go build -o .vscode/out/go/app app.go
+        if [ $? -ne 0 ]; then
+            return
+        fi
+        sleep 0.5 && git web--browse http://localhost:8080 & GO_ENV=${GO_ENV:-development} .vscode/out/go/app
     elif [ ${1:-${runtime}} = "python" ]; then
         sleep 0.5 && git web--browse http://localhost:8080 & PYTHON_ENV=${PYTHON_ENV:-development} python app.py
     elif [ ${1:-${runtime}} = "dotnet" ]; then
