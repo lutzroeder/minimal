@@ -5,10 +5,15 @@ pushd $(dirname ${BASH_SOURCE[0]}) > /dev/null
 configuration=$(basename ${BASH_SOURCE[0]}).cfg
 source "${configuration}"
 
+bold=$(tty -s && tput bold)
+regular=$(tty -s && tput sgr0)
+underline=$(tty -s && tput smul)
+error=$(tty -s && tput setaf 1)
+
 server_install() {
     server_uninstall
 
-    echo "$(tput bold)apt-get update$(tput sgr0)"
+    echo "${bold}apt-get update${regular}"
     if [ ${runtime} = "dotnet" ]; then
         if [ -z "$(which dotonet)" ]; then
             sudo sh -c 'echo "deb [arch=amd64] https://apt-mo.trafficmanager.net/repos/dotnet-release/ xenial main" > /etc/apt/sources.list.d/dotnetdev.list'
@@ -22,23 +27,23 @@ server_install() {
     sudo apt-get -qq update
 
     if [ ${runtime} = "go" ]; then 
-        echo "$(tput bold)apt-get install golang$(tput sgr0)"
+        echo "${bold}apt-get install golang${regular}"
         sudo apt-get -qq install --yes golang
     elif [ ${runtime} = "python" ]; then
-        echo "$(tput bold)apt-get install python$(tput sgr0)"
+        echo "${bold}apt-get install python${regular}"
         sudo apt-get -qq install --yes python python-dateutil
     elif [ ${runtime} = "dotnet" ]; then
-        echo "$(tput bold)apt-get install dotnet-dev-1.0.1$(tput sgr0)"
+        echo "${bold}apt-get install dotnet-dev-1.0.1${regular}"
         sudo apt-get -qq install --yes dotnet-dev-1.0.1
     else
-        echo "$(tput bold)apt-get install nodejs$(tput sgr0)"
+        echo "${bold}apt-get install nodejs${regular}"
         sudo apt-get -qq install --yes nodejs
     fi
 
-    echo "$(tput bold)apt-get install nginx$(tput sgr0)"
+    echo "${bold}apt-get install nginx${regular}"
     sudo apt-get -qq install --yes nginx
 
-    echo "$(tput bold)install nginx.service$(tput sgr0)"
+    echo "${bold}install nginx.service${regular}"
     sudo systemctl stop nginx.service
 cat << EOF >> "${site}.conf"
 server {
@@ -106,12 +111,12 @@ EOF
     sudo systemctl start "nginx.service"
     if [ $(systemctl is-active "nginx.service") != "active" ]; then
         sudo systemctl status "nginx.service" --no-pager --lines=25 --full
-        echo "$(tput bold)$(tput setaf 1)ngnix.service is not active.$(tput sgr0)"
+        echo "${bold}${error}ngnix.service is not active.${regular}"
         return
     fi
 
     if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
-        echo "$(tput bold)install ${site}-cert.service$(tput sgr0)"
+        echo "${bold}install ${site}-cert.service${regular}"
 cat > "${site}-cert.service" << EOF
 [Unit]
 Description=${site}-cert.service
@@ -126,7 +131,7 @@ EOF
         sudo cp "${site}-cert.service" "/etc/systemd/system/${site}-cert.service"
         rm "${site}-cert.service"
 
-        echo "$(tput bold)install ${site}-cert.timer$(tput sgr0)"
+        echo "${bold}install ${site}-cert.timer${regular}"
 cat > "${site}-cert.timer" << EOF
 [Unit]
 Description=${site}-cert.timer
@@ -143,12 +148,12 @@ EOF
         sudo systemctl start "${site}-cert.timer"
         if [ $(systemctl is-active "${site}-cert.timer") != "active" ]; then
             sudo systemctl status "${site}-cert.timer" --no-pager --lines=25 --full
-            echo "$(tput bold)$(tput setaf 1)${site}-cert.timer is not active.$(tput sgr0)"
+            echo "${bold}${error}${site}-cert.timer is not active.${regular}"
             return
         fi
     fi
 
-    echo "$(tput bold)install ${site}.service$(tput sgr0)"
+    echo "${bold}install ${site}.service${regular}"
     if [ ${runtime} = "go" ]; then 
         command="$(pwd)/.vscode/out/go/app"
         environment="GO_ENV=production"
@@ -182,7 +187,7 @@ EOF
     sudo systemctl enable "${site}.service"
     if [ $(systemctl is-enabled "${site}.service") != "enabled" ]; then
         sudo systemctl status "${site}.service" --no-pager --lines=25 --full
-        echo "$(tput bold)$(tput setaf 1)${site}.service is not enabled.$(tput sgr0)"
+        echo "${bold}${error}${site}.service is not enabled.${regular}"
         return
     fi
 
@@ -191,12 +196,12 @@ EOF
 server_uninstall() {
     server_stop
     if [ -f "/etc/systemd/system/${site}-cert.timer" ]; then
-        echo "$(tput bold)uninstall ${site}-cert.timer$(tput sgr0)"
+        echo "${bold}uninstall ${site}-cert.timer${regular}"
         if [ $(systemctl is-active "${site}-cert.timer") = "active" ]; then
             sudo systemctl stop "${site}-cert.timer"
             if [ $(systemctl is-active "${site}-cert.timer") != "inactive" ]; then
                 sudo systemctl status "${site}-cert.timer" --no-pager --lines=25 --full
-                echo "$(tput bold)$(tput setaf 1)${site}-cert.timer is not inactive.$(tput sgr0)"
+                echo "${bold}${error}${site}-cert.timer is not inactive.${regular}"
                 return
             fi
         fi
@@ -204,30 +209,30 @@ server_uninstall() {
             sudo systemctl disable "${site}-cert.timer"
             if [ $(systemctl is-enabled "${site}-cert.timer") != "disabled" ]; then
                 sudo systemctl status "${site}-cert.timer" --no-pager --lines=25 --full
-                echo "$(tput bold)$(tput setaf 1)${site}-cert.timer is not disabled.$(tput sgr0)"
+                echo "${bold}${error}${site}-cert.timer is not disabled.${regular}"
                 return
             fi
         fi
         sudo rm "/etc/systemd/system/${site}-cert.timer"
     fi
     if [ -f "/etc/systemd/system/${site}-cert.service" ]; then
-        echo "$(tput bold)uninstall ${site}-cert.service$(tput sgr0)"
+        echo "${bold}uninstall ${site}-cert.service${regular}"
         sudo rm "/etc/systemd/system/${site}-cert.service"
     fi
     if [ -f "/etc/systemd/system/${site}.service" ]; then
-        echo "$(tput bold)uninstall ${site}.service$(tput sgr0)"
+        echo "${bold}uninstall ${site}.service${regular}"
         if [ $(systemctl is-enabled ${site}.service) = "enabled" ]; then
             sudo systemctl disable "${site}.service"
             if [ $(systemctl is-enabled "${site}.service") != "disabled" ]; then
                 sudo systemctl status "${site}.service" --no-pager --lines=25 --full
-                echo "$(tput bold)$(tput setaf 1)${site}.service is not disabled.$(tput sgr0)"
+                echo "${bold}${error}${site}.service is not disabled.${regular}"
                 return
             fi
         fi
         sudo rm "/etc/systemd/system/${site}.service"
     fi
     if [ -f "/etc/nginx/sites-available/${site}.conf" ]; then
-        echo "$(tput bold)uninstall nginx.service$(tput sgr0)"
+        echo "${bold}uninstall nginx.service${regular}"
         sudo systemctl stop "nginx.service"
         sudo rm "/etc/nginx/sites-enabled/${site}.conf"
         sudo rm "/etc/nginx/sites-available/${site}.conf"
@@ -235,14 +240,14 @@ server_uninstall() {
         sudo systemctl start "nginx.service"
         if [ $(systemctl is-active "nginx.service") != "active" ]; then
             sudo systemctl status ngnix.service --no-pager --lines=25 --full
-            echo "$(tput bold)$(tput setaf 1)ngnix.service is not active.$(tput sgr0)"
+            echo "${bold}${error}ngnix.service is not active.${regular}"
             return
         fi
     fi
 }
 
 server_start() {
-    echo "$(tput bold)start ${site}.service$(tput sgr0)"
+    echo "${bold}start ${site}.service${regular}"
     if [ ${runtime} = "go" ]; then
         go build -o .vscode/out/go/app app.go
         if [ $? -ne 0 ]; then
@@ -251,7 +256,7 @@ server_start() {
     elif [ ${runtime} = "dotnet" ]; then
         dotnet restore && dotnet build
         if [ $? -ne 0 ]; then
-            echo "$(tput bold)$(tput setaf 1)dotnet restore && dotnet build failed.$(tput sgr0)"
+            echo "${bold}${error}dotnet restore && dotnet build failed.${regular}"
             return
         fi
     fi
@@ -259,20 +264,20 @@ server_start() {
     sleep 2
     sudo systemctl status ${site}.service  --no-pager --lines=1000 --full
     if [ $(systemctl is-active "${site}.service") != "active" ]; then
-        echo "$(tput bold)$(tput setaf 1)${site}.service is not active.$(tput sgr0)"
+        echo "${bold}${error}${site}.service is not active.${regular}"
         return
     fi
 }
 
 server_stop() {
     if [ $(systemctl is-active "${site}.service") = "active" ]; then
-        echo "$(tput bold)stop ${site}.service$(tput sgr0)"
+        echo "${bold}stop ${site}.service${regular}"
         sudo systemctl stop "${site}.service"
         if [ $(systemctl is-active "${site}.service") = "active" ]; then
             sudo systemctl stop "${site}.service"
             if [ $(systemctl is-active "${site}.service") != "inactive" ]; then
                 sudo systemctl status "${site}.service" --no-pager --lines=25 --full
-                echo "$(tput bold)$(tput setaf 1)${site}.service is not inactive.$(tput sgr0)"
+                echo "${bold}${error}${site}.service is not inactive.${regular}"
                 return
             fi
         fi
@@ -281,11 +286,11 @@ server_stop() {
 
 server_cert() {
     if [ -z ${domain} ] || [ -z ${email} ]; then
-        echo "$(tput bold)$(tput setaf 1)Update 'domain' and 'email' in $(tput smul)${configuration}$(tput sgr0)."
+        echo "${bold}${error}Update 'domain' and 'email' in ${underline}${configuration}${regular}."
         return
     fi
 
-    echo "$(tput bold)apt-get install letsencrypt$(tput sgr0)"
+    echo "${bold}apt-get install letsencrypt${regular}"
     sudo apt-get -qq update
     sudo apt-get -qq install --yes letsencrypt
 
@@ -294,10 +299,10 @@ server_cert() {
     server_start
 
     if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
-        echo "$(tput bold)renew certificate$(tput sgr0)"
+        echo "${bold}renew certificate${regular}"
         sudo letsencrypt renew
     else
-        echo "$(tput bold)create certificate$(tput sgr0)"
+        echo "${bold}create certificate${regular}"
         mkdir -p .well-known/acme-challenge
         sudo letsencrypt certonly --webroot -w $(pwd) -d ${domain} -d www.${domain} --agree-tos --email ${email}
         rm letsencrypt.log
@@ -307,12 +312,12 @@ server_cert() {
     rm -R ./.well-known
     server_start
 
-    echo "$(tput bold)reload nginx.service$(tput sgr0)"
+    echo "${bold}reload nginx.service${regular}"
     sudo systemctl stop "nginx.service"
     sudo systemctl start "nginx.service"
     if [ $(systemctl is-active "nginx.service") != "active" ]; then
         sudo systemctl status "nginx.service" --no-pager --lines=25 --full
-        echo "$(tput bold)$(tput setaf 1)nginx.service is not active.$(tput sgr0)"
+        echo "${bold}${error}nginx.service is not active.${regular}"
     fi
 }
 
@@ -321,10 +326,10 @@ server_status() {
 }
 
 server_pull() {
-    echo "$(tput bold)git fetch -p$(tput sgr0)"
+    echo "${bold}git fetch -p${regular}"
     git fetch -p
     branch=origin/$(git rev-parse --abbrev-ref HEAD)
-    echo "$(tput bold)git reset --hard ${branch}$(tput sgr0)"
+    echo "${bold}git reset --hard ${branch}${regular}"
     git reset --hard ${branch}
 }
 
@@ -350,7 +355,7 @@ client_start() {
     elif [ ${1:-${runtime}} = "dotnet" ]; then
         dotnet restore > /dev/null && dotnet build > /dev/null
         if [ $? -ne 0 ]; then
-            echo "$(tput bold)$(tput setaf 1)dotnet restore && dotnet build failed.$(tput sgr0)"
+            echo "${bold}${error}dotnet restore && dotnet build failed.${regular}"
             return
         fi
         sleep 1 && git web--browse http://localhost:8080 & ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development} dotnet exec .vscode/out/dotnet/bin/netcoreapp1.1/app.dll
@@ -360,29 +365,29 @@ client_start() {
 }
 
 client_status() {
-    echo "$(tput bold)ssh ${user}@${server} status$(tput sgr0)"
+    echo "${bold}ssh ${user}@${server} status${regular}"
     ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin status"
 }
 
 client_update() {
     client_push
-    echo "$(tput bold)ssh ${user}@${server} update$(tput sgr0)"
+    echo "${bold}ssh ${user}@${server} update${regular}"
     ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin update" # | sed 's/^/    /'
 }
 
 client_push() {
     message=$@
-    echo "$(tput bold)git add -v *$(tput sgr0)"
+    echo "${bold}git add -v *${regular}"
     git add -v *
     if [ -z "${message}" ]; then # if no description is provided amend last commit and push --force
-        echo "$(tput bold)git commit --amend --no-edit$(tput sgr0)"
+        echo "${bold}git commit --amend --no-edit${regular}"
         git commit --amend --no-edit
-        echo "$(tput bold)git push --force$(tput sgr0)"
+        echo "${bold}git push --force${regular}"
         git push --force
     else # if description is provided create new commit and push
-        echo "$(tput bold)git commit -m '${message}'$(tput sgr0)"
+        echo "${bold}git commit -m '${message}'${regular}"
         git commit -m "${message}"
-        echo "$(tput bold)git push$(tput sgr0)"
+        echo "${bold}git push${regular}"
         git push
     fi
 }
@@ -390,14 +395,14 @@ client_push() {
 client_test() {
     output="./.vscode/out/test"
     mkdir -p ${output}
-    echo "$(tput bold)node$(tput sgr0)"
+    echo "${bold}node${regular}"
     NODE_ENV=production node ./app.js & pid=$!
     sleep 0.5
     curl -s http://localhost:8080/ > ${output}/root_node.html
     curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_node.xml
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
-    echo "$(tput bold)go$(tput sgr0)"
+    echo "${bold}go${regular}"
     go build -o .vscode/out/go/app app.go
     GO_ENV=production .vscode/out/go/app & pid=$!
     sleep 0.5
@@ -405,17 +410,17 @@ client_test() {
     curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_go.xml
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
-    echo "$(tput bold)python$(tput sgr0)"
+    echo "${bold}python${regular}"
     PYTHON_ENV=production python ./app.py & pid=$!
     sleep 0.5
     curl -s http://localhost:8080/ > ${output}/root_python.html
     curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_python.xml
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
-    echo "$(tput bold)dotnet$(tput sgr0)"
+    echo "${bold}dotnet${regular}"
     dotnet restore > /dev/null && dotnet build > /dev/null
     if [ $? -ne 0 ]; then
-        echo "$(tput bold)$(tput setaf 1)dotnet restore && dotnet build failed.$(tput sgr0)"
+        echo "${bold}${error}dotnet restore && dotnet build failed.${regular}"
         return
     fi
     ASPNETCORE_ENVIRONMENT=Production dotnet exec .vscode/out/dotnet/bin/netcoreapp1.1/app.dll & pid=$!
@@ -424,7 +429,7 @@ client_test() {
     curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_dotnet.xml
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
-    echo "$(tput bold)compare$(tput sgr0)"
+    echo "${bold}compare${regular}"
     cmp ${output}/root_node.html ${output}/root_go.html
     cmp ${output}/root_node.html ${output}/root_python.html
     cmp ${output}/root_node.html ${output}/root_dotnet.html
@@ -440,7 +445,7 @@ client_console() {
 description() {
     echo
     echo "  This script automates common tasks to run this website."
-    echo "  It can be configured via $(tput smul)${configuration}$(tput sgr0) and provides two sets of commmands,"
+    echo "  It can be configured via ${underline}${configuration}${regular} and provides two sets of commmands,"
     echo "  one for local development and another for running the website on an"
     echo "  actual Linux server. Your computer is considered a server if the "
     echo "  script is located at /var/www/\${site}/."
@@ -462,16 +467,16 @@ server() {
         "test") server_test;;
         *)
             description;
-            echo "Usage: $(tput bold)$(basename "$0")$(tput sgr0) <server-command>"
+            echo "Usage: ${bold}$(basename "$0")${regular} <server-command>"
             echo
-            echo "    $(tput bold)install$(tput sgr0)    Install NGINX and $(tput bold)${site}.service$(tput sgr0)"
-            echo "    $(tput bold)start$(tput sgr0)      Start service"
-            echo "    $(tput bold)status$(tput sgr0)     Print current service status"
-            echo "    $(tput bold)update$(tput sgr0)     Run stop, pull, start and status"
-            echo "    $(tput bold)cert$(tput sgr0)       Create or renew SSL certificate"
-            echo "    $(tput bold)pull$(tput sgr0)       Fetch Git repo and reset master branch"
-            echo "    $(tput bold)stop$(tput sgr0)       Stop service"
-            echo "    $(tput bold)uninstall$(tput sgr0)  Stop and uninstall service"
+            echo "    ${bold}install${regular}    Install NGINX and ${bold}${site}.service${regular}"
+            echo "    ${bold}start${regular}      Start service"
+            echo "    ${bold}status${regular}     Print current service status"
+            echo "    ${bold}update${regular}     Run stop, pull, start and status"
+            echo "    ${bold}cert${regular}       Create or renew SSL certificate"
+            echo "    ${bold}pull${regular}       Fetch Git repo and reset master branch"
+            echo "    ${bold}stop${regular}       Stop service"
+            echo "    ${bold}uninstall${regular}  Stop and uninstall service"
             echo;
         ;;
     esac
@@ -489,13 +494,13 @@ client() {
         "test") client_test;;
         *)
             description;
-            echo "Usage: $(tput bold)$(basename "$0")$(tput sgr0) <client-command>"
+            echo "Usage: ${bold}$(basename "$0")${regular} <client-command>"
             echo
-            echo "    $(tput bold)start$(tput sgr0)      Start web server locally and open web browser"
-            echo "    $(tput bold)push$(tput sgr0)       Amend last commit or add new commit, then push changes"
-            echo "    $(tput bold)update$(tput sgr0)     Run push command and update server"
-            echo "    $(tput bold)status$(tput sgr0)     Show server log"
-            echo "    $(tput bold)console$(tput sgr0)    Connect via SSH to server"
+            echo "    ${bold}start${regular}      Start web server locally and open web browser"
+            echo "    ${bold}push${regular}       Amend last commit or add new commit, then push changes"
+            echo "    ${bold}update${regular}     Run push command and update server"
+            echo "    ${bold}status${regular}     Show server log"
+            echo "    ${bold}console${regular}    Connect via SSH to server"
             echo;
         ;;
     esac
