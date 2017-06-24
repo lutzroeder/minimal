@@ -102,17 +102,16 @@ class Program
         return template;
     }
 
-    static string FormatDate(DateTime date)
+    static string FormatDate(DateTime date, string format)
     {
-        return date.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
-    }
-
-    static string FormatUserDate(string text)
-    {
-        DateTime dateTime;
-        if (DateTime.TryParse(text, out dateTime))
+        switch (format)
         {
-            return dateTime.ToString("MMM d, yyyy");
+            case "atom": 
+                return date.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
+            case "rss": 
+                return date.ToUniversalTime().ToString("ddd, dd MMM yyyy HH:mm:ss") + " +0000";
+            case "user": 
+                return date.ToString("MMM d, yyyy");
         }
         return string.Empty;
     }
@@ -301,7 +300,7 @@ class Program
         {
             var data = File.ReadAllText(file);
             var lines = new Queue<string>(new Regex("\\r\\n?|\\n").Split(data));
-            var entry = new Dictionary<string, object>();
+            var item = new Dictionary<string, object>();
             var content = new List<string>();
             int metadata = -1;
             while (lines.Count > 0)
@@ -318,7 +317,7 @@ class Program
                     {
                         var name = line.Substring(0, index).Trim();
                         var value = line.Substring(index + 1).TrimStart(' ', '"').TrimEnd(' ', '"');
-                        entry[name] = value;
+                        item[name] = value;
                     }
                 }
                 else
@@ -326,8 +325,8 @@ class Program
                     content.Add(line);
                 }
             }
-            entry["content"] = string.Join("\n", content);
-            return entry;
+            item["content"] = string.Join("\n", content);
+            return item;
         }
         return null;
     }
@@ -345,27 +344,31 @@ class Program
 
     static string RenderBlog(Queue<string> files, int start)
     {
-        var entries = new List<object>();
-        var view = new Dictionary<string, object>() { ["entries"] = entries };
+        var items = new List<object>();
+        var view = new Dictionary<string, object>() { ["items"] = items };
         int length = 10;
         int index = 0;
         while (files.Count > 0 && index < (start + length))
         {
             string file = files.Dequeue();
-            var entry = LoadPost("blog/" + file);
-            if (entry != null && (((string)entry["state"]) == "post" || !environment.IsProduction()))
+            var item = LoadPost("blog/" + file);
+            if (item != null && (((string)item["state"]) == "post" || !environment.IsProduction()))
             {
                 if (index >= start)
                 {
-                    entry["url"] = "/blog/" + Path.GetFileNameWithoutExtension(file);
-                    entry["date"] = FormatUserDate((string) entry["date"]);
+                    item["url"] = "/blog/" + Path.GetFileNameWithoutExtension(file);
+                    DateTime date;
+                    if (item.ContainsKey("date") && DateTime.TryParse(item["date"] as string, out date))
+                    {
+                        item["date"] = FormatDate(date, "user");
+                    }
                     var post = new List<string>();
-                    var content = (string) entry["content"];
+                    var content = (string) item["content"];
                     content = new Regex("\\s\\s").Replace(content, " ");
                     var truncated = Truncate(content, 250);
-                    entry["content"] = truncated;
-                    entry["more"] = truncated != content;
-                    entries.Add(entry);
+                    item["content"] = truncated;
+                    item["more"] = truncated != content;
+                    items.Add(item);
                 }
                 index++;
             }
@@ -378,6 +381,61 @@ class Program
         }
         var template = File.ReadAllText("stream.html");
         return Mustache(template, view, null);
+    }
+
+    static string RenderFeed(string format, string host) 
+    {
+        var url = host + "/" + format + ".xml";
+        return CacheString(format + ":" + url, delegate() {
+            var count = 10;
+            var items = new List<object>();
+            var feed = new Dictionary<string, object>() {
+                ["name"] = configuration["name"],
+                ["description"] = configuration["description"],
+                ["author"] = configuration["name"],
+                ["host"] = host,
+                ["url"] = url,
+                ["items"] = items
+            };
+            var files = Posts();
+            var recentFound = false;
+            var recent = DateTime.Now;
+            while (files.Count > 0 && count > 0) 
+            {
+                string file = files.Dequeue();
+                var item = LoadPost("blog/" + file);
+                if (item != null && (((string)item["state"]) == "post" || !environment.IsProduction()))
+                {
+                    item["url"] = host + "/blog/" + Path.GetFileNameWithoutExtension(file);
+                    if (!item.ContainsKey("author") || item["author"] == configuration["name"]) 
+                    {
+                        item["author"] = false;
+                    }
+                    DateTime date;
+                    if (item.ContainsKey("date") && DateTime.TryParse(item["date"] as string, out date))
+                    {
+                        DateTime updated;
+                        if (!item.ContainsKey("updated") || !DateTime.TryParse(item["updated"] as string, out updated))
+                        {
+                            updated = date;
+                        }
+                        item["date"] = FormatDate(date, format);
+                        item["updated"] = FormatDate(updated, format);
+                        if (!recentFound || recent.CompareTo(updated) < 0)
+                        {
+                            recent = updated;
+                            recentFound = true;
+                        }
+                    }
+                    item["content"] = EscapeHtml(Truncate((string)item["content"], 10000));
+                    items.Add(item);
+                    count--;
+                }
+            }
+            feed["updated"] = FormatDate(recent, format);
+            var template = File.ReadAllText(format + ".xml");
+            return Mustache(template, feed, null);
+        });
     }
 
     static Task WriteStringAsync(HttpContext context, string contentType, string data)
@@ -400,50 +458,15 @@ class Program
     static Task AtomHandler(HttpContext context)
     {
         var host = context.Request.Scheme + "://" + context.Request.Host;
-        var url = host + "/blog/atom.xml";
-        var data = CacheString("atom:" + url, delegate() {
-            var count = 10;
-            var entries = new List<object>();
-            var feed = new Dictionary<string, object>() {
-                ["name"] = configuration["name"],
-                ["author"] = configuration["name"],
-                ["host"] = host,
-                ["url"] = url,
-                ["entries"] = entries
-            };
-            var files = Posts();
-            while (files.Count > 0 && count > 0) 
-            {
-                string file = files.Dequeue();
-                var entry = LoadPost("blog/" + file);
-                if (entry != null && (((string)entry["state"]) == "post" || !environment.IsProduction()))
-                {
-                    entry["url"] = host + "/blog/" + Path.GetFileNameWithoutExtension(file);
-                    if (!entry.ContainsKey("author") || entry["author"] == configuration["name"]) 
-                    {
-                        entry["author"] = false;
-                    }
-                    var date = FormatDate(DateTime.Parse((string) entry["date"]));
-                    var updated = entry.ContainsKey("updated") ? FormatDate(DateTime.Parse((string)entry["updated"])) : date;
-                    entry["date"] = date;
-                    entry["updated"] = updated;
-                    if (!feed.ContainsKey("updated") || (feed["updated"] as string).CompareTo(updated) < 0)
-                    {
-                        feed["updated"] = updated;
-                    }
-                    entry["content"] = EscapeHtml(Truncate((string)entry["content"], 10000));
-                    entries.Add(entry);
-                    count--;
-                }
-            }
-            if (!feed.ContainsKey("updated"))
-            {
-                feed["updated"] = FormatDate(DateTime.Now);
-            }
-            var template = File.ReadAllText("atom.xml");
-            return Mustache(template, feed, null);
-        });
+        var data = RenderFeed("atom", host);
         return WriteStringAsync(context, "application/atom+xml", data);
+    }
+
+    static Task RssHandler(HttpContext context)
+    {
+        var host = context.Request.Scheme + "://" + context.Request.Host;
+        var data = RenderFeed("rss", host);
+        return WriteStringAsync(context, "application/rss+xml", data);
     }
 
     static Dictionary<string,string> mimeTypeMap = new Dictionary<string,string>() {
@@ -462,15 +485,20 @@ class Program
         var pathname = context.Request.Path.Value;
         var file = pathname.TrimStart('/');
         string data = CacheString("post:" + file, delegate() {
-            var entry = LoadPost(file + ".html");
-            if (entry != null)
+            var item = LoadPost(file + ".html");
+            if (item != null)
             {
-                entry["date"] = FormatUserDate((string)entry["date"]);
-                if (!entry.ContainsKey("author"))
+                item["date"] = string.Empty;
+                DateTime date;
+                if (item.ContainsKey("date") && DateTime.TryParse(item["date"] as string, out date))
                 {
-                    entry["author"] = (string) configuration["name"];
+                    item["date"] = FormatDate(date, "user");
                 }
-                var view = Merge(configuration, entry);
+                if (!item.ContainsKey("author"))
+                {
+                    item["author"] = (string) configuration["name"];
+                }
+                var view = Merge(configuration, item);
                 var template = File.ReadAllText("post.html");
                 return Mustache(template, view, (name) => File.ReadAllText(name));
             }
@@ -566,7 +594,7 @@ class Program
             var view = Merge(configuration);
             view["feed"] = (Func<string>) delegate() {
                 string feed = (string) configuration["feed"];
-                return (!string.IsNullOrEmpty(feed)) ? feed : context.Request.Scheme + "://" + context.Request.Host + "/blog/atom.xml";
+                return (!string.IsNullOrEmpty(feed)) ? feed : context.Request.Scheme + "://" + context.Request.Host + "/atom.xml";
             };
             view["blog"] = (Func<string>) (() => RenderBlog(Posts(), 0));
             return Mustache(template, view, (name) => File.ReadAllText(name));
@@ -675,14 +703,14 @@ class Program
         router.Get("/.vscode/?*", RootHandler);
         router.Get("/admin*", RootHandler);
         router.Get("/app.*", RootHandler);
-        router.Get("/atom.xml", RootHandler);
+        router.Get("/atom.xml", AtomHandler);
         router.Get("/header.html", RootHandler);
         router.Get("/meta.html", RootHandler);
         router.Get("/package.json", RootHandler);
         router.Get("/post.html", RootHandler);
         router.Get("/post.css", RootHandler);
+        router.Get("/rss.xml", RssHandler);
         router.Get("/site.css", RootHandler);
-        router.Get("/blog/atom.xml", AtomHandler);
         router.Get("/blog/*", PostHandler);
         router.Get("/blog", BlogHandler);
         router.Get("/.well-known/acme-challenge/*", CertHandler);

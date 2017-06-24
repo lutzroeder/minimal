@@ -66,14 +66,17 @@ function redirect(response, status, location) {
     response.end();
 }
 
-function formatDate(date) {
-    return date.toISOString().replace(/\.[0-9]*Z/, "Z");
-}
-
-function formatUserDate(text) {
-    var date = new Date(text.split(/ \+| \-/)[0] + "Z");
-    var months = [ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" ];
-    return months[date.getMonth()] + " " + date.getDate() + ", " + date.getFullYear();
+function formatDate(date, format) {
+    switch (format) {
+        case "atom":
+            return date.toISOString().replace(/\.[0-9]*Z/, "Z");
+        case "rss":
+            return date.toUTCString().replace(" GMT", " +0000");
+        case "user":
+            var months = [ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" ];
+            return months[date.getMonth()] + " " + date.getDate() + ", " + date.getFullYear();
+    }
+    return "";
 }
 
 var cacheData = {};
@@ -212,7 +215,7 @@ function loadPost(file) {
     if (exists(file) && !isDirectory(file)) {
         var data = fs.readFileSync(file, "utf-8");
         if (data) {
-            var entry = {};
+            var item = {};
             var content = [];
             var metadata = -1;
             var lines = data.split(/\r\n?|\n/g);
@@ -229,37 +232,40 @@ function loadPost(file) {
                         if (value.startsWith('"') && value.endsWith('"')) {
                             value = value.slice(1, -1);
                         }
-                        entry[name] = value;
+                        item[name] = value;
                     }
                 }
                 else {
                     content.push(line);
                 }
             }
-            entry["content"] = content.join("\n");
-            return entry;
+            item["content"] = content.join("\n");
+            return item;
         }
     }
     return null;
 }
 
 function renderBlog(files, start) {
-    var view = { "entries": [] }
+    var view = { "items": [] }
     var length = 10;
     var index = 0;
     while (files.length > 0 && index < (start + length)) {
         var file = files.shift();
-        var entry = loadPost("blog/" + file);
-        if (entry && (entry["state"] === "post" || environment !== "production")) {
+        var item = loadPost("blog/" + file);
+        if (item && (item["state"] === "post" || environment !== "production")) {
             if (index >= start) {
-                entry["url"] = "/blog/" + path.basename(file, ".html");
-                entry["date"] = formatUserDate(entry["date"]);
-                var content = entry["content"];
+                item["url"] = "/blog/" + path.basename(file, ".html");
+                if ("date" in item) {
+                    var date = new Date(item["date"].split(/ \+| \-/)[0] + "Z");
+                    item["date"] = formatDate(date, "user");
+                }
+                var content = item["content"];
                 content = content.replace(/\s\s/g, " ");
                 var truncated = truncate(content, 250);
-                entry["content"] = truncated;
-                entry["more"] = truncated != content;
-                view["entries"].push(entry);
+                item["content"] = truncated;
+                item["more"] = truncated != content;
+                view["items"].push(item);
             }
             index++;
         }
@@ -270,6 +276,53 @@ function renderBlog(files, start) {
     }
     var template = fs.readFileSync("stream.html", "utf-8");
     return mustache(template, view, null);
+}
+
+function renderFeed(format, host) {
+    var url = host + "/" + format + ".xml";
+    return cache(format + ":" + url, function () {
+        var count = 10;
+        var feed = {
+            "name": configuration["name"],
+            "description": configuration["description"],
+            "author": configuration["name"],
+            "host": host,
+            "url": url,
+            "items": [] 
+        };
+        var files = posts();
+        var recentFound = false;
+        var recent = new Date();
+        while (files.length > 0 && count > 0) {
+            var file = files.shift();
+            var item = loadPost("blog/" + file);
+            if (item && (item["state"] === "post" || environment !== "production")) {
+                item["url"] = host + "/blog/" + path.basename(file, ".html"); 
+                if (!item["author"] || item["author"] === configuration["name"]) {
+                    item["author"] = false;
+                }
+                if ("date" in item) {
+                    var date = new Date(item["date"]);
+                    var updated = date;
+                    if ("updated" in item) {
+                        updated = new Date(item["updated"]);
+                    }
+                    item["date"] = formatDate(date, format);
+                    item["updated"] = formatDate(updated, format);
+                    if (!recentFound || recent < updated) {
+                        recent = updated;
+                        recentFound = true;
+                    }
+                }
+                item["content"] = escapeHtml(truncate(item["content"], 10000));
+                feed["items"].push(item);
+                count--;
+            }
+        }
+        feed["updated"] = formatDate(recent, format);
+        var template = fs.readFileSync(format + ".xml", "utf-8");
+        return mustache(template, feed, null);
+    });
 }
 
 function writeString(request, response, contentType, data) {
@@ -289,42 +342,14 @@ function rootHandler(request, response) {
 
 function atomHandler(request, response) {
     var host = scheme(request) + "://" + request.headers.host;
-    var url = host + "/blog/atom.xml";
-    var data = cache("atom:" + url, function () {
-        var count = 10;
-        var feed = {
-            "name": configuration["name"],
-            "author": configuration["name"],
-            "host": host,
-            "url": url,
-            "entries": [] 
-        };
-        var files = posts();
-        while (files.length > 0 && count > 0) {
-            var file = files.shift();
-            var entry = loadPost("blog/" + file);
-            if (entry && (entry["state"] === "post" || environment !== "production")) {
-                entry["url"] = host + "/blog/" + path.basename(file, ".html"); 
-                if (!entry["author"] || entry["author"] === configuration["name"]) {
-                    entry["author"] = false;
-                }
-                entry["date"] = formatDate(new Date(entry["date"]));
-                entry["updated"] = entry["updated"] ? formatDate(new Date(entry["updated"])) : entry["date"];
-                if (!feed["updated"] || feed["updated"] < entry["updated"]) {
-                    feed["updated"] = entry["updated"];
-                }
-                entry["content"] = escapeHtml(truncate(entry["content"], 10000));
-                feed["entries"].push(entry);
-                count--;
-            }
-        }
-        if (!feed["updated"]) {
-            feed["updated"] = formatDate(new Date());
-        }
-        var template = fs.readFileSync("atom.xml", "utf-8");
-        return mustache(template, feed, null);
-    });
+    var data = renderFeed("atom", host);
     writeString(request, response, "application/atom+xml", data);
+}
+
+function rssHandler(request, response) {
+    var host = scheme(request) + "://" + request.headers.host;
+    var data = renderFeed("rss", host);
+    writeString(request, response, "application/rss+xml", data);
 }
 
 var mimeTypeMap = {
@@ -342,11 +367,14 @@ function postHandler(request, response) {
     var pathname = url.parse(request.url, true).pathname;
     var file = pathname.replace(/^\/?/, "");
     var data = cache("post:" + file, function() {
-        var entry = loadPost(file + ".html");
-        if (entry) {
-            entry["date"] = formatUserDate(entry["date"]);
-            entry["author"] = entry["author"] || configuration["name"];
-            var view = merge(configuration, entry);
+        var item = loadPost(file + ".html");
+        if (item) {
+            if ("date" in item) {
+                var date = new Date(item["date"].split(/ \+| \-/)[0] + "Z");
+                item["date"] = formatDate(date, "user");
+            }
+            item["author"] = item["author"] || configuration["name"];
+            var view = merge(configuration, item);
             var template = fs.readFileSync("post.html", "utf-8");
             return mustache(template, view, function(name) {
                 return fs.readFileSync(name, "utf-8");
@@ -450,7 +478,7 @@ function defaultHandler(request, response) {
             if (configuration["feed"] && configuration["feed"].length > 0) {
                 return configuration["feed"];
             }
-            return scheme(request) + "://" + request.headers.host + "/blog/atom.xml";
+            return scheme(request) + "://" + request.headers.host + "/atom.xml";
         };
         view["blog"] = function() {
             return renderBlog(posts(), 0);
@@ -526,14 +554,14 @@ router.get("/.git/?*", rootHandler)
 router.get("/.vscode/?*", rootHandler);
 router.get("/admin*", rootHandler);
 router.get("/app.*", rootHandler);
-router.get("/atom.xml", rootHandler);
+router.get("/atom.xml", atomHandler);
 router.get("/header.html", rootHandler);
 router.get("/meta.html", rootHandler);
 router.get("/package.json", rootHandler);
 router.get("/post.html", rootHandler);
 router.get("/post.css", rootHandler);
+router.get("/rss.xml", rssHandler)
 router.get("/site.css", rootHandler);
-router.get("/blog/atom.xml", atomHandler);
 router.get("/blog/*", postHandler);
 router.get("/blog", blogHandler);
 router.get("/.well-known/acme-challenge/*", certHandler);

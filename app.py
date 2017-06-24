@@ -93,12 +93,14 @@ def redirect(request, status, location):
     request.send_header("Location", location)
     request.end_headers()
 
-def format_date(date):
-    return date.astimezone(dateutil.tz.gettz("UTC")).isoformat("T").split("+")[0] + "Z"
-
-def format_user_date(text):
-    date = dateutil.parser.parse(text)
-    return date.strftime("%b %d, %Y").replace(" 0", " ")
+def format_date(date, format):
+    if format == "atom":
+        return date.astimezone(dateutil.tz.gettz("UTC")).isoformat("T").split("+")[0] + "Z"
+    if format == "rss":
+        return date.astimezone(dateutil.tz.gettz("UTC")).strftime("%a, %d %b %Y %H:%M:%S %z")
+    if format == "user":
+        return date.strftime("%b %d, %Y").replace(" 0", " ")
+    return ""
 
 cache_data = {}
 
@@ -206,7 +208,7 @@ def truncate(text, length):
 def load_post(path):
     if exists(path) and not isdir(path):
         data = read_file(path)
-        entry = {}
+        item = {}
         content = []
         metadata = -1
         lines = re.split(r"\r\n?|\n", data)
@@ -221,31 +223,32 @@ def load_post(path):
                     value = line[index+1:].strip()
                     if value.startswith('"') and value.endswith('"'):
                         value = value[1:-1]
-                    entry[name] = value
+                    item[name] = value
             else:
                 content.append(line)
-        entry["content"] = "\n".join(content)
-        return entry
+        item["content"] = "\n".join(content)
+        return item
     return None
 
 def render_blog(files, start):
-    view = { "entries": [] }
+    view = { "items": [] }
     length = 10
     index = 0
     while len(files) > 0 and index < start + length:
         filename = files.pop(0)
-        entry = load_post("blog/" + filename)
-        if entry and (entry["state"] == "post" or environment != "production"):
+        item = load_post("blog/" + filename)
+        if item and (item["state"] == "post" or environment != "production"):
             if index >= start:
-                entry["url"] = "/blog/" + os.path.splitext(filename)[0]
-                if "date" in entry:
-                    entry["date"] = format_user_date(entry["date"])
-                content = entry["content"]
+                item["url"] = "/blog/" + os.path.splitext(filename)[0]
+                if "date" in item:
+                    date = dateutil.parser.parse(item["date"])
+                    item["date"] = format_date(date, "user")
+                content = item["content"]
                 content = re.sub(r"\s\s", " ", content)
                 truncated = truncate(content, 250)
-                entry["content"] = truncated
-                entry["more"] = truncated != content
-                view["entries"].append(entry)
+                item["content"] = truncated
+                item["more"] = truncated != content
+                view["items"].append(item)
             index += 1
     view["placeholder"] = []
     if len(files) > 0:
@@ -262,50 +265,72 @@ def write_string(request, content_type, data):
     if request.command != "HEAD":
         request.wfile.write(encoded)
 
-def atom_handler(request):
-    host = scheme(request) + "://" + request.headers.get("host")
-    url = host + "/blog/atom.xml"
+def render_feed(format, host):
+    url = host + "/" + format + ".xml"
     def render_feed():
         count = 10
         feed = {
             "name": configuration["name"],
+            "description": configuration["description"],
             "author": configuration["name"],
             "host": host,
             "url": url,
-            "entries": [] 
+            "items": [] 
         }
+        recent_found = False
+        recent = datetime.datetime.now()
         files = posts()
         while len(files) > 0 and count > 0:
             filename = files.pop(0)
-            entry = load_post("blog/" + filename)
-            if entry and (entry["state"] == "post" or environment != "production"):
-                entry["url"] = host + "/blog/" + os.path.splitext(filename)[0]
-                if not "author" in entry or entry["author"] == configuration["name"]:
-                    entry["author"] = False
-                entry["date"] = format_date(dateutil.parser.parse(entry["date"]))
-                entry["updated"] = format_date(dateutil.parser.parse(entry["updated"])) if "updated" in entry else entry["date"];
-                if not "updated" in feed or feed["updated"] < entry["updated"]:
-                    feed["updated"] = entry["updated"]
-                entry["content"] = escape_html(truncate(entry["content"], 10000));
-                feed["entries"].append(entry)
+            item = load_post("blog/" + filename)
+            if item and (item["state"] == "post" or environment != "production"):
+                item["url"] = host + "/blog/" + os.path.splitext(filename)[0]
+                if not "author" in item or item["author"] == configuration["name"]:
+                    item["author"] = False
+                if "date" in item:
+                    date = dateutil.parser.parse(item["date"])
+                    updated = date
+                    if "updated" in item:
+                        updated = dateutil.parser.parse(item["updated"])
+                    item["date"] = format_date(date, format)
+                    item["updated"] = format_date(updated, format)
+                    if not recent_found or recent < updated:
+                        recent = updated
+                        recent_found = True
+                item["content"] = escape_html(truncate(item["content"], 10000));
+                feed["items"].append(item)
                 count -= 1
-        if not "updated" in feed:
-            feed["updated"] = format_date(datetime.datetime.now())
-        template = read_file("./atom.xml")
+        feed["updated"] = format_date(recent, format)
+        template = read_file("./" + format + ".xml")
         return mustache(template, feed, None)
-    data = cache("atom:" + url, render_feed)
+    return cache(format + ":" + url, render_feed)
+
+def root_handler(request):
+    request.send_response(301)
+    request.send_header("Location", "/")
+    request.end_headers()
+
+def atom_handler(request):
+    host = scheme(request) + "://" + request.headers.get("host")
+    data = render_feed("atom", host)
     write_string(request, "application/atom+xml", data)
+
+def rss_handler(request):
+    host = scheme(request) + "://" + request.headers.get("host")
+    data = render_feed("rss", host)
+    write_string(request, "application/rss+xml", data)
 
 def post_handler(request):
     filename = urlparse(request.path).path.lstrip("/")
     def render_post():
-        entry = load_post(filename + ".html")
-        if entry:
-            if not "author" in entry:
-                entry["author"] = configuration["name"]
-            if "date" in entry:
-                entry["date"] = format_user_date(entry["date"])
-            view = merge([ configuration, entry ])
+        item = load_post(filename + ".html")
+        if item:
+            if not "author" in item:
+                item["author"] = configuration["name"]
+            if "date" in item:
+                date = dateutil.parser.parse(text)
+                item["date"] = format_date(date, "user")
+            view = merge([ configuration, item ])
             template = read_file("./post.html")
             return mustache(template, view, lambda name: read_file(name))
         return ""
@@ -379,16 +404,11 @@ def default_handler(request):
         view = merge([ configuration ])
         view["feed"] = lambda: configuration["feed"] if \
             ("feed" in configuration and len(configuration["feed"]) > 0) else \
-            scheme(request) + "://" + request.headers.get("host") + "/blog/atom.xml"
+            scheme(request) + "://" + request.headers.get("host") + "/atom.xml"
         view["blog"] = lambda: render_blog(posts(), 0)
         return mustache(template, view, lambda name: read_file(name))
     data = cache("default:" + filename, content)
     write_string(request, "text/html", data)
-
-def root_handler(request):
-    request.send_response(301)
-    request.send_header("Location", "/")
-    request.end_headers()
 
 class Router(object):
     def __init__(self, configuration):
@@ -445,14 +465,14 @@ router.get("/.git/?*", root_handler)
 router.get("/.vscode/?*", root_handler)
 router.get("/admin*", root_handler)
 router.get("/app.*", root_handler)
-router.get("/atom.xml", root_handler)
+router.get("/atom.xml", atom_handler)
 router.get("/header.html", root_handler)
 router.get("/meta.html", root_handler)
 router.get("/package.json", root_handler)
 router.get("/post.html", root_handler)
 router.get("/post.css", root_handler)
+router.get("/rss.xml", rss_handler)
 router.get("/site.css", root_handler)
-router.get("/blog/atom.xml", atom_handler)
 router.get("/blog/*", post_handler)
 router.get("/blog", blog_handler)
 router.get("/.well-known/acme-challenge/*", cert_handler)

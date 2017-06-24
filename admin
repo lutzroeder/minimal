@@ -403,7 +403,8 @@ client_test() {
     NODE_ENV=production node ./app.js & pid=$!
     sleep 0.5
     curl -s http://localhost:8080/ > ${output}/root_node.html
-    curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_node.xml
+    curl -s http://localhost:8080/atom.xml > ${output}/atom_node.xml
+    curl -s http://localhost:8080/rss.xml > ${output}/rss_node.xml
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
     echo "${bold}go${regular}"
@@ -411,14 +412,16 @@ client_test() {
     GO_ENV=production .vscode/out/go/app & pid=$!
     sleep 0.5
     curl -s http://localhost:8080/ > ${output}/root_go.html
-    curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_go.xml
+    curl -s http://localhost:8080/atom.xml > ${output}/atom_go.xml
+    curl -s http://localhost:8080/rss.xml > ${output}/rss_go.xml
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
     echo "${bold}python${regular}"
     PYTHON_ENV=production python ./app.py & pid=$!
     sleep 0.5
     curl -s http://localhost:8080/ > ${output}/root_python.html
-    curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_python.xml
+    curl -s http://localhost:8080/atom.xml > ${output}/atom_python.xml
+    curl -s http://localhost:8080/rss.xml > ${output}/rss_python.xml
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
     echo "${bold}dotnet${regular}"
@@ -428,9 +431,10 @@ client_test() {
         return
     fi
     ASPNETCORE_ENVIRONMENT=Production dotnet exec .vscode/out/dotnet/bin/netcoreapp1.1/app.dll & pid=$!
-    sleep 0.5
+    sleep 1
     curl -s http://localhost:8080/ > ${output}/root_dotnet.html
-    curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_dotnet.xml
+    curl -s http://localhost:8080/atom.xml > ${output}/atom_dotnet.xml
+    curl -s http://localhost:8080/rss.xml > ${output}/rss_dotnet.xml
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
     echo "${bold}compare${regular}"
@@ -440,6 +444,9 @@ client_test() {
     cmp ${output}/atom_node.xml ${output}/atom_go.xml
     cmp ${output}/atom_node.xml ${output}/atom_python.xml
     cmp ${output}/atom_node.xml ${output}/atom_dotnet.xml
+    cmp ${output}/rss_node.xml ${output}/rss_go.xml
+    cmp ${output}/rss_node.xml ${output}/rss_python.xml
+    cmp ${output}/rss_node.xml ${output}/rss_dotnet.xml
 }
 
 client_console() {

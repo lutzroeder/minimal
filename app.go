@@ -116,12 +116,13 @@ func scheme(request *http.Request) string {
 	return "http"
 }
 
-func formatDate(date time.Time) string {
-	return date.UTC().Format("2006-01-02T15:04:05Z")
-}
-
-func formatUserDate(text string) string {
-	if date, e := time.Parse("2006-01-02 15:04:05 -07:00", text); e == nil {
+func formatDate(date time.Time, format string) string {
+	switch format {
+	case "atom":
+		return date.UTC().Format("2006-01-02T15:04:05Z")
+	case "rss":
+		return date.UTC().Format("Mon, 02 Jan 2006 15:04:05 +0000")
+	case "user":
 		return date.Format("Jan 2, 2006")
 	}
 	return ""
@@ -315,7 +316,7 @@ func loadPost(path string) map[string]interface{} {
 		if err != nil {
 			fmt.Println(err)
 		} else {
-			entry := make(map[string]interface{})
+			item := make(map[string]interface{})
 			content := []string{}
 			metadata := -1
 			lines := regexp.MustCompile("\\r\\n?|\\n").Split(string(data), -1)
@@ -329,45 +330,47 @@ func loadPost(path string) map[string]interface{} {
 					if index >= 0 {
 						name := strings.Trim(strings.Trim(line[0:index], " "), "\"")
 						value := strings.Trim(strings.Trim(line[index+1:], " "), "\"")
-						entry[name] = value
+						item[name] = value
 					}
 				} else {
 					content = append(content, line)
 				}
 			}
-			entry["content"] = strings.Join(content, "\n")
-			return entry
+			item["content"] = strings.Join(content, "\n")
+			return item
 		}
 	}
 	return nil
 }
 
 func renderBlog(files []string, start int) string {
-	entries := make([]interface{}, 0)
+	items := make([]interface{}, 0)
 	view := make(map[string]interface{})
 	length := 10
 	index := 0
 	for len(files) > 0 && index < start+length {
 		file := files[0]
 		files = files[1:]
-		entry := loadPost("blog/" + file)
-		if entry != nil && (entry["state"] == "post" || environment != "production") {
+		item := loadPost("blog/" + file)
+		if item != nil && (item["state"] == "post" || environment != "production") {
 			if index >= start {
-				entry["url"] = "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
-				if date, ok := entry["date"]; ok {
-					entry["date"] = formatUserDate(date.(string))
+				item["url"] = "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
+				if _, ok := item["date"]; ok {
+					if date, e := time.Parse("2006-01-02 15:04:05 -07:00", item["date"].(string)); e == nil {
+						item["date"] = formatDate(date, "user")
+					}
 				}
-				content := entry["content"].(string)
+				content := item["content"].(string)
 				content = regexp.MustCompile("\\s\\s").ReplaceAllString(content, " ")
 				truncated := truncate(content, 250)
-				entry["content"] = truncated
-				entry["more"] = truncated != content
-				entries = append(entries, entry)
+				item["content"] = truncated
+				item["more"] = truncated != content
+				items = append(items, item)
 			}
 			index++
 		}
 	}
-	view["entries"] = entries
+	view["items"] = items
 	placeholder := make([]interface{}, 0)
 	if len(files) > 0 {
 		placeholder = append(placeholder, map[string]interface{}{"url": "/blog?id=" + strconv.Itoa(index)})
@@ -379,6 +382,63 @@ func renderBlog(files []string, start int) string {
 		return ""
 	}
 	return mustache(string(template), view, nil)
+}
+
+func renderFeed(format string, host string) string {
+	url := host + "/" + format + ".xml"
+	return cacheString(format+":"+url, func() string {
+		count := 10
+		items := make([]interface{}, 0)
+		feed := map[string]interface{}{
+			"name":        configuration["name"],
+			"description": configuration["description"],
+			"author":      configuration["name"],
+			"host":        host,
+			"url":         url,
+		}
+		recentFound := false
+		recent := time.Now()
+		files := posts()
+		for len(files) > 0 && count > 0 {
+			file := files[0]
+			files = files[1:]
+			item := loadPost("blog/" + file)
+			if item != nil && (item["state"] == "post" || environment != "production") {
+				item["url"] = host + "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
+				if author, ok := item["author"]; !ok || author.(string) == configuration["name"].(string) {
+					item["author"] = false
+				}
+				if _, ok := item["date"]; ok {
+					if date, err := time.Parse("2006-01-02 15:04:05 -07:00", item["date"].(string)); err == nil {
+						updated := date
+						if _, ok := item["updated"]; ok {
+							if temp, err := time.Parse("2006-01-02 15:04:05 -07:00", item["updated"].(string)); err == nil {
+								updated = temp
+							}
+						}
+						item["date"] = formatDate(date, format)
+						item["updated"] = formatDate(updated, format)
+						if !recentFound || recent.Before(updated) {
+							recent = updated
+							recentFound = true;
+						}
+					}
+				}
+				item["content"] = escapeHTML(truncate(item["content"].(string), 4000))
+				items = append(items, item)
+				count--
+			}
+		}
+		feed["updated"] = formatDate(recent, format)
+		feed["items"] = items
+		template, err := ioutil.ReadFile("./" + format + ".xml")
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			return mustache(string(template), feed, nil)
+		}
+		return ""
+	})
 }
 
 func writeString(response http.ResponseWriter, request *http.Request, contentType string, text string) {
@@ -395,75 +455,30 @@ func rootHandler(response http.ResponseWriter, request *http.Request) {
 
 func atomHandler(response http.ResponseWriter, request *http.Request) {
 	host := scheme(request) + "://" + request.Host
-	url := host + "/blog/atom.xml"
-	data := cacheString("atom:"+url, func() string {
-		count := 10
-		entries := make([]interface{}, 0)
-		feed := map[string]interface{}{
-			"name":   configuration["name"],
-			"author": configuration["name"],
-			"host":   host,
-			"url":    url,
-		}
-		files := posts()
-		for len(files) > 0 && count > 0 {
-			file := files[0]
-			files = files[1:]
-			entry := loadPost("blog/" + file)
-			if entry != nil && (entry["state"] == "post" || environment != "production") {
-				entry["url"] = host + "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
-				if author, ok := entry["author"]; !ok || author.(string) == configuration["name"].(string) {
-					entry["author"] = false
-				}
-				date := ""
-				if value, ok := entry["date"]; ok {
-					if time, err := time.Parse("2006-01-02 15:04:05 -07:00", value.(string)); err == nil {
-						date = formatDate(time)
-					}
-				}
-				updated := date
-				if value, ok := entry["updated"]; ok {
-					if time, err := time.Parse("2006-01-02 15:04:05 -07:00", value.(string)); err == nil {
-						updated = formatDate(time)
-					}
-				}
-				entry["date"] = date
-				entry["updated"] = updated
-				if recent, ok := feed["updated"]; !ok || recent.(string) < updated {
-					feed["updated"] = updated
-				}
-				entry["content"] = escapeHTML(truncate(entry["content"].(string), 4000))
-				entries = append(entries, entry)
-				count--
-			}
-		}
-		if _, ok := feed["updated"]; !ok {
-			feed["updated"] = formatDate(time.Now())
-		}
-		feed["entries"] = entries
-		template, err := ioutil.ReadFile("./atom.xml")
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			return mustache(string(template), feed, nil)
-		}
-		return ""
-	})
+	data := renderFeed("atom", host)
 	writeString(response, request, "application/atom+xml", data)
+}
+
+func rssHandler(response http.ResponseWriter, request *http.Request) {
+	host := scheme(request) + "://" + request.Host
+	data := renderFeed("rss", host)
+	writeString(response, request, "application/rss+xml", data)
 }
 
 func postHandler(response http.ResponseWriter, request *http.Request) {
 	file := strings.TrimPrefix(path.Clean(request.URL.Path), "/")
 	data := cacheString("post:"+file, func() string {
-		entry := loadPost(file + ".html")
-		if entry != nil {
-			if date, ok := entry["date"]; ok {
-				entry["date"] = formatUserDate(date.(string))
+		item := loadPost(file + ".html")
+		if item != nil {
+			if _, ok := item["date"]; ok {
+				if date, e := time.Parse("2006-01-02 15:04:05 -07:00", item["date"].(string)); e == nil {
+					item["date"] = formatDate(date, "user")
+				}
 			}
-			if _, ok := entry["author"]; !ok {
-				entry["author"] = configuration["name"].(string)
+			if _, ok := item["author"]; !ok {
+				item["author"] = configuration["name"].(string)
 			}
-			view := merge(configuration, entry)
+			view := merge(configuration, item)
 			template, err := ioutil.ReadFile("./post.html")
 			if err != nil {
 				fmt.Println(err)
@@ -562,7 +577,7 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 				if feed, ok := configuration["feed"]; ok && len(feed.(string)) > 0 {
 					return feed.(string)
 				}
-				return scheme(request) + "://" + request.Host + "/blog/atom.xml"
+				return scheme(request) + "://" + request.Host + "/atom.xml"
 			}
 			view["blog"] = func() string {
 				return renderBlog(posts(), 0)
@@ -687,14 +702,14 @@ func main() {
 	router.Get("/.vscode/?*", rootHandler)
 	router.Get("/admin*", rootHandler)
 	router.Get("/app.*", rootHandler)
-	router.Get("/atom.xml", rootHandler)
+	router.Get("/atom.xml", atomHandler)
 	router.Get("/header.html", rootHandler)
 	router.Get("/meta.html", rootHandler)
 	router.Get("/package.json", rootHandler)
 	router.Get("/post.html", rootHandler)
 	router.Get("/post.css", rootHandler)
+	router.Get("/rss.xml", rssHandler)
 	router.Get("/site.css", rootHandler)
-	router.Get("/blog/atom.xml", atomHandler)
 	router.Get("/blog/*", postHandler)
 	router.Get("/blog", blogHandler)
 	router.Get("/.well-known/acme-challenge/*", certHandler)
