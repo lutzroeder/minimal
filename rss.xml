@@ -14,9 +14,7 @@
 <guid>{{{url}}}</guid>
 <pubDate>{{date}}</pubDate>
 <description>
-<![CDATA[
 {{{content}}}
-]]>
 </description>
 </item>
 {{/items}}

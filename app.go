@@ -84,9 +84,9 @@ func mustache(template string, view map[string]interface{}, partials func(string
 		if value, ok := view[name]; ok {
 			switch value := value.(type) {
 			case func() string:
-				return value()
+				return mustache(value(), view, partials)
 			case string:
-				return value
+				return mustache(value, view, partials)
 			}
 		}
 		return match
@@ -573,12 +573,8 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 			fmt.Println(err)
 		} else {
 			view := merge(configuration)
-			view["feed"] = func() string {
-				if feed, ok := configuration["feed"]; ok && len(feed.(string)) > 0 {
-					return feed.(string)
-				}
-				return scheme(request) + "://" + request.Host + "/atom.xml"
-			}
+			view["scheme"] = scheme(request)
+			view["host"] = request.Host
 			view["blog"] = func() string {
 				return renderBlog(posts(), 0)
 			}

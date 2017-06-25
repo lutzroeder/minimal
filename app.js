@@ -42,7 +42,7 @@ function mustache(template, view, partials) {
     });
     template = template.replace(/{{{\s*([-_\/\.\w]+)\s*}}}/gm, function (match, name) {
         var value = view[name];
-        return typeof value === "function" ? value() : value;
+        return mustache(typeof value === "function" ? value() : value, view, partials);
     });
     template = template.replace(/{{\s*([-_\/\.\w]+)\s*}}/gm, function (match, name) {
         var value = view[name];
@@ -474,12 +474,8 @@ function defaultHandler(request, response) {
     var data = cache("default:" + file, function() {
         var template = fs.readFileSync(file, "utf-8");
         var view = merge(configuration);
-        view["feed"] = function() {
-            if (configuration["feed"] && configuration["feed"].length > 0) {
-                return configuration["feed"];
-            }
-            return scheme(request) + "://" + request.headers.host + "/atom.xml";
-        };
+        view["scheme"] = scheme(request);
+        view["host"] = request.headers.host;
         view["blog"] = function() {
             return renderBlog(posts(), 0);
         };

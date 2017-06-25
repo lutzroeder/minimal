@@ -76,9 +76,9 @@ class Program
                 switch (value)
                 {
                     case Func<string> callback:
-                        return callback();
+                        return Mustache(callback(), view, partials);
                     case string content:
-                        return content;
+                        return Mustache(content, view, partials);
                 }
             }
             return match.Groups[0].Value;
@@ -592,10 +592,8 @@ class Program
         string data = CacheString("default:" + file, delegate() {
             string template = File.ReadAllText(file);
             var view = Merge(configuration);
-            view["feed"] = (Func<string>) delegate() {
-                string feed = (string) configuration["feed"];
-                return (!string.IsNullOrEmpty(feed)) ? feed : context.Request.Scheme + "://" + context.Request.Host + "/atom.xml";
-            };
+            view["scheme"] = context.Request.Scheme;
+            view["host"] = context.Request.Host.ToString();
             view["blog"] = (Func<string>) (() => RenderBlog(Posts(), 0));
             return Mustache(template, view, (name) => File.ReadAllText(name));
         });

@@ -61,6 +61,7 @@ def mustache(template, view, partials):
             value = view[name]
             if callable(value):
                 value = value()
+            return mustache(value, view, partials)
         return value
     template = re.sub(r"{{{\s*([-_/.\w]+)\s*}}}", replace, template)
     def replace_escape(match):
@@ -402,9 +403,8 @@ def default_handler(request):
     def content():
         template = read_file(os.path.join("./", filename))
         view = merge([ configuration ])
-        view["feed"] = lambda: configuration["feed"] if \
-            ("feed" in configuration and len(configuration["feed"]) > 0) else \
-            scheme(request) + "://" + request.headers.get("host") + "/atom.xml"
+        view["scheme"] = scheme(request)
+        view["host"] = request.headers.get("host")
         view["blog"] = lambda: render_blog(posts(), 0)
         return mustache(template, view, lambda name: read_file(name))
     data = cache("default:" + filename, content)
