@@ -48,12 +48,14 @@ body { margin: 0 0 65px 0; background-color: #f8f8f8; }
 .item .border img { border: 1px solid rgba(0, 0, 0, .09); box-shadow: 0 1px 4px 0 rgba(0, 0, 0, .04); }
 .item .more { color: #aaaaaa; font-size: 12px; vertical-align: baseline; margin: 1px 0 5px 0; }
 .placeholder { box-sizing: border-box; max-width: 640px !important; padding: 45px 20px 30px 20px; margin: 0 auto 10px auto; }
+.center { box-sizing: border-box; max-width: 640px !important; padding: 0px 20px 22px 20px; margin: 0 auto 15px auto; }
+.center h1 { font-size: 16px; font-weight: 600; }
 @media all and (max-width: 767px) {
-.profile { padding-top: 36px; padding-bottom: 36px; }
-.profile .portrait { width: 80px !important; height: 80px !important; }
-.profile .toolbar { padding-bottom: 22px; }
-.profile .button { padding-top: 7px; padding-bottom: 7px; }
-.navigation .tabbar { font-size: 14px; padding: 12px 0 18px 0; }
+.header .profile { padding-top: 36px; padding-bottom: 36px; }
+.header .profile .portrait { width: 80px !important; height: 80px !important; }
+.header .profile .toolbar { padding-bottom: 22px; }
+.header .profile .button { padding-top: 7px; padding-bottom: 7px; }
+.header .navigation .tabbar { font-size: 14px; padding: 12px 0 18px 0; }
 .item h1 { font-size: 25px; margin-left: -1.75px; }
 .item { padding-left: 20px; padding-right: 20px; }
 }
