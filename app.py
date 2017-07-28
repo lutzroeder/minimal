@@ -146,9 +146,9 @@ def isdir(path):
 def posts():
     def get_posts():
         files = []
-        for filename in sorted(os.listdir("./blog"), reverse=True):
-            if os.path.splitext(filename)[1] == ".html":
-                files.append(filename)
+        for post in sorted(os.listdir("./blog"), reverse=True):
+            if os.path.isdir("./blog/" + post) and os.path.exists("./blog/" + post + "/index.html"):
+                files.append(post)
         return files
     return list(cache("blog:files", get_posts))
 
@@ -237,7 +237,7 @@ def render_blog(files, start):
     index = 0
     while len(files) > 0 and index < start + length:
         filename = files.pop(0)
-        item = load_post("blog/" + filename)
+        item = load_post("blog/" + filename + "/index.html")
         if item and (item["state"] == "post" or environment != "production"):
             if index >= start:
                 item["url"] = "/blog/" + os.path.splitext(filename)[0]
@@ -254,7 +254,7 @@ def render_blog(files, start):
     view["placeholder"] = []
     if len(files) > 0:
         view["placeholder"].append({ "url": "/blog?id=" + str(index) })
-    template = read_file("./stream.html")
+    template = read_file("./blog/stream.html")
     return mustache(template, view, None)
 
 def write_string(request, content_type, data):
@@ -267,7 +267,7 @@ def write_string(request, content_type, data):
         request.wfile.write(encoded)
 
 def render_feed(format, host):
-    url = host + "/" + format + ".xml"
+    url = host + "/blog/" + format + ".xml"
     def render_feed():
         count = 10
         feed = {
@@ -283,7 +283,7 @@ def render_feed(format, host):
         files = posts()
         while len(files) > 0 and count > 0:
             filename = files.pop(0)
-            item = load_post("blog/" + filename)
+            item = load_post("blog/" + filename + "/index.html")
             if item and (item["state"] == "post" or environment != "production"):
                 item["url"] = host + "/blog/" + os.path.splitext(filename)[0]
                 if not "author" in item or item["author"] == configuration["name"]:
@@ -302,7 +302,7 @@ def render_feed(format, host):
                 feed["items"].append(item)
                 count -= 1
         feed["updated"] = format_date(recent, format)
-        template = read_file("./" + format + ".xml")
+        template = read_file("./blog/" + format + ".xml")
         return mustache(template, feed, None)
     return cache(format + ":" + url, render_feed)
 
@@ -312,19 +312,19 @@ def root_handler(request):
     request.end_headers()
 
 def atom_handler(request):
-    host = scheme(request) + "://" + request.headers.get("host")
+    host = configuration["host"]
     data = render_feed("atom", host)
     write_string(request, "application/atom+xml", data)
 
 def rss_handler(request):
-    host = scheme(request) + "://" + request.headers.get("host")
+    host = configuration["host"]
     data = render_feed("rss", host)
     write_string(request, "application/rss+xml", data)
 
 def post_handler(request):
     filename = urlparse(request.path).path.lstrip("/")
     def render_post():
-        item = load_post(filename + ".html")
+        item = load_post(filename + "/index.html")
         if item:
             if not "author" in item:
                 item["author"] = configuration["name"]
@@ -332,7 +332,7 @@ def post_handler(request):
                 date = dateutil.parser.parse(text)
                 item["date"] = format_date(date, "user")
             view = merge([ configuration, item ])
-            template = read_file("./post.html")
+            template = read_file("./blog/post.html")
             return mustache(template, view, lambda name: read_file(name))
         return ""
     data = cache("post:"+ filename, render_post)
@@ -403,8 +403,6 @@ def default_handler(request):
     def content():
         template = read_file(os.path.join("./", filename))
         view = merge([ configuration ])
-        view["scheme"] = scheme(request)
-        view["host"] = request.headers.get("host")
         view["blog"] = lambda: render_blog(posts(), 0)
         return mustache(template, view, lambda name: read_file(name))
     data = cache("default:" + filename, content)
@@ -465,14 +463,15 @@ router.get("/.git/?*", root_handler)
 router.get("/.vscode/?*", root_handler)
 router.get("/admin*", root_handler)
 router.get("/app.*", root_handler)
-router.get("/atom.xml", atom_handler)
 router.get("/header.html", root_handler)
 router.get("/meta.html", root_handler)
 router.get("/package.json", root_handler)
-router.get("/post.html", root_handler)
-router.get("/post.css", root_handler)
-router.get("/rss.xml", rss_handler)
 router.get("/site.css", root_handler)
+router.get("/blog/atom.xml", atom_handler)
+router.get("/blog/post.html", root_handler)
+router.get("/blog/post.css", root_handler)
+router.get("/blog/rss.xml", rss_handler)
+router.get("/blog/stream.html", blog_handler)
 router.get("/blog/*", post_handler)
 router.get("/blog", blog_handler)
 router.get("/.well-known/acme-challenge/*", cert_handler)

@@ -207,7 +207,7 @@ function truncate(text, length) {
 
 function posts() {
     return cache("blog:files", function() {
-        return fs.readdirSync("./blog/").filter(file => path.extname(file) === ".html").sort().reverse();
+        return fs.readdirSync("./blog/").filter(post => fs.statSync("./blog/" + post).isDirectory() && fs.existsSync("./blog/" + post + "/index.html")).sort().reverse();
     }).slice(0);
 }
 
@@ -252,7 +252,7 @@ function renderBlog(files, start) {
     var index = 0;
     while (files.length > 0 && index < (start + length)) {
         var file = files.shift();
-        var item = loadPost("blog/" + file);
+        var item = loadPost("blog/" + file + "/index.html");
         if (item && (item["state"] === "post" || environment !== "production")) {
             if (index >= start) {
                 item["url"] = "/blog/" + path.basename(file, ".html");
@@ -274,12 +274,12 @@ function renderBlog(files, start) {
     if (files.length > 0) {
         view["placeholder"].push({ "url": "/blog?id=" + index.toString() });
     }
-    var template = fs.readFileSync("stream.html", "utf-8");
+    var template = fs.readFileSync("blog/stream.html", "utf-8");
     return mustache(template, view, null);
 }
 
 function renderFeed(format, host) {
-    var url = host + "/" + format + ".xml";
+    var url = host + "/blog/" + format + ".xml";
     return cache(format + ":" + url, function () {
         var count = 10;
         var feed = {
@@ -295,7 +295,7 @@ function renderFeed(format, host) {
         var recent = new Date();
         while (files.length > 0 && count > 0) {
             var file = files.shift();
-            var item = loadPost("blog/" + file);
+            var item = loadPost("blog/" + file + "/index.html");
             if (item && (item["state"] === "post" || environment !== "production")) {
                 item["url"] = host + "/blog/" + path.basename(file, ".html"); 
                 if (!item["author"] || item["author"] === configuration["name"]) {
@@ -320,7 +320,7 @@ function renderFeed(format, host) {
             }
         }
         feed["updated"] = formatDate(recent, format);
-        var template = fs.readFileSync(format + ".xml", "utf-8");
+        var template = fs.readFileSync("blog/" + format + ".xml", "utf-8");
         return mustache(template, feed, null);
     });
 }
@@ -341,13 +341,13 @@ function rootHandler(request, response) {
 }
 
 function atomHandler(request, response) {
-    var host = scheme(request) + "://" + request.headers.host;
+    var host = configuration["host"];
     var data = renderFeed("atom", host);
     writeString(request, response, "application/atom+xml", data);
 }
 
 function rssHandler(request, response) {
-    var host = scheme(request) + "://" + request.headers.host;
+    var host = configuration["host"];
     var data = renderFeed("rss", host);
     writeString(request, response, "application/rss+xml", data);
 }
@@ -367,7 +367,7 @@ function postHandler(request, response) {
     var pathname = url.parse(request.url, true).pathname;
     var file = pathname.replace(/^\/?/, "");
     var data = cache("post:" + file, function() {
-        var item = loadPost(file + ".html");
+        var item = loadPost(file + "/index.html");
         if (item) {
             if ("date" in item) {
                 var date = new Date(item["date"].split(/ \+| \-/)[0] + "Z");
@@ -375,7 +375,7 @@ function postHandler(request, response) {
             }
             item["author"] = item["author"] || configuration["name"];
             var view = merge(configuration, item);
-            var template = fs.readFileSync("post.html", "utf-8");
+            var template = fs.readFileSync("blog/post.html", "utf-8");
             return mustache(template, view, function(name) {
                 return fs.readFileSync(name, "utf-8");
             });
@@ -474,8 +474,6 @@ function defaultHandler(request, response) {
     var data = cache("default:" + file, function() {
         var template = fs.readFileSync(file, "utf-8");
         var view = merge(configuration);
-        view["scheme"] = scheme(request);
-        view["host"] = request.headers.host;
         view["blog"] = function() {
             return renderBlog(posts(), 0);
         };
@@ -550,14 +548,15 @@ router.get("/.git/?*", rootHandler)
 router.get("/.vscode/?*", rootHandler);
 router.get("/admin*", rootHandler);
 router.get("/app.*", rootHandler);
-router.get("/atom.xml", atomHandler);
 router.get("/header.html", rootHandler);
 router.get("/meta.html", rootHandler);
 router.get("/package.json", rootHandler);
-router.get("/post.html", rootHandler);
-router.get("/post.css", rootHandler);
-router.get("/rss.xml", rssHandler)
 router.get("/site.css", rootHandler);
+router.get("/blog/atom.xml", atomHandler);
+router.get("/blog/post.html", rootHandler);
+router.get("/blog/post.css", rootHandler);
+router.get("/blog/rss.xml", rssHandler)
+router.get("/blog/stream.html", rootHandler);
 router.get("/blog/*", postHandler);
 router.get("/blog", blogHandler);
 router.get("/.well-known/acme-challenge/*", certHandler);

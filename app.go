@@ -301,9 +301,12 @@ func posts() []string {
 		files := []string{}
 		fileInfos, _ := ioutil.ReadDir("blog/")
 		for i := len(fileInfos) - 1; i >= 0; i-- {
-			file := fileInfos[i].Name()
-			if path.Ext(file) == ".html" {
-				files = append(files, file)
+			if fileInfos[i].IsDir() {
+				post := fileInfos[i].Name()
+				_, err := os.Stat("blog/" + post + "/index.html")
+				if (!os.IsNotExist(err)) {
+					files = append(files, post)
+				}
 			}
 		}
 		return files
@@ -351,7 +354,7 @@ func renderBlog(files []string, start int) string {
 	for len(files) > 0 && index < start+length {
 		file := files[0]
 		files = files[1:]
-		item := loadPost("blog/" + file)
+		item := loadPost("blog/" + file + "/index.html")
 		if item != nil && (item["state"] == "post" || environment != "production") {
 			if index >= start {
 				item["url"] = "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
@@ -376,7 +379,7 @@ func renderBlog(files []string, start int) string {
 		placeholder = append(placeholder, map[string]interface{}{"url": "/blog?id=" + strconv.Itoa(index)})
 	}
 	view["placeholder"] = placeholder
-	template, err := ioutil.ReadFile("./stream.html")
+	template, err := ioutil.ReadFile("./blog/stream.html")
 	if err != nil {
 		fmt.Println(err)
 		return ""
@@ -385,7 +388,7 @@ func renderBlog(files []string, start int) string {
 }
 
 func renderFeed(format string, host string) string {
-	url := host + "/" + format + ".xml"
+	url := host + "/blog/" + format + ".xml"
 	return cacheString(format+":"+url, func() string {
 		count := 10
 		items := make([]interface{}, 0)
@@ -402,7 +405,7 @@ func renderFeed(format string, host string) string {
 		for len(files) > 0 && count > 0 {
 			file := files[0]
 			files = files[1:]
-			item := loadPost("blog/" + file)
+			item := loadPost("blog/" + file + "/index.html")
 			if item != nil && (item["state"] == "post" || environment != "production") {
 				item["url"] = host + "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
 				if author, ok := item["author"]; !ok || author.(string) == configuration["name"].(string) {
@@ -431,7 +434,7 @@ func renderFeed(format string, host string) string {
 		}
 		feed["updated"] = formatDate(recent, format)
 		feed["items"] = items
-		template, err := ioutil.ReadFile("./" + format + ".xml")
+		template, err := ioutil.ReadFile("./blog/" + format + ".xml")
 		if err != nil {
 			fmt.Println(err)
 		} else {
@@ -454,13 +457,13 @@ func rootHandler(response http.ResponseWriter, request *http.Request) {
 }
 
 func atomHandler(response http.ResponseWriter, request *http.Request) {
-	host := scheme(request) + "://" + request.Host
+	host := configuration["host"].(string);
 	data := renderFeed("atom", host)
 	writeString(response, request, "application/atom+xml", data)
 }
 
 func rssHandler(response http.ResponseWriter, request *http.Request) {
-	host := scheme(request) + "://" + request.Host
+	host := configuration["host"].(string);
 	data := renderFeed("rss", host)
 	writeString(response, request, "application/rss+xml", data)
 }
@@ -468,7 +471,7 @@ func rssHandler(response http.ResponseWriter, request *http.Request) {
 func postHandler(response http.ResponseWriter, request *http.Request) {
 	file := strings.TrimPrefix(path.Clean(request.URL.Path), "/")
 	data := cacheString("post:"+file, func() string {
-		item := loadPost(file + ".html")
+		item := loadPost(file + "/index.html")
 		if item != nil {
 			if _, ok := item["date"]; ok {
 				if date, e := time.Parse("2006-01-02 15:04:05 -07:00", item["date"].(string)); e == nil {
@@ -479,7 +482,7 @@ func postHandler(response http.ResponseWriter, request *http.Request) {
 				item["author"] = configuration["name"].(string)
 			}
 			view := merge(configuration, item)
-			template, err := ioutil.ReadFile("./post.html")
+			template, err := ioutil.ReadFile("./blog/post.html")
 			if err != nil {
 				fmt.Println(err)
 			} else {
@@ -573,8 +576,6 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 			fmt.Println(err)
 		} else {
 			view := merge(configuration)
-			view["scheme"] = scheme(request)
-			view["host"] = request.Host
 			view["blog"] = func() string {
 				return renderBlog(posts(), 0)
 			}
@@ -698,14 +699,15 @@ func main() {
 	router.Get("/.vscode/?*", rootHandler)
 	router.Get("/admin*", rootHandler)
 	router.Get("/app.*", rootHandler)
-	router.Get("/atom.xml", atomHandler)
 	router.Get("/header.html", rootHandler)
 	router.Get("/meta.html", rootHandler)
 	router.Get("/package.json", rootHandler)
-	router.Get("/post.html", rootHandler)
-	router.Get("/post.css", rootHandler)
-	router.Get("/rss.xml", rssHandler)
 	router.Get("/site.css", rootHandler)
+	router.Get("/blog/atom.xml", atomHandler)
+	router.Get("/blog/post.html", rootHandler)
+	router.Get("/blog/post.css", rootHandler)
+	router.Get("/blog/rss.xml", rssHandler)
+	router.Get("/blog/stream.html", blogHandler)
 	router.Get("/blog/*", postHandler)
 	router.Get("/blog", blogHandler)
 	router.Get("/.well-known/acme-challenge/*", certHandler)

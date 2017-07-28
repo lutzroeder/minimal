@@ -2,9 +2,10 @@
   "name":        "John Smith",
   "bio":         "I explore, I work, and I have hobbies.",
   "description": "Detailed description for search engines.",
+  "host": "http://www.________.com",
   "feeds": [
-    { "type": "application/atom+xml", "url": "{{{scheme}}}://{{{host}}}/atom.xml"},
-    { "type": "application/rss+xml",  "url": "{{{scheme}}}://{{{host}}}/rss.xml"}
+    { "type": "application/atom+xml", "url": "{{{host}}}/blog/atom.xml"},
+    { "type": "application/rss+xml",  "url": "{{{host}}}/blog/rss.xml"}
   ],
   "links": [
     { "name": "Twitter",  "symbol": "&#xe286;", "url": "http://www.twitter.com/lutzroeder" },

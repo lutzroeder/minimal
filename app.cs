@@ -334,7 +334,7 @@ class Program
     static Queue<string> Posts()
     {
         var posts = (List<string>) Cache("blog:files", delegate() {
-            var list = new List<string>(Directory.GetFiles("blog/", "*.html").Select(file => Path.GetFileName(file)));
+            var list = new List<string>(Directory.GetDirectories("blog/").Where(post => File.Exists(post + "/index.html")).Select(post => Path.GetFileName(post)));
             list.Sort();
             list.Reverse();
             return list;
@@ -351,7 +351,7 @@ class Program
         while (files.Count > 0 && index < (start + length))
         {
             string file = files.Dequeue();
-            var item = LoadPost("blog/" + file);
+            var item = LoadPost("blog/" + file + "/index.html");
             if (item != null && (((string)item["state"]) == "post" || !environment.IsProduction()))
             {
                 if (index >= start)
@@ -379,13 +379,13 @@ class Program
         {
             placeholder.Add(new Dictionary<string, object>() { ["url"] = "/blog?id=" + index.ToString() });
         }
-        var template = File.ReadAllText("stream.html");
+        var template = File.ReadAllText("blog/stream.html");
         return Mustache(template, view, null);
     }
 
     static string RenderFeed(string format, string host) 
     {
-        var url = host + "/" + format + ".xml";
+        var url = host + "/blog/" + format + ".xml";
         return CacheString(format + ":" + url, delegate() {
             var count = 10;
             var items = new List<object>();
@@ -403,7 +403,7 @@ class Program
             while (files.Count > 0 && count > 0) 
             {
                 string file = files.Dequeue();
-                var item = LoadPost("blog/" + file);
+                var item = LoadPost("blog/" + file + "/index.html");
                 if (item != null && (((string)item["state"]) == "post" || !environment.IsProduction()))
                 {
                     item["url"] = host + "/blog/" + Path.GetFileNameWithoutExtension(file);
@@ -433,7 +433,7 @@ class Program
                 }
             }
             feed["updated"] = FormatDate(recent, format);
-            var template = File.ReadAllText(format + ".xml");
+            var template = File.ReadAllText("blog/" + format + ".xml");
             return Mustache(template, feed, null);
         });
     }
@@ -457,14 +457,14 @@ class Program
 
     static Task AtomHandler(HttpContext context)
     {
-        var host = context.Request.Scheme + "://" + context.Request.Host;
+        var host = (string) configuration["host"];
         var data = RenderFeed("atom", host);
         return WriteStringAsync(context, "application/atom+xml", data);
     }
 
     static Task RssHandler(HttpContext context)
     {
-        var host = context.Request.Scheme + "://" + context.Request.Host;
+        var host = (string) configuration["host"];
         var data = RenderFeed("rss", host);
         return WriteStringAsync(context, "application/rss+xml", data);
     }
@@ -485,7 +485,7 @@ class Program
         var pathname = context.Request.Path.Value;
         var file = pathname.TrimStart('/');
         string data = CacheString("post:" + file, delegate() {
-            var item = LoadPost(file + ".html");
+            var item = LoadPost(file + "/index.html");
             if (item != null)
             {
                 item["date"] = string.Empty;
@@ -499,7 +499,7 @@ class Program
                     item["author"] = (string) configuration["name"];
                 }
                 var view = Merge(configuration, item);
-                var template = File.ReadAllText("post.html");
+                var template = File.ReadAllText("blog/post.html");
                 return Mustache(template, view, (name) => File.ReadAllText(name));
             }
             return string.Empty;
@@ -592,8 +592,6 @@ class Program
         string data = CacheString("default:" + file, delegate() {
             string template = File.ReadAllText(file);
             var view = Merge(configuration);
-            view["scheme"] = context.Request.Scheme;
-            view["host"] = context.Request.Host.ToString();
             view["blog"] = (Func<string>) (() => RenderBlog(Posts(), 0));
             return Mustache(template, view, (name) => File.ReadAllText(name));
         });
@@ -701,14 +699,15 @@ class Program
         router.Get("/.vscode/?*", RootHandler);
         router.Get("/admin*", RootHandler);
         router.Get("/app.*", RootHandler);
-        router.Get("/atom.xml", AtomHandler);
         router.Get("/header.html", RootHandler);
         router.Get("/meta.html", RootHandler);
         router.Get("/package.json", RootHandler);
-        router.Get("/post.html", RootHandler);
-        router.Get("/post.css", RootHandler);
-        router.Get("/rss.xml", RssHandler);
         router.Get("/site.css", RootHandler);
+        router.Get("/blog/atom.xml", AtomHandler);
+        router.Get("/blog/post.html", RootHandler);
+        router.Get("/blog/post.css", RootHandler);
+        router.Get("/blog/rss.xml", RssHandler);
+        router.Get("/blog/stream.html", RssHandler);
         router.Get("/blog/*", PostHandler);
         router.Get("/blog", BlogHandler);
         router.Get("/.well-known/acme-challenge/*", CertHandler);
