@@ -80,14 +80,17 @@ def read_file(path):
     with codecs.open(path, "r", "utf-8") as open_file:
         return open_file.read()
 
-def scheme(request):
+def host(request):
+    if "host" in configuration:
+        return configuration["host"]
+    scheme = "http"
     value = request.headers.get("x-forwarded-proto")
     if value and len(value) > 0:
-        return value
+        scheme = value
     value = request.headers.get("x-forwarded-protocol")
     if value and len(value) > 0:
-        return value
-    return "http"
+        scheme = value
+    return scheme + "://" + request.headers.get("host")
 
 def redirect(request, status, location):
     request.send_response(status)
@@ -312,13 +315,11 @@ def root_handler(request):
     request.end_headers()
 
 def atom_handler(request):
-    host = configuration["host"]
-    data = render_feed("atom", host)
+    data = render_feed("atom", host(request))
     write_string(request, "application/atom+xml", data)
 
 def rss_handler(request):
-    host = configuration["host"]
-    data = render_feed("rss", host)
+    data = render_feed("rss", host(request))
     write_string(request, "application/rss+xml", data)
 
 def post_handler(request):
@@ -403,6 +404,7 @@ def default_handler(request):
     def content():
         template = read_file(os.path.join("./", filename))
         view = merge([ configuration ])
+        view["host"] = host(request)
         view["blog"] = lambda: render_blog(posts(), 0)
         return mustache(template, view, lambda name: read_file(name))
     data = cache("default:" + filename, content)
@@ -476,8 +478,7 @@ router.get("/blog/*", post_handler)
 router.get("/blog", blog_handler)
 router.get("/.well-known/acme-challenge/*", cert_handler)
 router.get("/*", default_handler)
-host = "localhost"
 port = 8080
-print("http://" + host + ":" + str(port))
-server = HTTPServer((host, port), HTTPRequestHandler)
+print("http://" + "localhost" + ":" + str(port))
+server = HTTPServer(("localhost", port), HTTPRequestHandler)
 server.serve_forever()

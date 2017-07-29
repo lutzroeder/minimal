@@ -2,7 +2,6 @@
   "name":        "John Smith",
   "bio":         "I explore, I work, and I have hobbies.",
   "description": "Detailed description for search engines.",
-  "host": "http://www.________.com",
   "feeds": [
     { "type": "application/atom+xml", "url": "{{{host}}}/blog/atom.xml"},
     { "type": "application/rss+xml",  "url": "{{{host}}}/blog/rss.xml"}

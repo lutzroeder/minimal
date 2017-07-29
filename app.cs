@@ -102,6 +102,17 @@ class Program
         return template;
     }
 
+    static string Host(HttpContext context)
+    {
+        object host;
+        if (configuration.TryGetValue("host", out host))
+        {
+            return (string)host;
+        }
+
+        return context.Request.Scheme + "://" + context.Request.Host;
+    }
+
     static string FormatDate(DateTime date, string format)
     {
         switch (format)
@@ -457,15 +468,13 @@ class Program
 
     static Task AtomHandler(HttpContext context)
     {
-        var host = (string) configuration["host"];
-        var data = RenderFeed("atom", host);
+        var data = RenderFeed("atom", Host(context));
         return WriteStringAsync(context, "application/atom+xml", data);
     }
 
     static Task RssHandler(HttpContext context)
     {
-        var host = (string) configuration["host"];
-        var data = RenderFeed("rss", host);
+        var data = RenderFeed("rss", Host(context));
         return WriteStringAsync(context, "application/rss+xml", data);
     }
 
@@ -592,6 +601,7 @@ class Program
         string data = CacheString("default:" + file, delegate() {
             string template = File.ReadAllText(file);
             var view = Merge(configuration);
+            view["host"] = Host(context);
             view["blog"] = (Func<string>) (() => RenderBlog(Posts(), 0));
             return Mustache(template, view, (name) => File.ReadAllText(name));
         });

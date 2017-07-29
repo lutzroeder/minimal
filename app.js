@@ -51,14 +51,19 @@ function mustache(template, view, partials) {
     return template;
 }
 
-function scheme(request) {
+function host(request) {
+    if (configuration["host"]) {
+        return configuration["host"];
+    }
+
+    var scheme = "http";
     if (request.headers["x-forwarded-proto"]) {
-        return request.headers["x-forwarded-proto"];
+        scheme = request.headers["x-forwarded-proto"];
     }
-    if (request.headers["x-forwarded-protocol"]) {
-        return request.headers["x-forwarded-protocol"];
+    else if (request.headers["x-forwarded-protocol"]) {
+        scheme = request.headers["x-forwarded-protocol"];
     }
-    return "http";
+    return scheme + "://" + request.headers.host;
 }
 
 function redirect(response, status, location) {
@@ -341,14 +346,12 @@ function rootHandler(request, response) {
 }
 
 function atomHandler(request, response) {
-    var host = configuration["host"];
-    var data = renderFeed("atom", host);
+    var data = renderFeed("atom", host(request));
     writeString(request, response, "application/atom+xml", data);
 }
 
 function rssHandler(request, response) {
-    var host = configuration["host"];
-    var data = renderFeed("rss", host);
+    var data = renderFeed("rss", host(request));
     writeString(request, response, "application/rss+xml", data);
 }
 
@@ -474,6 +477,7 @@ function defaultHandler(request, response) {
     var data = cache("default:" + file, function() {
         var template = fs.readFileSync(file, "utf-8");
         var view = merge(configuration);
+        view["host"] = host(request);
         view["blog"] = function() {
             return renderBlog(posts(), 0);
         };

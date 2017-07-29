@@ -106,14 +106,18 @@ func mustache(template string, view map[string]interface{}, partials func(string
 	return template
 }
 
-func scheme(request *http.Request) string {
-	if scheme := request.Header.Get("x-forwarded-proto"); len(scheme) > 0 {
-		return scheme
+func host(request *http.Request) string {
+	if host, ok := configuration["host"]; ok {
+		return host.(string)
 	}
-	if scheme := request.Header.Get("x-forwarded-protocol"); len(scheme) > 0 {
-		return scheme
+	scheme := "http"
+	if value := request.Header.Get("x-forwarded-proto"); len(value) > 0 {
+		scheme = value
 	}
-	return "http"
+	if value := request.Header.Get("x-forwarded-protocol"); len(value) > 0 {
+		scheme = value
+	}
+	return scheme + "://" + request.Host
 }
 
 func formatDate(date time.Time, format string) string {
@@ -457,14 +461,12 @@ func rootHandler(response http.ResponseWriter, request *http.Request) {
 }
 
 func atomHandler(response http.ResponseWriter, request *http.Request) {
-	host := configuration["host"].(string);
-	data := renderFeed("atom", host)
+	data := renderFeed("atom", host(request))
 	writeString(response, request, "application/atom+xml", data)
 }
 
 func rssHandler(response http.ResponseWriter, request *http.Request) {
-	host := configuration["host"].(string);
-	data := renderFeed("rss", host)
+	data := renderFeed("rss", host(request))
 	writeString(response, request, "application/rss+xml", data)
 }
 
@@ -576,6 +578,7 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 			fmt.Println(err)
 		} else {
 			view := merge(configuration)
+			view["host"] = host(request)
 			view["blog"] = func() string {
 				return renderBlog(posts(), 0)
 			}
