@@ -24,6 +24,7 @@ function merge() {
     }
     return target;
 }
+
 function mustache(template, view, partials) {
     template = template.replace(/{{#\s*([-_\/\.\w]+)\s*}}\s?([\s\S]*){{\/\1}}\s?/gm, function (match, name, content) {
         if (name in view) {
@@ -251,6 +252,27 @@ function loadPost(file) {
     return null;
 }
 
+function renderPost(file, host) {
+    if (file.startsWith("blog/") && file.endsWith("/index.html")) {
+        var item = loadPost(file);
+        if (item) {
+            if ("date" in item) {
+                var date = new Date(item["date"].split(/ \+| \-/)[0] + "Z");
+                item["date"] = formatDate(date, "user");
+            }
+            item["author"] = item["author"] || configuration["name"];
+            var view = merge(configuration, item);
+            view["/"] = "/";
+            view["host"] = host(request);
+            var template = fs.readFileSync("blog/post.html", "utf-8");
+            return mustache(template, view, function(name) {
+                return fs.readFileSync(name, "utf-8");
+            });
+        }
+    }
+    return "";
+}
+
 function renderBlog(files, start) {
     var view = { "items": [] }
     var length = 10;
@@ -260,7 +282,7 @@ function renderBlog(files, start) {
         var item = loadPost("blog/" + file + "/index.html");
         if (item && (item["state"] === "post" || environment !== "production")) {
             if (index >= start) {
-                item["url"] = "/blog/" + path.basename(file, ".html");
+                item["url"] = "/blog/" + file + "/";
                 if ("date" in item) {
                     var date = new Date(item["date"].split(/ \+| \-/)[0] + "Z");
                     item["date"] = formatDate(date, "user");
@@ -302,7 +324,7 @@ function renderFeed(format, host) {
             var file = files.shift();
             var item = loadPost("blog/" + file + "/index.html");
             if (item && (item["state"] === "post" || environment !== "production")) {
-                item["url"] = host + "/blog/" + path.basename(file, ".html"); 
+                item["url"] = host + "/blog/" + file + "/"; 
                 if (!item["author"] || item["author"] === configuration["name"]) {
                     item["author"] = false;
                 }
@@ -365,38 +387,6 @@ var mimeTypeMap = {
     ".zip":  "application/zip",
     ".json": "application/json"
 };
-
-function postHandler(request, response) {
-    var pathname = url.parse(request.url, true).pathname;
-    var file = pathname.replace(/^\/?/, "");
-    var data = cache("post:" + file, function() {
-        var item = loadPost(file + "/index.html");
-        if (item) {
-            if ("date" in item) {
-                var date = new Date(item["date"].split(/ \+| \-/)[0] + "Z");
-                item["date"] = formatDate(date, "user");
-            }
-            item["author"] = item["author"] || configuration["name"];
-            var view = merge(configuration, item);
-            var template = fs.readFileSync("blog/post.html", "utf-8");
-            return mustache(template, view, function(name) {
-                return fs.readFileSync(name, "utf-8");
-            });
-        }
-        return null;
-    });
-    if (data) {
-        writeString(request, response, "text/html", data);
-        return;
-    }
-    var extension = path.extname(file);
-    var contentType = mimeTypeMap[extension] ;
-    if (contentType) {
-        defaultHandler(request, response);
-        return;
-    }
-    rootHandler(request, response);
-}
 
 function blogHandler(request, response) {
     var query = url.parse(request.url, true).query;
@@ -475,8 +465,13 @@ function defaultHandler(request, response) {
         return;
     }
     var data = cache("default:" + file, function() {
+        var post = renderPost(file, host(request));
+        if (post) {
+            return post;
+        }
         var template = fs.readFileSync(file, "utf-8");
         var view = merge(configuration);
+        view["/"] = "/";
         view["host"] = host(request);
         view["blog"] = function() {
             return renderBlog(posts(), 0);
@@ -552,16 +547,15 @@ router.get("/.git/?*", rootHandler)
 router.get("/.vscode/?*", rootHandler);
 router.get("/admin*", rootHandler);
 router.get("/app.*", rootHandler);
+router.get("/build.js", rootHandler);
 router.get("/header.html", rootHandler);
 router.get("/meta.html", rootHandler);
 router.get("/package.json", rootHandler);
 router.get("/site.css", rootHandler);
 router.get("/blog/atom.xml", atomHandler);
-router.get("/blog/post.html", rootHandler);
-router.get("/blog/post.css", rootHandler);
 router.get("/blog/rss.xml", rssHandler)
+router.get("/blog/post.*", rootHandler);
 router.get("/blog/stream.html", rootHandler);
-router.get("/blog/*", postHandler);
 router.get("/blog", blogHandler);
 router.get("/.well-known/acme-challenge/*", certHandler);
 router.get("/*", defaultHandler);

@@ -243,7 +243,7 @@ def render_blog(files, start):
         item = load_post("blog/" + filename + "/index.html")
         if item and (item["state"] == "post" or environment != "production"):
             if index >= start:
-                item["url"] = "/blog/" + os.path.splitext(filename)[0]
+                item["url"] = "/blog/" + filename + "/"
                 if "date" in item:
                     date = dateutil.parser.parse(item["date"])
                     item["date"] = format_date(date, "user")
@@ -288,7 +288,7 @@ def render_feed(format, host):
             filename = files.pop(0)
             item = load_post("blog/" + filename + "/index.html")
             if item and (item["state"] == "post" or environment != "production"):
-                item["url"] = host + "/blog/" + os.path.splitext(filename)[0]
+                item["url"] = host + "/blog/" + filename + "/"
                 if not "author" in item or item["author"] == configuration["name"]:
                     item["author"] = False
                 if "date" in item:
@@ -322,29 +322,21 @@ def rss_handler(request):
     data = render_feed("rss", host(request))
     write_string(request, "application/rss+xml", data)
 
-def post_handler(request):
-    filename = urlparse(request.path).path.lstrip("/")
-    def render_post():
-        item = load_post(filename + "/index.html")
+def render_post(file, host):
+    if file.startswith("blog/") and file.endswith("/index.html"):
+        item = load_post(file)
         if item:
             if not "author" in item:
                 item["author"] = configuration["name"]
             if "date" in item:
-                date = dateutil.parser.parse(text)
+                date = dateutil.parser.parse(item["date"])
                 item["date"] = format_date(date, "user")
             view = merge([ configuration, item ])
+            view["/"] = "/"
+            view["host"] = host;
             template = read_file("./blog/post.html")
             return mustache(template, view, lambda name: read_file(name))
-        return ""
-    data = cache("post:"+ filename, render_post)
-    if len(data) > 0:
-        write_string(request, "text/html", data)
-        return
-    extension = os.path.splitext(filename)
-    if extension in mimetypes.types_map:
-        default_handler(request)
-        return
-    root_handler(request)
+    return ""
 
 def blog_handler(request):
     url = urlparse(request.path)
@@ -402,8 +394,12 @@ def default_handler(request):
             request.wfile.write(buffer)
         return
     def content():
+        post = render_post(filename, host(request))
+        if len(post) > 0:
+            return post
         template = read_file(os.path.join("./", filename))
         view = merge([ configuration ])
+        view["/"] = "/"
         view["host"] = host(request)
         view["blog"] = lambda: render_blog(posts(), 0)
         return mustache(template, view, lambda name: read_file(name))
@@ -465,16 +461,15 @@ router.get("/.git/?*", root_handler)
 router.get("/.vscode/?*", root_handler)
 router.get("/admin*", root_handler)
 router.get("/app.*", root_handler)
+router.get("/build.js", root_handler)
 router.get("/header.html", root_handler)
 router.get("/meta.html", root_handler)
 router.get("/package.json", root_handler)
 router.get("/site.css", root_handler)
 router.get("/blog/atom.xml", atom_handler)
-router.get("/blog/post.html", root_handler)
-router.get("/blog/post.css", root_handler)
 router.get("/blog/rss.xml", rss_handler)
-router.get("/blog/stream.html", blog_handler)
-router.get("/blog/*", post_handler)
+router.get("/blog/post.*", root_handler)
+router.get("/blog/stream.html", root_handler)
 router.get("/blog", blog_handler)
 router.get("/.well-known/acme-challenge/*", cert_handler)
 router.get("/*", default_handler)

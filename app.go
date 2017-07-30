@@ -350,6 +350,39 @@ func loadPost(path string) map[string]interface{} {
 	return nil
 }
 
+func renderPost(file string, host string) string {
+	if strings.HasPrefix(file, "blog/") && strings.HasSuffix(file, "/index.html") {
+		item := loadPost(file)
+		if item != nil {
+			if _, ok := item["date"]; ok {
+				if date, e := time.Parse("2006-01-02 15:04:05 -07:00", item["date"].(string)); e == nil {
+					item["date"] = formatDate(date, "user")
+				}
+			}
+			if _, ok := item["author"]; !ok {
+				item["author"] = configuration["name"].(string)
+			}
+			view := merge(configuration, item)
+			view["/"] = "/"
+			view["host"] = host
+			template, err := ioutil.ReadFile("./blog/post.html")
+			if err != nil {
+				fmt.Println(err)
+			} else {
+				return mustache(string(template), view, func(name string) string {
+					data, err := ioutil.ReadFile(name)
+					if err != nil {
+						fmt.Println(err)
+						return ""
+					}
+					return string(data)
+				})
+			}
+		}
+	}
+	return ""
+}
+
 func renderBlog(files []string, start int) string {
 	items := make([]interface{}, 0)
 	view := make(map[string]interface{})
@@ -361,7 +394,7 @@ func renderBlog(files []string, start int) string {
 		item := loadPost("blog/" + file + "/index.html")
 		if item != nil && (item["state"] == "post" || environment != "production") {
 			if index >= start {
-				item["url"] = "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
+				item["url"] = "/blog/" + file + "/"
 				if _, ok := item["date"]; ok {
 					if date, e := time.Parse("2006-01-02 15:04:05 -07:00", item["date"].(string)); e == nil {
 						item["date"] = formatDate(date, "user")
@@ -411,7 +444,7 @@ func renderFeed(format string, host string) string {
 			files = files[1:]
 			item := loadPost("blog/" + file + "/index.html")
 			if item != nil && (item["state"] == "post" || environment != "production") {
-				item["url"] = host + "/blog/" + strings.TrimSuffix(path.Base(file), ".html")
+				item["url"] = host + "/blog/" + file + "/"
 				if author, ok := item["author"]; !ok || author.(string) == configuration["name"].(string) {
 					item["author"] = false
 				}
@@ -468,49 +501,6 @@ func atomHandler(response http.ResponseWriter, request *http.Request) {
 func rssHandler(response http.ResponseWriter, request *http.Request) {
 	data := renderFeed("rss", host(request))
 	writeString(response, request, "application/rss+xml", data)
-}
-
-func postHandler(response http.ResponseWriter, request *http.Request) {
-	file := strings.TrimPrefix(path.Clean(request.URL.Path), "/")
-	data := cacheString("post:"+file, func() string {
-		item := loadPost(file + "/index.html")
-		if item != nil {
-			if _, ok := item["date"]; ok {
-				if date, e := time.Parse("2006-01-02 15:04:05 -07:00", item["date"].(string)); e == nil {
-					item["date"] = formatDate(date, "user")
-				}
-			}
-			if _, ok := item["author"]; !ok {
-				item["author"] = configuration["name"].(string)
-			}
-			view := merge(configuration, item)
-			template, err := ioutil.ReadFile("./blog/post.html")
-			if err != nil {
-				fmt.Println(err)
-			} else {
-				return mustache(string(template), view, func(name string) string {
-					data, err := ioutil.ReadFile(name)
-					if err != nil {
-						fmt.Println(err)
-						return ""
-					}
-					return string(data)
-				})
-			}
-		}
-		return ""
-	})
-	if len(data) > 0 {
-		writeString(response, request, "text/html", data)
-		return
-	}
-	extension := path.Ext(file)
-	contentType := mime.TypeByExtension(extension)
-	if len(contentType) > 0 {
-		defaultHandler(response, request)
-		return
-	}
-	rootHandler(response, request)
 }
 
 func blogHandler(response http.ResponseWriter, request *http.Request) {
@@ -573,11 +563,16 @@ func defaultHandler(response http.ResponseWriter, request *http.Request) {
 		return
 	}
 	data := cacheString("default:"+file, func() string {
+		post := renderPost(file, host(request))
+		if len(post) > 0 {
+			return post
+		}
 		template, err := ioutil.ReadFile(file)
 		if err != nil {
 			fmt.Println(err)
 		} else {
 			view := merge(configuration)
+			view["/"] = "/"
 			view["host"] = host(request)
 			view["blog"] = func() string {
 				return renderBlog(posts(), 0)
@@ -702,16 +697,15 @@ func main() {
 	router.Get("/.vscode/?*", rootHandler)
 	router.Get("/admin*", rootHandler)
 	router.Get("/app.*", rootHandler)
+	router.Get("/build.js", rootHandler);
 	router.Get("/header.html", rootHandler)
 	router.Get("/meta.html", rootHandler)
 	router.Get("/package.json", rootHandler)
 	router.Get("/site.css", rootHandler)
 	router.Get("/blog/atom.xml", atomHandler)
-	router.Get("/blog/post.html", rootHandler)
-	router.Get("/blog/post.css", rootHandler)
 	router.Get("/blog/rss.xml", rssHandler)
-	router.Get("/blog/stream.html", blogHandler)
-	router.Get("/blog/*", postHandler)
+	router.Get("/blog/post.*", rootHandler)
+	router.Get("/blog/stream.html", rootHandler)
 	router.Get("/blog", blogHandler)
 	router.Get("/.well-known/acme-challenge/*", certHandler)
 	router.Get("/*", defaultHandler)
