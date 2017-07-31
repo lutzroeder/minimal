@@ -424,9 +424,24 @@ func renderBlog(files []string, start int) string {
 	return mustache(string(template), view, nil)
 }
 
-func renderFeed(format string, host string) string {
-	url := host + "/blog/" + format + ".xml"
-	return cacheString(format+":"+url, func() string {
+func writeString(response http.ResponseWriter, request *http.Request, contentType string, text string) {
+	response.Header().Set("Content-Type", contentType)
+	response.Header().Set("Content-Length", strconv.Itoa(bytes.NewBufferString(text).Len()))
+	if request.Method != "HEAD" {
+		io.WriteString(response, text)
+	}
+}
+
+func rootHandler(response http.ResponseWriter, request *http.Request) {
+	http.Redirect(response, request, "/", http.StatusFound)
+}
+
+func feedHandler(response http.ResponseWriter, request *http.Request) {
+	pathname := request.URL.Path
+	format := strings.TrimSuffix(path.Base(pathname), ".xml")
+	host := host(request)
+	url := host + pathname
+	data := cacheString(format+":"+url, func() string {
 		count := 10
 		items := make([]interface{}, 0)
 		feed := map[string]interface{}{
@@ -479,28 +494,7 @@ func renderFeed(format string, host string) string {
 		}
 		return ""
 	})
-}
-
-func writeString(response http.ResponseWriter, request *http.Request, contentType string, text string) {
-	response.Header().Set("Content-Type", contentType)
-	response.Header().Set("Content-Length", strconv.Itoa(bytes.NewBufferString(text).Len()))
-	if request.Method != "HEAD" {
-		io.WriteString(response, text)
-	}
-}
-
-func rootHandler(response http.ResponseWriter, request *http.Request) {
-	http.Redirect(response, request, "/", http.StatusFound)
-}
-
-func atomHandler(response http.ResponseWriter, request *http.Request) {
-	data := renderFeed("atom", host(request))
-	writeString(response, request, "application/atom+xml", data)
-}
-
-func rssHandler(response http.ResponseWriter, request *http.Request) {
-	data := renderFeed("rss", host(request))
-	writeString(response, request, "application/rss+xml", data)
+	writeString(response, request, "application/"+format+"xml", data)
 }
 
 func blogHandler(response http.ResponseWriter, request *http.Request) {
@@ -693,19 +687,8 @@ func main() {
 	fmt.Println(environment)
 	initPathCache(".")
 	router := newRouter(configuration)
-	router.Get("/.git/?*", rootHandler)
-	router.Get("/.vscode/?*", rootHandler)
-	router.Get("/admin*", rootHandler)
-	router.Get("/app.*", rootHandler)
-	router.Get("/build.js", rootHandler);
-	router.Get("/header.html", rootHandler)
-	router.Get("/meta.html", rootHandler)
-	router.Get("/package.json", rootHandler)
-	router.Get("/site.css", rootHandler)
-	router.Get("/blog/atom.xml", atomHandler)
-	router.Get("/blog/rss.xml", rssHandler)
-	router.Get("/blog/post.*", rootHandler)
-	router.Get("/blog/stream.html", rootHandler)
+	router.Get("/blog/atom.xml", feedHandler)
+	router.Get("/blog/rss.xml", feedHandler)
 	router.Get("/blog", blogHandler)
 	router.Get("/.well-known/acme-challenge/*", certHandler)
 	router.Get("/*", defaultHandler)

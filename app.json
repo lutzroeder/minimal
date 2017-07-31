@@ -16,5 +16,18 @@
   "pages": [
     { "name": "Blog",     "url": "{{/}}" },
     { "name": "Projects", "url": "{{/}}projects" }
+  ],
+  "redirects": [
+    { "pattern": "/.git/?*",          "target": "/" },
+    { "pattern": "/.vscode/?*",       "target": "/" },
+    { "pattern": "/admin*",           "target": "/" },
+    { "pattern": "/app.*",            "target": "/" },
+    { "pattern": "/build.js",         "target": "/" },
+    { "pattern": "/header.html",      "target": "/" },
+    { "pattern": "/meta.html",        "target": "/" },
+    { "pattern": "/package.json",     "target": "/" },
+    { "pattern": "/site.css",         "target": "/" },
+    { "pattern": "/blog/post.*",      "target": "/" },
+    { "pattern": "/blog/stream.html", "target": "/" }
   ]
 }

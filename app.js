@@ -305,18 +305,33 @@ function renderBlog(files, start) {
     return mustache(template, view, null);
 }
 
-function renderFeed(format, host) {
-    var url = host + "/blog/" + format + ".xml";
-    return cache(format + ":" + url, function () {
+function writeString(request, response, contentType, data) {
+    response.writeHead(200, { 
+        "Content-Type": contentType, 
+        "Content-Length": Buffer.byteLength(data)
+    });
+    if (request.method !== "HEAD") {
+        response.write(data);
+    }
+    response.end();
+}
+
+function rootHandler(request, response) {
+    redirect(response, 302, "/");
+}
+
+function feedHandler(request, response) {
+    var pathname = url.parse(request.url, true).pathname.toLowerCase();
+    var format = path.basename(pathname, ".xml")
+    var data = cache(format + ":" + host(request) + pathname, function () {
         var count = 10;
-        var feed = {
-            "name": configuration["name"],
-            "description": configuration["description"],
-            "author": configuration["name"],
-            "host": host,
-            "url": url,
-            "items": [] 
-        };
+        var feed = {};
+        feed["name"] = configuration["name"];
+        feed["description"] = configuration["description"];
+        feed["author"] = configuration["name"];
+        feed["host"] = host(request);
+        feed["url"] = host(request) + pathname;
+        feed["items"] = [];
         var files = posts();
         var recentFound = false;
         var recent = new Date();
@@ -324,7 +339,7 @@ function renderFeed(format, host) {
             var file = files.shift();
             var item = loadPost("blog/" + file + "/index.html");
             if (item && (item["state"] === "post" || environment !== "production")) {
-                item["url"] = host + "/blog/" + file + "/"; 
+                item["url"] = host(request) + "/blog/" + file + "/"; 
                 if (!item["author"] || item["author"] === configuration["name"]) {
                     item["author"] = false;
                 }
@@ -350,31 +365,7 @@ function renderFeed(format, host) {
         var template = fs.readFileSync("blog/" + format + ".xml", "utf-8");
         return mustache(template, feed, null);
     });
-}
-
-function writeString(request, response, contentType, data) {
-    response.writeHead(200, { 
-        "Content-Type": contentType, 
-        "Content-Length": Buffer.byteLength(data)
-    });
-    if (request.method !== "HEAD") {
-        response.write(data);
-    }
-    response.end();
-}
-
-function rootHandler(request, response) {
-    redirect(response, 302, "/");
-}
-
-function atomHandler(request, response) {
-    var data = renderFeed("atom", host(request));
-    writeString(request, response, "application/atom+xml", data);
-}
-
-function rssHandler(request, response) {
-    var data = renderFeed("rss", host(request));
-    writeString(request, response, "application/rss+xml", data);
+    writeString(request, response, "application/" + format + "+xml", data);
 }
 
 var mimeTypeMap = {
@@ -543,19 +534,8 @@ var environment = process.env.NODE_ENV;
 console.log(environment);
 initPathCache(".");
 var router = new Router(configuration);
-router.get("/.git/?*", rootHandler)
-router.get("/.vscode/?*", rootHandler);
-router.get("/admin*", rootHandler);
-router.get("/app.*", rootHandler);
-router.get("/build.js", rootHandler);
-router.get("/header.html", rootHandler);
-router.get("/meta.html", rootHandler);
-router.get("/package.json", rootHandler);
-router.get("/site.css", rootHandler);
-router.get("/blog/atom.xml", atomHandler);
-router.get("/blog/rss.xml", rssHandler)
-router.get("/blog/post.*", rootHandler);
-router.get("/blog/stream.html", rootHandler);
+router.get("/blog/atom.xml", feedHandler);
+router.get("/blog/rss.xml", feedHandler)
 router.get("/blog", blogHandler);
 router.get("/.well-known/acme-challenge/*", certHandler);
 router.get("/*", defaultHandler);

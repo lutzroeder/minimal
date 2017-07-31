@@ -421,10 +421,31 @@ class Program
         return Mustache(template, view, null);
     }
 
-    static string RenderFeed(string format, string host) 
+
+    static Task WriteStringAsync(HttpContext context, string contentType, string data)
     {
-        var url = host + "/blog/" + format + ".xml";
-        return CacheString(format + ":" + url, delegate() {
+        context.Response.ContentType = contentType;
+        context.Response.ContentLength = Encoding.UTF8.GetByteCount(data);
+        if (context.Request.Method != "HEAD")
+        {
+            return context.Response.WriteAsync(data);
+        }
+        return Task.CompletedTask;
+    }
+
+    static Task RootHandler(HttpContext context)
+    {
+        context.Response.Redirect("/");
+        return Task.CompletedTask;
+    }
+
+    static Task FeedHandler(HttpContext context)
+    {
+        var pathname = context.Request.Path.Value.ToLower();
+        var format = Path.GetFileNameWithoutExtension(pathname);
+        var host = Host(context);
+        var url = host + pathname;
+        var data = CacheString(format + ":" + url, delegate() {
             var count = 10;
             var items = new List<object>();
             var feed = new Dictionary<string, object>() {
@@ -474,35 +495,7 @@ class Program
             var template = File.ReadAllText("blog/" + format + ".xml");
             return Mustache(template, feed, null);
         });
-    }
-
-    static Task WriteStringAsync(HttpContext context, string contentType, string data)
-    {
-        context.Response.ContentType = contentType;
-        context.Response.ContentLength = Encoding.UTF8.GetByteCount(data);
-        if (context.Request.Method != "HEAD")
-        {
-            return context.Response.WriteAsync(data);
-        }
-        return Task.CompletedTask;
-    }
-
-    static Task RootHandler(HttpContext context)
-    {
-        context.Response.Redirect("/");
-        return Task.CompletedTask;
-    }
-
-    static Task AtomHandler(HttpContext context)
-    {
-        var data = RenderFeed("atom", Host(context));
-        return WriteStringAsync(context, "application/atom+xml", data);
-    }
-
-    static Task RssHandler(HttpContext context)
-    {
-        var data = RenderFeed("rss", Host(context));
-        return WriteStringAsync(context, "application/rss+xml", data);
+        return WriteStringAsync(context, "application/"+format+"xml", data);
     }
 
     static Dictionary<string,string> mimeTypeMap = new Dictionary<string,string>() {
@@ -701,19 +694,8 @@ class Program
         Console.WriteLine("dotnetcore " + version);
         configuration = (IDictionary<string, object>) JsonReader.Parse(File.ReadAllText("app.json"));
         Router router = new Router(configuration);
-        router.Get("/.git/?*", RootHandler);
-        router.Get("/.vscode/?*", RootHandler);
-        router.Get("/admin*", RootHandler);
-        router.Get("/app.*", RootHandler);
-        router.Get("/build.js", RootHandler);
-        router.Get("/header.html", RootHandler);
-        router.Get("/meta.html", RootHandler);
-        router.Get("/package.json", RootHandler);
-        router.Get("/site.css", RootHandler);
-        router.Get("/blog/atom.xml", AtomHandler);
-        router.Get("/blog/rss.xml", RssHandler);
-        router.Get("/blog/post.*", RootHandler);
-        router.Get("/blog/stream.html", RootHandler);
+        router.Get("/blog/atom.xml", FeedHandler);
+        router.Get("/blog/rss.xml", FeedHandler);
         router.Get("/blog", BlogHandler);
         router.Get("/.well-known/acme-challenge/*", CertHandler);
         router.Get("/*", DefaultHandler);
