@@ -380,13 +380,15 @@ class Program
         return string.Empty;        
     }
 
+    static int blogCount = 10;
+
     static string RenderBlog(Queue<string> files, int start)
     {
         var items = new List<object>();
         var view = new Dictionary<string, object>() { ["items"] = items };
-        int length = 10;
+        int count = blogCount;
         int index = 0;
-        while (files.Count > 0 && index < (start + length))
+        while (files.Count > 0 && index < (start + count))
         {
             string file = files.Dequeue();
             var item = LoadPost("blog/" + file + "/index.html");
@@ -415,9 +417,9 @@ class Program
         view["placeholder"] = placeholder;
         if (files.Count > 0)
         {
-            placeholder.Add(new Dictionary<string, object>() { ["url"] = "/blog?id=" + index.ToString() });
+            placeholder.Add(new Dictionary<string, object>() { ["url"] = "/blog/page" + index.ToString() + ".html" });
         }
-        var template = File.ReadAllText("blog/stream.html");
+        var template = File.ReadAllText("blog/blog.html");
         return Mustache(template, view, null);
     }
 
@@ -446,7 +448,7 @@ class Program
         var host = Host(context);
         var url = host + pathname;
         var data = CacheString(format + ":" + url, delegate() {
-            var count = 10;
+            var count = blogCount;
             var items = new List<object>();
             var feed = new Dictionary<string, object>() {
                 ["name"] = configuration["name"],
@@ -495,36 +497,25 @@ class Program
             var template = File.ReadAllText("blog/" + format + ".xml");
             return Mustache(template, feed, null);
         });
-        return WriteStringAsync(context, "application/"+format+"xml", data);
+        return WriteStringAsync(context, "application/"+format+"+xml", data);
     }
 
-    static Dictionary<string,string> mimeTypeMap = new Dictionary<string,string>() {
-        [".js"] = "text/javascript",
-        [".css"] = "text/css",
-        [".png"] = "image/png",
-        [".gif"] = "image/gif",
-        [".jpg"] = "image/jpeg",
-        [".ico"] = "image/x-icon",
-        [".zip"] = "application/zip",
-        [".json"] = "application/json",
-    };
+    static Regex blogRegexp = new Regex("/blog/page(.*).html");
 
     static Task BlogHandler(HttpContext context)
     {
-        if (context.Request.Query.ContainsKey("id"))
+        string pathname = context.Request.Path.Value.ToLower();
+        var match = blogRegexp.Match(pathname);
+        int start = 0;
+        if (match.Success && int.TryParse(match.Groups[1].Value, out start))
         {
-            int id;
-            if (int.TryParse(context.Request.Query["id"], out id))
+            var files = Posts();
+            var data = string.Empty;
+            if (start < files.Count)
             {
-                var key = "/blog?id=" + id.ToString();
-                var files = Posts();
-                var data = string.Empty;
-                if (id < files.Count)
-                {
-                    data = CacheString("blog:" + key, () => RenderBlog(files, id));
-                }
-                return WriteStringAsync(context, "text/html", data);
+                data = CacheString("default:" + pathname, () => RenderBlog(files, start));
             }
+            return WriteStringAsync(context, "text/html", data);
         }
         return RootHandler(context);
     }
@@ -543,6 +534,17 @@ class Program
         context.Response.StatusCode = (int) HttpStatusCode.NotFound;
         return Task.CompletedTask;
     }
+
+    static Dictionary<string,string> mimeTypeMap = new Dictionary<string,string>() {
+        [".js"] = "text/javascript",
+        [".css"] = "text/css",
+        [".png"] = "image/png",
+        [".gif"] = "image/gif",
+        [".jpg"] = "image/jpeg",
+        [".ico"] = "image/x-icon",
+        [".zip"] = "application/zip",
+        [".json"] = "application/json",
+    };
 
     static Task DefaultHandler(HttpContext context)
     {
@@ -696,7 +698,7 @@ class Program
         Router router = new Router(configuration);
         router.Get("/blog/atom.xml", FeedHandler);
         router.Get("/blog/rss.xml", FeedHandler);
-        router.Get("/blog", BlogHandler);
+        router.Get("/blog/page*.html", BlogHandler);
         router.Get("/.well-known/acme-challenge/*", CertHandler);
         router.Get("/*", DefaultHandler);
         int port = 8080;

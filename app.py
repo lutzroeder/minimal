@@ -234,11 +234,13 @@ def load_post(path):
         return item
     return None
 
+blog_count = 10
+
 def render_blog(files, start):
     view = { "items": [] }
-    length = 10
+    count = blog_count
     index = 0
-    while len(files) > 0 and index < start + length:
+    while len(files) > 0 and index < start + count:
         filename = files.pop(0)
         item = load_post("blog/" + filename + "/index.html")
         if item and (item["state"] == "post" or environment != "production"):
@@ -256,8 +258,8 @@ def render_blog(files, start):
             index += 1
     view["placeholder"] = []
     if len(files) > 0:
-        view["placeholder"].append({ "url": "/blog?id=" + str(index) })
-    template = read_file("./blog/stream.html")
+        view["placeholder"].append({ "url": "/blog/page" + str(index) + ".html" })
+    template = read_file("./blog/blog.html")
     return mustache(template, view, None)
 
 def write_string(request, content_type, data):
@@ -279,7 +281,7 @@ def feed_handler(request):
     format = os.path.splitext(os.path.basename(pathname))[0]
     url = host(request) + pathname
     def render_feed():
-        count = 10
+        count = blog_count
         feed = {
             "name": configuration["name"],
             "description": configuration["description"],
@@ -315,7 +317,7 @@ def feed_handler(request):
         template = read_file("./blog/" + format + ".xml")
         return mustache(template, feed, None)
     data = cache(format + ":" + url, render_feed)
-    write_string(request, "application/atom" + format + "xml", data)
+    write_string(request, "application/" + format + "+xml", data)
 
 def render_post(file, host):
     if file.startswith("blog/") and file.endswith("/index.html"):
@@ -333,16 +335,17 @@ def render_post(file, host):
             return mustache(template, view, lambda name: read_file(name))
     return ""
 
+blog_regexp = re.compile("/blog/page(.*).html$")
+
 def blog_handler(request):
-    url = urlparse(request.path)
-    query = parse_qs(url.query)
-    if "id" in query:
-        start = int(query["id"][0])
-        key = "/blog?id=" + query["id"][0]
+    pathname = urlparse(request.path).path.lower()
+    match = blog_regexp.match(pathname) 
+    if match and match.group(1).isdigit():
+        start = int(match.group(1))
         files = posts()
         data = ""
         if start < len(files):
-            data = cache("blog:" + key, lambda: render_blog(files, start))
+            data = cache("default:" + pathname, lambda: render_blog(files, start))
         write_string(request, "text/html", data)
         return
     root_handler(request)
@@ -454,7 +457,7 @@ init_path_cache(".")
 router = Router(configuration)
 router.get("/blog/atom.xml", feed_handler)
 router.get("/blog/rss.xml", feed_handler)
-router.get("/blog", blog_handler)
+router.get("/blog/page*.html", blog_handler)
 router.get("/.well-known/acme-challenge/*", cert_handler)
 router.get("/*", default_handler)
 port = 8080

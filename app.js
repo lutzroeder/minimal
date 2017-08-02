@@ -273,11 +273,13 @@ function renderPost(file, host) {
     return "";
 }
 
+var blogCount = 10;
+
 function renderBlog(files, start) {
     var view = { "items": [] }
-    var length = 10;
+    var count = blogCount;
     var index = 0;
-    while (files.length > 0 && index < (start + length)) {
+    while (files.length > 0 && index < (start + count)) {
         var file = files.shift();
         var item = loadPost("blog/" + file + "/index.html");
         if (item && (item["state"] === "post" || environment !== "production")) {
@@ -299,9 +301,9 @@ function renderBlog(files, start) {
     }
     view["placeholder"] = [];
     if (files.length > 0) {
-        view["placeholder"].push({ "url": "/blog?id=" + index.toString() });
+        view["placeholder"].push({ "url": "/blog/page" + index.toString() + ".html" });
     }
-    var template = fs.readFileSync("blog/stream.html", "utf-8");
+    var template = fs.readFileSync("blog/blog.html", "utf-8");
     return mustache(template, view, null);
 }
 
@@ -324,7 +326,7 @@ function feedHandler(request, response) {
     var pathname = url.parse(request.url, true).pathname.toLowerCase();
     var format = path.basename(pathname, ".xml")
     var data = cache(format + ":" + host(request) + pathname, function () {
-        var count = 10;
+        var count = blogCount;
         var feed = {};
         feed["name"] = configuration["name"];
         feed["description"] = configuration["description"];
@@ -368,27 +370,16 @@ function feedHandler(request, response) {
     writeString(request, response, "application/" + format + "+xml", data);
 }
 
-var mimeTypeMap = {
-    ".js":   "text/javascript",
-    ".css":  "text/css",
-    ".png":  "image/png",
-    ".gif":  "image/gif",
-    ".jpg":  "image/jpeg",
-    ".ico":  "image/x-icon",
-    ".zip":  "application/zip",
-    ".json": "application/json"
-};
-
 function blogHandler(request, response) {
-    var query = url.parse(request.url, true).query;
-    if (query.id) {
-        var id = Number(query.id);
-        var key = "/blog?id=" + query.id;
+    var pathname = url.parse(request.url, true).pathname;
+    var match = pathname.match("/blog/page(.*).html$");
+    if (match && /^\d+$/.test(match[1])) {
+        var start = Number(match[1]);
         var files = posts();
         var data = "";
-        if (id < files.length) {
-            data = cache("blog:" + key, function() {
-                return renderBlog(files, id);
+        if (start < files.length) {
+            data = cache("blog:" + pathname, function() {
+                return renderBlog(files, start);
             });
         }
         writeString(request, response, "text/html", data);
@@ -409,6 +400,17 @@ function certHandler(request, response) {
     response.writeHead(404);
     response.end();
 }
+
+var mimeTypeMap = {
+    ".js":   "text/javascript",
+    ".css":  "text/css",
+    ".png":  "image/png",
+    ".gif":  "image/gif",
+    ".jpg":  "image/jpeg",
+    ".ico":  "image/x-icon",
+    ".zip":  "application/zip",
+    ".json": "application/json"
+};
 
 function defaultHandler(request, response) {
     var pathname = url.parse(request.url, true).pathname.toLowerCase();
@@ -536,7 +538,7 @@ initPathCache(".");
 var router = new Router(configuration);
 router.get("/blog/atom.xml", feedHandler);
 router.get("/blog/rss.xml", feedHandler)
-router.get("/blog", blogHandler);
+router.get("/blog/page*.html", blogHandler);
 router.get("/.well-known/acme-challenge/*", certHandler);
 router.get("/*", defaultHandler);
 var server = http.createServer(function (request, response) {

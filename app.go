@@ -383,12 +383,14 @@ func renderPost(file string, host string) string {
 	return ""
 }
 
+var blogCount = 10
+
 func renderBlog(files []string, start int) string {
 	items := make([]interface{}, 0)
 	view := make(map[string]interface{})
-	length := 10
+	count := blogCount
 	index := 0
-	for len(files) > 0 && index < start+length {
+	for len(files) > 0 && index < start+count {
 		file := files[0]
 		files = files[1:]
 		item := loadPost("blog/" + file + "/index.html")
@@ -413,10 +415,10 @@ func renderBlog(files []string, start int) string {
 	view["items"] = items
 	placeholder := make([]interface{}, 0)
 	if len(files) > 0 {
-		placeholder = append(placeholder, map[string]interface{}{"url": "/blog?id=" + strconv.Itoa(index)})
+		placeholder = append(placeholder, map[string]interface{}{"url": "/blog/page" + strconv.Itoa(index) + ".html" })
 	}
 	view["placeholder"] = placeholder
-	template, err := ioutil.ReadFile("./blog/stream.html")
+	template, err := ioutil.ReadFile("./blog/blog.html")
 	if err != nil {
 		fmt.Println(err)
 		return ""
@@ -442,7 +444,7 @@ func feedHandler(response http.ResponseWriter, request *http.Request) {
 	host := host(request)
 	url := host + pathname
 	data := cacheString(format+":"+url, func() string {
-		count := 10
+		count := blogCount
 		items := make([]interface{}, 0)
 		feed := map[string]interface{}{
 			"name":        configuration["name"],
@@ -494,21 +496,26 @@ func feedHandler(response http.ResponseWriter, request *http.Request) {
 		}
 		return ""
 	})
-	writeString(response, request, "application/"+format+"xml", data)
+	writeString(response, request, "application/"+format+"+xml", data)
 }
 
+var blogRegexp = regexp.MustCompile("/blog/page(.*).html")
+
 func blogHandler(response http.ResponseWriter, request *http.Request) {
-	id := request.URL.Query().Get("id")
-	if start, e := strconv.Atoi(id); e == nil {
-		files := posts()
-		data := ""
-		if start < len(files) {
-			data = cacheString("blog:/blog?id="+id, func() string {
-				return renderBlog(files, start)
-			})
+	pathname := strings.ToLower(path.Clean(request.URL.Path))
+	if match := blogRegexp.FindStringIndex(pathname); match != nil {
+		id := blogRegexp.FindStringSubmatch(pathname[match[0] : match[1]])[1]
+		if start, e := strconv.Atoi(id); e == nil {
+			files := posts()
+			data := ""
+			if start < len(files) {
+				data = cacheString("default:"+pathname, func() string {
+					return renderBlog(files, start)
+				})
+			}
+			writeString(response, request, "text/html", data)
+			return
 		}
-		writeString(response, request, "text/html", data)
-		return
 	}
 	rootHandler(response, request)
 }
@@ -689,7 +696,7 @@ func main() {
 	router := newRouter(configuration)
 	router.Get("/blog/atom.xml", feedHandler)
 	router.Get("/blog/rss.xml", feedHandler)
-	router.Get("/blog", blogHandler)
+	router.Get("/blog/page*.html", blogHandler)
 	router.Get("/.well-known/acme-challenge/*", certHandler)
 	router.Get("/*", defaultHandler)
 	port := 8080
