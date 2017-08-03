@@ -275,16 +275,16 @@ function renderPost(file, host) {
 
 var blogCount = 10;
 
-function renderBlog(files, start) {
+function renderBlog(folders, start) {
     var view = { "items": [] }
     var count = blogCount;
     var index = 0;
-    while (files.length > 0 && index < (start + count)) {
-        var file = files.shift();
-        var item = loadPost("blog/" + file + "/index.html");
+    while (folders.length > 0 && index < (start + count)) {
+        var folder = folders.shift();
+        var item = loadPost("blog/" + folder + "/index.html");
         if (item && (item["state"] === "post" || environment !== "production")) {
             if (index >= start) {
-                item["url"] = "/blog/" + file + "/";
+                item["url"] = "/blog/" + folder + "/";
                 if ("date" in item) {
                     var date = new Date(item["date"].split(/ \+| \-/)[0] + "Z");
                     item["date"] = formatDate(date, "user");
@@ -300,10 +300,10 @@ function renderBlog(files, start) {
         }
     }
     view["placeholder"] = [];
-    if (files.length > 0) {
+    if (folders.length > 0) {
         view["placeholder"].push({ "url": "/blog/page" + index.toString() + ".html" });
     }
-    var template = fs.readFileSync("blog/blog.html", "utf-8");
+    var template = fs.readFileSync("blog/feed.html", "utf-8");
     return mustache(template, view, null);
 }
 
@@ -324,8 +324,9 @@ function rootHandler(request, response) {
 
 function feedHandler(request, response) {
     var pathname = url.parse(request.url, true).pathname.toLowerCase();
-    var format = path.basename(pathname, ".xml")
-    var data = cache(format + ":" + host(request) + pathname, function () {
+    var filename = path.basename(pathname)
+    var format = path.extname(pathname).replace(".", "")
+    var data = cache("feed:" + host(request) + pathname, function () {
         var count = blogCount;
         var feed = {};
         feed["name"] = configuration["name"];
@@ -334,14 +335,14 @@ function feedHandler(request, response) {
         feed["host"] = host(request);
         feed["url"] = host(request) + pathname;
         feed["items"] = [];
-        var files = posts();
+        var folders = posts();
         var recentFound = false;
         var recent = new Date();
-        while (files.length > 0 && count > 0) {
-            var file = files.shift();
-            var item = loadPost("blog/" + file + "/index.html");
+        while (folders.length > 0 && count > 0) {
+            var folder = folders.shift();
+            var item = loadPost("blog/" + folder + "/index.html");
             if (item && (item["state"] === "post" || environment !== "production")) {
-                item["url"] = host(request) + "/blog/" + file + "/"; 
+                item["url"] = host(request) + "/blog/" + folder + "/"; 
                 if (!item["author"] || item["author"] === configuration["name"]) {
                     item["author"] = false;
                 }
@@ -364,7 +365,7 @@ function feedHandler(request, response) {
             }
         }
         feed["updated"] = formatDate(recent, format);
-        var template = fs.readFileSync("blog/" + format + ".xml", "utf-8");
+        var template = fs.readFileSync("blog/" + filename, "utf-8");
         return mustache(template, feed, null);
     });
     writeString(request, response, "application/" + format + "+xml", data);
@@ -375,11 +376,11 @@ function blogHandler(request, response) {
     var match = pathname.match("/blog/page(.*).html$");
     if (match && /^\d+$/.test(match[1])) {
         var start = Number(match[1]);
-        var files = posts();
+        var folders = posts();
         var data = "";
-        if (start < files.length) {
+        if (start < folders.length) {
             data = cache("blog:" + pathname, function() {
-                return renderBlog(files, start);
+                return renderBlog(folders, start);
             });
         }
         writeString(request, response, "text/html", data);
@@ -536,8 +537,8 @@ var environment = process.env.NODE_ENV;
 console.log(environment);
 initPathCache(".");
 var router = new Router(configuration);
-router.get("/blog/atom.xml", feedHandler);
-router.get("/blog/rss.xml", feedHandler)
+router.get("/blog/feed.atom", feedHandler);
+router.get("/blog/feed.rss", feedHandler)
 router.get("/blog/page*.html", blogHandler);
 router.get("/.well-known/acme-challenge/*", certHandler);
 router.get("/*", defaultHandler);

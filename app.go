@@ -301,19 +301,19 @@ func truncate(text string, length int) string {
 }
 
 func posts() []string {
-	return append([]string{}, cache("blog:files", func() interface{} {
-		files := []string{}
+	return append([]string{}, cache("blog:*", func() interface{} {
+		folders := []string{}
 		fileInfos, _ := ioutil.ReadDir("blog/")
 		for i := len(fileInfos) - 1; i >= 0; i-- {
 			if fileInfos[i].IsDir() {
 				post := fileInfos[i].Name()
 				_, err := os.Stat("blog/" + post + "/index.html")
 				if (!os.IsNotExist(err)) {
-					files = append(files, post)
+					folders = append(folders, post)
 				}
 			}
 		}
-		return files
+		return folders
 	}).([]string)...)
 }
 
@@ -385,18 +385,18 @@ func renderPost(file string, host string) string {
 
 var blogCount = 10
 
-func renderBlog(files []string, start int) string {
+func renderBlog(folders []string, start int) string {
 	items := make([]interface{}, 0)
 	view := make(map[string]interface{})
 	count := blogCount
 	index := 0
-	for len(files) > 0 && index < start+count {
-		file := files[0]
-		files = files[1:]
-		item := loadPost("blog/" + file + "/index.html")
+	for len(folders) > 0 && index < start+count {
+		folder := folders[0]
+		folders = folders[1:]
+		item := loadPost("blog/" + folder + "/index.html")
 		if item != nil && (item["state"] == "post" || environment != "production") {
 			if index >= start {
-				item["url"] = "/blog/" + file + "/"
+				item["url"] = "/blog/" + folder + "/"
 				if _, ok := item["date"]; ok {
 					if date, e := time.Parse("2006-01-02 15:04:05 -07:00", item["date"].(string)); e == nil {
 						item["date"] = formatDate(date, "user")
@@ -414,11 +414,11 @@ func renderBlog(files []string, start int) string {
 	}
 	view["items"] = items
 	placeholder := make([]interface{}, 0)
-	if len(files) > 0 {
+	if len(folders) > 0 {
 		placeholder = append(placeholder, map[string]interface{}{"url": "/blog/page" + strconv.Itoa(index) + ".html" })
 	}
 	view["placeholder"] = placeholder
-	template, err := ioutil.ReadFile("./blog/blog.html")
+	template, err := ioutil.ReadFile("./blog/feed.html")
 	if err != nil {
 		fmt.Println(err)
 		return ""
@@ -440,10 +440,11 @@ func rootHandler(response http.ResponseWriter, request *http.Request) {
 
 func feedHandler(response http.ResponseWriter, request *http.Request) {
 	pathname := request.URL.Path
-	format := strings.TrimSuffix(path.Base(pathname), ".xml")
+	filename := path.Base(pathname)
+	format := strings.TrimPrefix(path.Ext(filename), ".")
 	host := host(request)
 	url := host + pathname
-	data := cacheString(format+":"+url, func() string {
+	data := cacheString("feed:"+url, func() string {
 		count := blogCount
 		items := make([]interface{}, 0)
 		feed := map[string]interface{}{
@@ -455,13 +456,13 @@ func feedHandler(response http.ResponseWriter, request *http.Request) {
 		}
 		recentFound := false
 		recent := time.Now()
-		files := posts()
-		for len(files) > 0 && count > 0 {
-			file := files[0]
-			files = files[1:]
-			item := loadPost("blog/" + file + "/index.html")
+		folders := posts()
+		for len(folders) > 0 && count > 0 {
+			folder := folders[0]
+			folders = folders[1:]
+			item := loadPost("blog/" + folder + "/index.html")
 			if item != nil && (item["state"] == "post" || environment != "production") {
-				item["url"] = host + "/blog/" + file + "/"
+				item["url"] = host + "/blog/" + folder + "/"
 				if author, ok := item["author"]; !ok || author.(string) == configuration["name"].(string) {
 					item["author"] = false
 				}
@@ -488,7 +489,7 @@ func feedHandler(response http.ResponseWriter, request *http.Request) {
 		}
 		feed["updated"] = formatDate(recent, format)
 		feed["items"] = items
-		template, err := ioutil.ReadFile("./blog/" + format + ".xml")
+		template, err := ioutil.ReadFile("./blog/" + filename)
 		if err != nil {
 			fmt.Println(err)
 		} else {
@@ -506,11 +507,11 @@ func blogHandler(response http.ResponseWriter, request *http.Request) {
 	if match := blogRegexp.FindStringIndex(pathname); match != nil {
 		id := blogRegexp.FindStringSubmatch(pathname[match[0] : match[1]])[1]
 		if start, e := strconv.Atoi(id); e == nil {
-			files := posts()
+			folders := posts()
 			data := ""
-			if start < len(files) {
+			if start < len(folders) {
 				data = cacheString("default:"+pathname, func() string {
-					return renderBlog(files, start)
+					return renderBlog(folders, start)
 				})
 			}
 			writeString(response, request, "text/html", data)
@@ -694,8 +695,8 @@ func main() {
 	fmt.Println(environment)
 	initPathCache(".")
 	router := newRouter(configuration)
-	router.Get("/blog/atom.xml", feedHandler)
-	router.Get("/blog/rss.xml", feedHandler)
+	router.Get("/blog/feed.atom", feedHandler)
+	router.Get("/blog/feed.rss", feedHandler)
 	router.Get("/blog/page*.html", blogHandler)
 	router.Get("/.well-known/acme-challenge/*", certHandler)
 	router.Get("/*", defaultHandler)

@@ -344,7 +344,7 @@ class Program
 
     static Queue<string> Posts()
     {
-        var posts = (List<string>) Cache("blog:files", delegate() {
+        var posts = (List<string>) Cache("blog:*", delegate() {
             var list = new List<string>(Directory.GetDirectories("blog/").Where(post => File.Exists(post + "/index.html")).Select(post => Path.GetFileName(post)));
             list.Sort();
             list.Reverse();
@@ -382,21 +382,21 @@ class Program
 
     static int blogCount = 10;
 
-    static string RenderBlog(Queue<string> files, int start)
+    static string RenderBlog(Queue<string> folders, int start)
     {
         var items = new List<object>();
         var view = new Dictionary<string, object>() { ["items"] = items };
         int count = blogCount;
         int index = 0;
-        while (files.Count > 0 && index < (start + count))
+        while (folders.Count > 0 && index < (start + count))
         {
-            string file = files.Dequeue();
-            var item = LoadPost("blog/" + file + "/index.html");
+            string folder = folders.Dequeue();
+            var item = LoadPost("blog/" + folder + "/index.html");
             if (item != null && (((string)item["state"]) == "post" || !environment.IsProduction()))
             {
                 if (index >= start)
                 {
-                    item["url"] = "/blog/" + file + "/";
+                    item["url"] = "/blog/" + folder + "/";
                     DateTime date;
                     if (item.ContainsKey("date") && DateTime.TryParse(item["date"] as string, out date))
                     {
@@ -415,11 +415,11 @@ class Program
         }
         var placeholder = new List<object>();
         view["placeholder"] = placeholder;
-        if (files.Count > 0)
+        if (folders.Count > 0)
         {
             placeholder.Add(new Dictionary<string, object>() { ["url"] = "/blog/page" + index.ToString() + ".html" });
         }
-        var template = File.ReadAllText("blog/blog.html");
+        var template = File.ReadAllText("blog/feed.html");
         return Mustache(template, view, null);
     }
 
@@ -444,10 +444,11 @@ class Program
     static Task FeedHandler(HttpContext context)
     {
         var pathname = context.Request.Path.Value.ToLower();
-        var format = Path.GetFileNameWithoutExtension(pathname);
+        var filename = Path.GetFileName(pathname);
+        var format = Path.GetExtension(pathname).TrimStart('.');
         var host = Host(context);
         var url = host + pathname;
-        var data = CacheString(format + ":" + url, delegate() {
+        var data = CacheString("feed:" + url, delegate() {
             var count = blogCount;
             var items = new List<object>();
             var feed = new Dictionary<string, object>() {
@@ -458,12 +459,12 @@ class Program
                 ["url"] = url,
                 ["items"] = items
             };
-            var files = Posts();
+            var folder = Posts();
             var recentFound = false;
             var recent = DateTime.Now;
-            while (files.Count > 0 && count > 0) 
+            while (folder.Count > 0 && count > 0) 
             {
-                string file = files.Dequeue();
+                string file = folder.Dequeue();
                 var item = LoadPost("blog/" + file + "/index.html");
                 if (item != null && (((string)item["state"]) == "post" || !environment.IsProduction()))
                 {
@@ -494,7 +495,7 @@ class Program
                 }
             }
             feed["updated"] = FormatDate(recent, format);
-            var template = File.ReadAllText("blog/" + format + ".xml");
+            var template = File.ReadAllText("blog/" + filename);
             return Mustache(template, feed, null);
         });
         return WriteStringAsync(context, "application/"+format+"+xml", data);
@@ -509,11 +510,11 @@ class Program
         int start = 0;
         if (match.Success && int.TryParse(match.Groups[1].Value, out start))
         {
-            var files = Posts();
+            var folders = Posts();
             var data = string.Empty;
-            if (start < files.Count)
+            if (start < folders.Count)
             {
-                data = CacheString("default:" + pathname, () => RenderBlog(files, start));
+                data = CacheString("default:" + pathname, () => RenderBlog(folders, start));
             }
             return WriteStringAsync(context, "text/html", data);
         }
@@ -696,8 +697,8 @@ class Program
         Console.WriteLine("dotnetcore " + version);
         configuration = (IDictionary<string, object>) JsonReader.Parse(File.ReadAllText("app.json"));
         Router router = new Router(configuration);
-        router.Get("/blog/atom.xml", FeedHandler);
-        router.Get("/blog/rss.xml", FeedHandler);
+        router.Get("/blog/feed.atom", FeedHandler);
+        router.Get("/blog/feed.rss", FeedHandler);
         router.Get("/blog/page*.html", BlogHandler);
         router.Get("/.well-known/acme-challenge/*", CertHandler);
         router.Get("/*", DefaultHandler);

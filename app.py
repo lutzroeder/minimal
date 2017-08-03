@@ -148,12 +148,12 @@ def isdir(path):
 
 def posts():
     def get_posts():
-        files = []
+        folders = []
         for post in sorted(os.listdir("./blog"), reverse=True):
             if os.path.isdir("./blog/" + post) and os.path.exists("./blog/" + post + "/index.html"):
-                files.append(post)
-        return files
-    return list(cache("blog:files", get_posts))
+                folders.append(post)
+        return folders
+    return list(cache("blog:*", get_posts))
 
 tag_regexp = re.compile(r"<(\w+)[^>]*>")
 entity_regexp = re.compile(r"(#?[A-Za-z0-9]+;)")
@@ -236,16 +236,16 @@ def load_post(path):
 
 blog_count = 10
 
-def render_blog(files, start):
+def render_blog(folders, start):
     view = { "items": [] }
     count = blog_count
     index = 0
-    while len(files) > 0 and index < start + count:
-        filename = files.pop(0)
-        item = load_post("blog/" + filename + "/index.html")
+    while len(folders) > 0 and index < start + count:
+        folder = folders.pop(0)
+        item = load_post("blog/" + folder + "/index.html")
         if item and (item["state"] == "post" or environment != "production"):
             if index >= start:
-                item["url"] = "/blog/" + filename + "/"
+                item["url"] = "/blog/" + folder + "/"
                 if "date" in item:
                     date = dateutil.parser.parse(item["date"])
                     item["date"] = format_date(date, "user")
@@ -257,9 +257,9 @@ def render_blog(files, start):
                 view["items"].append(item)
             index += 1
     view["placeholder"] = []
-    if len(files) > 0:
+    if len(folders) > 0:
         view["placeholder"].append({ "url": "/blog/page" + str(index) + ".html" })
-    template = read_file("./blog/blog.html")
+    template = read_file("./blog/feed.html")
     return mustache(template, view, None)
 
 def write_string(request, content_type, data):
@@ -278,7 +278,8 @@ def root_handler(request):
 
 def feed_handler(request):
     pathname = urlparse(request.path).path.lower()
-    format = os.path.splitext(os.path.basename(pathname))[0]
+    filename = os.path.basename(pathname)
+    format = os.path.splitext(filename)[1].replace(".", "")
     url = host(request) + pathname
     def render_feed():
         count = blog_count
@@ -292,12 +293,12 @@ def feed_handler(request):
         }
         recent_found = False
         recent = datetime.datetime.now()
-        files = posts()
-        while len(files) > 0 and count > 0:
-            filename = files.pop(0)
-            item = load_post("blog/" + filename + "/index.html")
+        folders = posts()
+        while len(folders) > 0 and count > 0:
+            folder = folders.pop(0)
+            item = load_post("blog/" + folder + "/index.html")
             if item and (item["state"] == "post" or environment != "production"):
-                item["url"] = host(request) + "/blog/" + filename + "/"
+                item["url"] = host(request) + "/blog/" + folder + "/"
                 if not "author" in item or item["author"] == configuration["name"]:
                     item["author"] = False
                 if "date" in item:
@@ -314,9 +315,9 @@ def feed_handler(request):
                 feed["items"].append(item)
                 count -= 1
         feed["updated"] = format_date(recent, format)
-        template = read_file("./blog/" + format + ".xml")
+        template = read_file("./blog/" + filename)
         return mustache(template, feed, None)
-    data = cache(format + ":" + url, render_feed)
+    data = cache("feed:" + url, render_feed)
     write_string(request, "application/" + format + "+xml", data)
 
 def render_post(file, host):
@@ -342,10 +343,10 @@ def blog_handler(request):
     match = blog_regexp.match(pathname) 
     if match and match.group(1).isdigit():
         start = int(match.group(1))
-        files = posts()
+        folders = posts()
         data = ""
-        if start < len(files):
-            data = cache("default:" + pathname, lambda: render_blog(files, start))
+        if start < len(folders):
+            data = cache("default:" + pathname, lambda: render_blog(folders, start))
         write_string(request, "text/html", data)
         return
     root_handler(request)
@@ -455,8 +456,8 @@ environment = os.getenv("PYTHON_ENV")
 print(environment)
 init_path_cache(".")
 router = Router(configuration)
-router.get("/blog/atom.xml", feed_handler)
-router.get("/blog/rss.xml", feed_handler)
+router.get("/blog/feed.atom", feed_handler)
+router.get("/blog/feed.rss", feed_handler)
 router.get("/blog/page*.html", blog_handler)
 router.get("/.well-known/acme-challenge/*", cert_handler)
 router.get("/*", default_handler)
