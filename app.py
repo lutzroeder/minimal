@@ -234,11 +234,9 @@ def load_post(path):
         return item
     return None
 
-blog_count = 10
-
 def render_blog(folders, start):
     view = { "items": [] }
-    count = blog_count
+    count = 10
     index = 0
     while len(folders) > 0 and index < start + count:
         folder = folders.pop(0)
@@ -282,7 +280,7 @@ def feed_handler(request):
     format = os.path.splitext(filename)[1].replace(".", "")
     url = host(request) + pathname
     def render_feed():
-        count = blog_count
+        count = 10
         feed = {
             "name": configuration["name"],
             "description": configuration["description"],

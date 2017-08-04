@@ -383,12 +383,10 @@ func renderPost(file string, host string) string {
 	return ""
 }
 
-var blogCount = 10
-
 func renderBlog(folders []string, start int) string {
 	items := make([]interface{}, 0)
 	view := make(map[string]interface{})
-	count := blogCount
+	count := 10
 	index := 0
 	for len(folders) > 0 && index < start+count {
 		folder := folders[0]
@@ -445,7 +443,7 @@ func feedHandler(response http.ResponseWriter, request *http.Request) {
 	host := host(request)
 	url := host + pathname
 	data := cacheString("feed:"+url, func() string {
-		count := blogCount
+		count := 10
 		items := make([]interface{}, 0)
 		feed := map[string]interface{}{
 			"name":        configuration["name"],

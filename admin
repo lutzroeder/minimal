@@ -403,8 +403,8 @@ client_test() {
     NODE_ENV=production node ./app.js & pid=$!
     sleep 0.5
     curl -s http://localhost:8080/ > ${output}/root_node.html
-    curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_node.xml
-    curl -s http://localhost:8080/blog/rss.xml > ${output}/rss_node.xml
+    curl -s http://localhost:8080/blog/feed.atom > ${output}/feed_node.atom
+    curl -s http://localhost:8080/blog/feed.rss > ${output}/feed_node.rss
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
     echo "${bold}go${regular}"
@@ -412,16 +412,16 @@ client_test() {
     GO_ENV=production .vscode/out/go/app & pid=$!
     sleep 0.5
     curl -s http://localhost:8080/ > ${output}/root_go.html
-    curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_go.xml
-    curl -s http://localhost:8080/blog/rss.xml > ${output}/rss_go.xml
+    curl -s http://localhost:8080/blog/feed.atom > ${output}/feed_go.atom
+    curl -s http://localhost:8080/blog/feed.rss > ${output}/feed_go.rss
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
     echo "${bold}python${regular}"
     PYTHON_ENV=production python ./app.py & pid=$!
     sleep 0.5
     curl -s http://localhost:8080/ > ${output}/root_python.html
-    curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_python.xml
-    curl -s http://localhost:8080/blog/rss.xml > ${output}/rss_python.xml
+    curl -s http://localhost:8080/blog/feed.atom > ${output}/feed_python.atom
+    curl -s http://localhost:8080/blog/feed.rss > ${output}/feed_python.rss
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
     echo "${bold}dotnet${regular}"
@@ -433,20 +433,20 @@ client_test() {
     ASPNETCORE_ENVIRONMENT=Production dotnet exec .vscode/out/dotnet/bin/netcoreapp1.1/app.dll & pid=$!
     sleep 1
     curl -s http://localhost:8080/ > ${output}/root_dotnet.html
-    curl -s http://localhost:8080/blog/atom.xml > ${output}/atom_dotnet.xml
-    curl -s http://localhost:8080/blog/rss.xml > ${output}/rss_dotnet.xml
+    curl -s http://localhost:8080/blog/feed.atom > ${output}/feed_dotnet.atom
+    curl -s http://localhost:8080/blog/feed.rss > ${output}/feed_dotnet.rss
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
     echo "${bold}compare${regular}"
     cmp ${output}/root_node.html ${output}/root_go.html
     cmp ${output}/root_node.html ${output}/root_python.html
     cmp ${output}/root_node.html ${output}/root_dotnet.html
-    cmp ${output}/atom_node.xml ${output}/atom_go.xml
-    cmp ${output}/atom_node.xml ${output}/atom_python.xml
-    cmp ${output}/atom_node.xml ${output}/atom_dotnet.xml
-    cmp ${output}/rss_node.xml ${output}/rss_go.xml
-    cmp ${output}/rss_node.xml ${output}/rss_python.xml
-    cmp ${output}/rss_node.xml ${output}/rss_dotnet.xml
+    cmp ${output}/feed_node.atom ${output}/feed_go.atom
+    cmp ${output}/feed_node.atom ${output}/feed_python.atom
+    cmp ${output}/feed_node.atom ${output}/feed_dotnet.atom
+    cmp ${output}/feed_node.rss ${output}/feed_go.rss
+    cmp ${output}/feed_node.rss ${output}/feed_python.rss
+    cmp ${output}/feed_node.rss ${output}/feed_dotnet.rss
 }
 
 client_console() {

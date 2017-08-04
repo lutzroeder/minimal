@@ -273,11 +273,9 @@ function renderPost(file, host) {
     return "";
 }
 
-var blogCount = 10;
-
 function renderBlog(folders, start) {
     var view = { "items": [] }
-    var count = blogCount;
+    var count = 10;
     var index = 0;
     while (folders.length > 0 && index < (start + count)) {
         var folder = folders.shift();
@@ -327,7 +325,7 @@ function feedHandler(request, response) {
     var filename = path.basename(pathname)
     var format = path.extname(pathname).replace(".", "")
     var data = cache("feed:" + host(request) + pathname, function () {
-        var count = blogCount;
+        var count = 10;
         var feed = {};
         feed["name"] = configuration["name"];
         feed["description"] = configuration["description"];
@@ -481,7 +479,7 @@ function Router(configuration) {
     this.routes = [];
     if (configuration["redirects"]) {
         for (var i = 0; i < configuration["redirects"].length; i++) {
-            var redirect = configuration["redirects"][i]
+            var redirect = configuration["redirects"][i];
             var target = redirect["target"];
             this.get(redirect["pattern"], function (request, response) {
                 response.writeHead(301, { "Location": target });

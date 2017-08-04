@@ -380,13 +380,11 @@ class Program
         return string.Empty;        
     }
 
-    static int blogCount = 10;
-
     static string RenderBlog(Queue<string> folders, int start)
     {
         var items = new List<object>();
         var view = new Dictionary<string, object>() { ["items"] = items };
-        int count = blogCount;
+        int count = 10;
         int index = 0;
         while (folders.Count > 0 && index < (start + count))
         {
@@ -449,7 +447,7 @@ class Program
         var host = Host(context);
         var url = host + pathname;
         var data = CacheString("feed:" + url, delegate() {
-            var count = blogCount;
+            var count = 10;
             var items = new List<object>();
             var feed = new Dictionary<string, object>() {
                 ["name"] = configuration["name"],
