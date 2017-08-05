@@ -494,7 +494,7 @@ Router.prototype.route = function (pattern) {
     if (!route) {
         route = {
             pattern: pattern,
-            regexp: new RegExp("^" + pattern.replace("*", "(.*)") + "$", "i"),
+            regexp: new RegExp("^" + pattern.replace(".", "\.").replace("*", "(.*)") + "$", "i"),
             handlers: {}
         };
         this.routes.push(route);

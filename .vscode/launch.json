@@ -5,7 +5,7 @@
             "name": "node",
             "type": "node",
             "request": "launch",
-            "program": "${workspaceRoot}/app.js",
+            "program": "${file}",
             "env": {
                 "NODE_ENV": "development"
             }
@@ -32,20 +32,6 @@
             ],
             "env": {
                 "PYTHON_ENV": "development"
-            }
-        },
-        {
-            "name": "dotnet",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "dotnet_build",
-            "program": "${workspaceRoot}/.vscode/out/dotnet/bin/netcoreapp1.1/app.dll",
-            "args": [],
-            "cwd": "${workspaceRoot}",
-            "stopAtEntry": false,
-            "internalConsoleOptions": "openOnSessionStart",
-            "env": {
-                "ASPNETCORE_ENVIRONMENT": "Development"
             }
         }
     ]

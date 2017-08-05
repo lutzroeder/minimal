@@ -14,12 +14,7 @@ server_install() {
     server_uninstall
 
     echo "${bold}apt-get update${regular}"
-    if [ ${runtime} = "dotnet" ]; then
-        if [ -z "$(which dotonet)" ]; then
-            sudo sh -c 'echo "deb [arch=amd64] https://apt-mo.trafficmanager.net/repos/dotnet-release/ xenial main" > /etc/apt/sources.list.d/dotnetdev.list'
-            sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 417A0893
-        fi
-    elif [ ${runtime} = "node" ]; then
+    if [ ${runtime} = "node" ]; then
         if [ -z "$(which node)" ]; then
             curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
         fi
@@ -32,9 +27,6 @@ server_install() {
     elif [ ${runtime} = "python" ]; then
         echo "${bold}apt-get install python${regular}"
         sudo apt-get -qq install --yes python python-dateutil
-    elif [ ${runtime} = "dotnet" ]; then
-        echo "${bold}apt-get install dotnet-dev-1.0.1${regular}"
-        sudo apt-get -qq install --yes dotnet-dev-1.0.1
     else
         echo "${bold}apt-get install nodejs${regular}"
         sudo apt-get -qq install --yes nodejs
@@ -155,14 +147,11 @@ EOF
 
     echo "${bold}install ${site}.service${regular}"
     if [ ${runtime} = "go" ]; then 
-        command="$(pwd)/.vscode/out/go/app"
+        command="$(which go) run $(pwd)/app.go"
         environment="GO_ENV=production"
     elif [ ${runtime} = "python" ]; then
         command="$(which python) $(pwd)/app.py"
         environment="PYTHON_ENV=production"
-    elif [ ${runtime} = "dotnet" ]; then
-        command="$(which dotnet) exec .vscode/out/dotnet/bin/netcoreapp1.1/app.dll"
-        environment="ASPNETCORE_ENVIRONMENT=Production"
     else
         command="$(which node) $(pwd)/app.js"
         environment="NODE_ENV=production"
@@ -190,7 +179,6 @@ EOF
         echo "${bold}${error}${site}.service is not enabled.${regular}"
         return
     fi
-
 }
 
 server_uninstall() {
@@ -248,18 +236,6 @@ server_uninstall() {
 
 server_start() {
     echo "${bold}start ${site}.service${regular}"
-    if [ ${runtime} = "go" ]; then
-        go build -o .vscode/out/go/app app.go
-        if [ $? -ne 0 ]; then
-            return
-        fi
-    elif [ ${runtime} = "dotnet" ]; then
-        dotnet restore && dotnet build
-        if [ $? -ne 0 ]; then
-            echo "${bold}${error}dotnet restore && dotnet build failed.${regular}"
-            return
-        fi
-    fi
     sudo systemctl start ${site}.service
     sleep 2
     sudo systemctl status ${site}.service  --no-pager --lines=1000 --full
@@ -349,20 +325,9 @@ server_test() {
 
 client_start() {
     if [ ${1:-${runtime}} = "go" ]; then 
-        go build -o .vscode/out/go/app app.go
-        if [ $? -ne 0 ]; then
-            return
-        fi
-        sleep 0.5 && git web--browse http://localhost:8080 & GO_ENV=${GO_ENV:-development} .vscode/out/go/app
+        sleep 0.5 && git web--browse http://localhost:8080 & GO_ENV=${GO_ENV:-development} go run app.go
     elif [ ${1:-${runtime}} = "python" ]; then
         sleep 0.5 && git web--browse http://localhost:8080 & PYTHON_ENV=${PYTHON_ENV:-development} python app.py
-    elif [ ${1:-${runtime}} = "dotnet" ]; then
-        dotnet restore > /dev/null && dotnet build > /dev/null
-        if [ $? -ne 0 ]; then
-            echo "${bold}${error}dotnet restore && dotnet build failed.${regular}"
-            return
-        fi
-        sleep 1 && git web--browse http://localhost:8080 & ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development} dotnet exec .vscode/out/dotnet/bin/netcoreapp1.1/app.dll
     else
         sleep 0.5 && git web--browse http://localhost:8080 & NODE_ENV=${NODE_ENV:-development} node app.js
     fi
@@ -408,12 +373,12 @@ client_test() {
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
     echo "${bold}go${regular}"
-    go build -o .vscode/out/go/app app.go
-    GO_ENV=production .vscode/out/go/app & pid=$!
+    GO_ENV=production go run app.go & pid=$!
     sleep 0.5
     curl -s http://localhost:8080/ > ${output}/root_go.html
     curl -s http://localhost:8080/blog/feed.atom > ${output}/feed_go.atom
     curl -s http://localhost:8080/blog/feed.rss > ${output}/feed_go.rss
+    kill -9 $(ps -ef | awk '$3 == '${pid}' { print $2 }')
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
     echo "${bold}python${regular}"
@@ -424,29 +389,13 @@ client_test() {
     curl -s http://localhost:8080/blog/feed.rss > ${output}/feed_python.rss
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
-    echo "${bold}dotnet${regular}"
-    dotnet restore > /dev/null && dotnet build > /dev/null
-    if [ $? -ne 0 ]; then
-        echo "${bold}${error}dotnet restore && dotnet build failed.${regular}"
-        return
-    fi
-    ASPNETCORE_ENVIRONMENT=Production dotnet exec .vscode/out/dotnet/bin/netcoreapp1.1/app.dll & pid=$!
-    sleep 1
-    curl -s http://localhost:8080/ > ${output}/root_dotnet.html
-    curl -s http://localhost:8080/blog/feed.atom > ${output}/feed_dotnet.atom
-    curl -s http://localhost:8080/blog/feed.rss > ${output}/feed_dotnet.rss
-    kill -9 ${pid}
-    wait ${pid} 2>/dev/null
     echo "${bold}compare${regular}"
     cmp ${output}/root_node.html ${output}/root_go.html
     cmp ${output}/root_node.html ${output}/root_python.html
-    cmp ${output}/root_node.html ${output}/root_dotnet.html
     cmp ${output}/feed_node.atom ${output}/feed_go.atom
     cmp ${output}/feed_node.atom ${output}/feed_python.atom
-    cmp ${output}/feed_node.atom ${output}/feed_dotnet.atom
     cmp ${output}/feed_node.rss ${output}/feed_go.rss
     cmp ${output}/feed_node.rss ${output}/feed_python.rss
-    cmp ${output}/feed_node.rss ${output}/feed_dotnet.rss
 }
 
 client_console() {

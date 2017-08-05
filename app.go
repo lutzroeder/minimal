@@ -641,7 +641,7 @@ func (router *router) route(pattern string) *route {
 	}
 	route := &route{
 		pattern,
-		regexp.MustCompile("^" + strings.Replace(pattern, "*", "(.*)", -1) + "$"),
+		regexp.MustCompile("^" + strings.Replace(strings.Replace(pattern, ".", "\\.", -1), "*", "(.*)", -1) + "$"),
 		make(map[string]interface{}),
 	}
 	router.routes = append(router.routes, route)

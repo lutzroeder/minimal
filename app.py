@@ -416,7 +416,7 @@ class Router(object):
         if not route:
             route = {
                 "pattern": pattern,
-                "regexp": re.compile("^" + pattern.replace("*", "(.*)") + "$"),
+                "regexp": re.compile("^" + pattern.replace(".", "\.").replace("*", "(.*)") + "$"),
                 "handlers": {}
             }
             self.routes.append(route)

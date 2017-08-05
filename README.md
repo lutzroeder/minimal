@@ -1,6 +1,6 @@
 # Minimal
 
-Minimal is a personal website and blog template for Go, Node.js, Python and .NET Core. It has no external dependencies and requires only a few hundred lines of server code to run. Everything is minimal, easy to take appart and rewrite.
+Minimal is a personal website and blog template for Go, Node.js and Python. It has no external dependencies and requires only a few hundred lines of server code to run. Everything is minimal, easy to take appart and rewrite.
 
 ## Getting Started
 
@@ -13,7 +13,6 @@ To launch the web server locally run **either** of the following:
 * Install [Node.js](https://nodejs.org/en/download) and run `node app.js`.
 * Install [Go](https://golang.org/doc/install) and run `go run app.go`.
 * Install [Python](https://www.python.org/downloads/) and run `python app.py`.
-* Install [.NET Core](https://www.microsoft.com/net/core) and run `dotnet restore && dotnet run`
 
 Finally, navigate to `http://localhost:8080` in your web browser to see the result.
 
