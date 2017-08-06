@@ -5,7 +5,7 @@
             "name": "node",
             "type": "node",
             "request": "launch",
-            "program": "${file}",
+            "program": "${workspaceRoot}/app.js",
             "env": {
                 "NODE_ENV": "development"
             }

@@ -362,7 +362,7 @@ client_push() {
 }
 
 client_test() {
-    output="./.vscode/out/test"
+    output="./test"
     mkdir -p ${output}
     echo "${bold}node${regular}"
     NODE_ENV=production node ./app.js & pid=$!
@@ -390,12 +390,16 @@ client_test() {
     kill -9 ${pid}
     wait ${pid} 2>/dev/null
     echo "${bold}compare${regular}"
-    cmp ${output}/root_node.html ${output}/root_go.html
-    cmp ${output}/root_node.html ${output}/root_python.html
-    cmp ${output}/feed_node.atom ${output}/feed_go.atom
-    cmp ${output}/feed_node.atom ${output}/feed_python.atom
-    cmp ${output}/feed_node.rss ${output}/feed_go.rss
-    cmp ${output}/feed_node.rss ${output}/feed_python.rss
+    error_status=0
+    cmp "${output}/root_node.html" "${output}/root_go.html" || error_status=$?
+    cmp "${output}/root_node.html" "${output}/root_python.html" || error_status=$?
+    cmp "${output}/feed_node.atom" "${output}/feed_go.atom" || error_status=$?
+    cmp "${output}/feed_node.atom" "${output}/feed_python.atom" || error_status=$?
+    cmp "${output}/feed_node.rss" "${output}/feed_go.rss" || error_status=$?
+    cmp "${output}/feed_node.rss" "${output}/feed_python.rss" || error_status=$?
+    if [ ${error_status} == 0 ]; then 
+        rm -R ${output}
+    fi
 }
 
 client_console() {
