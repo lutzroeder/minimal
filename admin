@@ -335,13 +335,13 @@ client_start() {
 
 client_status() {
     echo "${bold}ssh ${user}@${server} status${regular}"
-    ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin status"
+    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin status"
 }
 
 client_update() {
     client_push
     echo "${bold}ssh ${user}@${server} update${regular}"
-    ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin update" # | sed 's/^/    /'
+    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin update" # | sed 's/^/    /'
 }
 
 client_push() {
@@ -403,7 +403,7 @@ client_test() {
 }
 
 client_console() {
-    ssh -i ~/.ssh/${user}_id_rsa ${user}@${server} -t "cd /var/www/${site} && exec bash -l"
+    ssh -i ${identity} ${user}@${server} -t "cd /var/www/${site} && exec bash -l"
 }
 
 description() {
