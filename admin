@@ -96,10 +96,9 @@ cat << EOF >> "${site}.conf"
     }
 }
 EOF
-    sudo cp "${site}.conf" "/etc/nginx/sites-available/${site}.conf"
+    sudo cp "${site}.conf" "/etc/nginx/sites-enabled/${site}.conf"
     rm "${site}.conf"
     sudo rm -f "/etc/nginx/sites-enabled/default"
-    sudo ln -f -s "/etc/nginx/sites-available/${site}.conf" "/etc/nginx/sites-enabled/${site}.conf"
     sudo systemctl start "nginx.service"
     if [ $(systemctl is-active "nginx.service") != "active" ]; then
         sudo systemctl status "nginx.service" --no-pager --lines=25 --full
@@ -219,11 +218,10 @@ server_uninstall() {
         fi
         sudo rm "/etc/systemd/system/${site}.service"
     fi
-    if [ -f "/etc/nginx/sites-available/${site}.conf" ]; then
+    if [ -f "/etc/nginx/sites-enabled/${site}.conf" ]; then
         echo "${bold}uninstall nginx.service${regular}"
         sudo systemctl stop "nginx.service"
         sudo rm "/etc/nginx/sites-enabled/${site}.conf"
-        sudo rm "/etc/nginx/sites-available/${site}.conf"
         sudo ln -f -s "/etc/nginx/sites-available/default" "/etc/nginx/sites-enabled/default"
         sudo systemctl start "nginx.service"
         if [ $(systemctl is-active "nginx.service") != "active" ]; then
@@ -410,9 +408,8 @@ description() {
     echo
     echo "  This script automates common tasks to run this website."
     echo "  It can be configured via ${underline}${configuration}${regular} and provides two sets of commmands,"
-    echo "  one for local development and another for running the website on an"
-    echo "  actual Linux server. Your computer is considered a server if the "
-    echo "  script is located at /var/www/\${site}/."
+    echo "  for local development and for running the website on a Linux server."
+    echo "  Your computer is considered a server if \$ENVIRONMENT=production."
     echo
 }
 
@@ -470,7 +467,7 @@ client() {
     esac
 }
 
-if [ -d "/var/www/${site}" ]; then 
+if [ "${ENVIRONMENT}" = "production" ]; then 
     server $@
 else
     client $@
