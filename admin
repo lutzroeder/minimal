@@ -67,20 +67,13 @@ ${ssl}
 EOF
         else
 cat << EOF >> "${site}.conf"
-server {
-    listen 80
     server_name www.${domain};
 EOF
         fi
     fi
 cat << EOF >> "${site}.conf"
-    gzip on;
-    gzip_proxied any;
-    gzip_min_length 1000;
-    gzip_http_version 1.0;
-    gzip_disable 'msie6';
+    gzip on; gzip_proxied any; gzip_min_length 1000; gzip_http_version 1.0; gzip_disable 'msie6'; gzip_vary on;
     gzip_types text/plain text/css text/javascript application/json application/atom+xml application/rss+xml;
-    gzip_vary on;
     location / {
         proxy_pass http://localhost:8080;
         proxy_http_version 1.1;
@@ -96,14 +89,18 @@ cat << EOF >> "${site}.conf"
     }
 }
 EOF
-    sudo cp "${site}.conf" "/etc/nginx/sites-enabled/${site}.conf"
-    rm "${site}.conf"
-    sudo rm -f "/etc/nginx/sites-enabled/default"
-    sudo systemctl start "nginx.service"
-    if [ $(systemctl is-active "nginx.service") != "active" ]; then
-        sudo systemctl status "nginx.service" --no-pager --lines=25 --full
-        echo "${bold}${error}ngnix.service is not active.${regular}"
-        return
+    if [ $(which nginx) ]; then
+        nginx_configuration=$(dirname $(nginx -V 2>&1 | grep -o '\-\-conf-path=\(.*conf\)' | cut -d '=' -f2))
+        if sudo test -f "${nginx_configuration}/conf.d/default.conf"; then
+            sudo mv "${nginx_configuration}/conf.d/default.conf" "${nginx_configuration}/conf.d/default.conf.backup"
+        fi
+        sudo mv "${site}.conf" "${nginx_configuration}/conf.d/${site}.conf"
+        sudo systemctl start "nginx.service"
+        if [ $(systemctl is-active "nginx.service") != "active" ]; then
+            sudo systemctl status "nginx.service" --no-pager --lines=25 --full
+            echo "${bold}${error}ngnix.service is not active.${regular}"
+            return
+        fi
     fi
 
     if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
@@ -218,16 +215,21 @@ server_uninstall() {
         fi
         sudo rm "/etc/systemd/system/${site}.service"
     fi
-    if [ -f "/etc/nginx/sites-enabled/${site}.conf" ]; then
-        echo "${bold}uninstall nginx.service${regular}"
-        sudo systemctl stop "nginx.service"
-        sudo rm "/etc/nginx/sites-enabled/${site}.conf"
-        sudo ln -f -s "/etc/nginx/sites-available/default" "/etc/nginx/sites-enabled/default"
-        sudo systemctl start "nginx.service"
-        if [ $(systemctl is-active "nginx.service") != "active" ]; then
-            sudo systemctl status ngnix.service --no-pager --lines=25 --full
-            echo "${bold}${error}ngnix.service is not active.${regular}"
-            return
+    if [ $(which nginx) ]; then
+        nginx_conf=$(dirname $(nginx -V 2>&1 | grep -o '\-\-conf-path=\(.*conf\)' | cut -d '=' -f2))/conf.d
+        if [ -f "${nginx_conf}/${site}.conf" ]; then
+            echo "${bold}uninstall nginx.service${regular}"
+            sudo systemctl stop "nginx.service"
+            if sudo test -f "${nginx_conf}/default.conf"; then
+                sudo mv "${nginx_conf}/default.conf.backup" "${nginx_configuration}/default.conf"
+            fi
+            sudo rm "${nginx_conf}/${site}.conf"
+            sudo systemctl start "nginx.service"
+            if [ $(systemctl is-active "nginx.service") != "active" ]; then
+                sudo systemctl status ngnix.service --no-pager --lines=25 --full
+                echo "${bold}${error}ngnix.service is not active.${regular}"
+                return
+            fi
         fi
     fi
 }
@@ -295,7 +297,7 @@ server_cert() {
     fi
 }
 
-server_status() {
+server_log() {
     sudo systemctl status ${site}.service --no-pager --lines=1000 --full
 }
 
@@ -331,9 +333,8 @@ client_start() {
     fi
 }
 
-client_status() {
-    echo "${bold}ssh ${user}@${server} status${regular}"
-    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin status"
+client_log() {
+    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin log"
 }
 
 client_update() {
@@ -424,7 +425,7 @@ server() {
         "start") server_start;;
         "stop") server_stop;;
         "update") server_update;;
-        "status") server_status;;
+        "log") server_log;;
         "test") server_test;;
         *)
             description;
@@ -432,10 +433,10 @@ server() {
             echo
             echo "    ${bold}install${regular}    Install NGINX and ${bold}${site}.service${regular}"
             echo "    ${bold}start${regular}      Start service"
-            echo "    ${bold}status${regular}     Print current service status"
-            echo "    ${bold}update${regular}     Run stop, pull, start and status"
-            echo "    ${bold}cert${regular}       Create or renew SSL certificate"
+            echo "    ${bold}update${regular}     Run stop, pull and start"
             echo "    ${bold}pull${regular}       Fetch Git repo and reset master branch"
+            echo "    ${bold}log${regular}        Show server log"
+            echo "    ${bold}cert${regular}       Create or renew SSL certificate"
             echo "    ${bold}stop${regular}       Stop service"
             echo "    ${bold}uninstall${regular}  Stop and uninstall service"
             echo;
@@ -450,7 +451,7 @@ client() {
         "start") client_start $@;;
         "push") client_push $@;;
         "update") client_update $@;;
-        "status") client_status;;
+        "log") client_log;;
         "console") client_console;;
         "test") client_test;;
         *)
@@ -460,7 +461,7 @@ client() {
             echo "    ${bold}start${regular}      Start web server locally and open web browser"
             echo "    ${bold}push${regular}       Amend last commit or add new commit, then push changes"
             echo "    ${bold}update${regular}     Run push command and update server"
-            echo "    ${bold}status${regular}     Show server log"
+            echo "    ${bold}log${regular}        Show server log"
             echo "    ${bold}console${regular}    Connect via SSH to server"
             echo;
         ;;
