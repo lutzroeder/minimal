@@ -37,22 +37,18 @@ server_install() {
 
     echo "${bold}install nginx.service${regular}"
     sudo systemctl stop nginx.service
+
 cat << EOF >> "${site}.conf"
 server {
     listen 80;
 EOF
-    if [ -n "${domain}" ]; then
-        if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
-ssl=$(cat << EOF
+    if test -n "${domain}" && sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
+cat << EOF >> "${site}.conf"
     listen 443 ssl;
     ssl_certificate /etc/letsencrypt/live/${domain}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
     ssl_prefer_server_ciphers on;
     ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
-EOF
-)
-cat << EOF >> "${site}.conf"
-${ssl}
     server_name ${domain};
     return 301 https://www.${domain}\$request_uri;
 }
@@ -62,14 +58,13 @@ server {
     return 301 https://www.${domain}\$request_uri;
 }
 server {
-${ssl}
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/${domain}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
     server_name www.${domain};
 EOF
-        else
-cat << EOF >> "${site}.conf"
-    server_name www.${domain};
-EOF
-        fi
     fi
 cat << EOF >> "${site}.conf"
     gzip on; gzip_proxied any; gzip_min_length 1000; gzip_http_version 1.0; gzip_disable 'msie6'; gzip_vary on;
