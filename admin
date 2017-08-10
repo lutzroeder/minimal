@@ -10,8 +10,17 @@ regular=$(tty -s && tput sgr0)
 underline=$(tty -s && tput smul)
 error=$(tty -s && tput setaf 1)
 
+case "${OSTYPE}" in
+    linux-gnu*) root=/var ;;
+    darwin*) root=/usr/local/var ;;
+    msys*) root=/c ;;
+esac
+
 server_install() {
     server_uninstall
+
+    sudo rm -rf ${root}/log/nginx/${site}
+    sudo mkdir -p ${root}/log/nginx/${site}
 
     echo "${bold}apt-get update${regular}"
     if [ ${runtime} = "node" ]; then
@@ -39,6 +48,9 @@ server_install() {
     sudo systemctl stop nginx.service
 
 cat << EOF >> "${site}.conf"
+
+log_format ${site}_format '[\$time_local] \$status \$request_uri';
+
 server {
     listen 80;
 EOF
@@ -70,26 +82,33 @@ cat << EOF >> "${site}.conf"
     gzip on; gzip_proxied any; gzip_min_length 1000; gzip_http_version 1.0; gzip_disable 'msie6'; gzip_vary on;
     gzip_types text/plain text/css text/javascript application/json application/atom+xml application/rss+xml;
     location / {
-        proxy_pass http://localhost:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header X-NginX-Proxy true;
-        proxy_cache_bypass \$http_upgrade;
-        proxy_ssl_session_reuse off;
+        root ${root}/www/${site};
+        access_log ${root}/log/nginx/${site}/access.log ${site}_format;
+        error_log ${root}/log/nginx/${site}/access.log;
+EOF
+if [ -f "./admin.map" ]; then
+    sed 's/^/        /' ./admin.map >> "${site}.conf"
+fi
+cat << EOF >> "${site}.conf"
+        location ~ ^(.*)/index.html\$ {
+            return 301 \$scheme://\$http_host\$1/;
+        }
+        location ~ ^(.*)/\$ {
+            try_files \$1/index.html =404;
+        }
+        location ~ ^(/.*)/[^/]+\$ {
+           error_page 404 =301 \$scheme://\$http_host\$1/;
+        }
+        error_page 404 =301 \$scheme://\$http_host/;
     }
 }
 EOF
     if [ $(which nginx) ]; then
-        nginx_configuration=$(dirname $(nginx -V 2>&1 | grep -o '\-\-conf-path=\(.*conf\)' | cut -d '=' -f2))
-        if sudo test -f "${nginx_configuration}/conf.d/default.conf"; then
-            sudo mv "${nginx_configuration}/conf.d/default.conf" "${nginx_configuration}/conf.d/default.conf.backup"
+        nginx_conf=$(dirname $(nginx -V 2>&1 | grep -o '\-\-conf-path=\(.*conf\)' | cut -d '=' -f2))/conf.d
+        if sudo test -f "${nginx_conf}/default.conf"; then
+            sudo mv "${nginx_conf}/default.conf" "${nginx_conf}/default.conf.backup"
         fi
-        sudo mv "${site}.conf" "${nginx_configuration}/conf.d/${site}.conf"
+        sudo mv "${site}.conf" "${nginx_conf}/${site}.conf"
         sudo systemctl start "nginx.service"
         if [ $(systemctl is-active "nginx.service") != "active" ]; then
             sudo systemctl status "nginx.service" --no-pager --lines=25 --full
@@ -135,45 +154,9 @@ EOF
             return
         fi
     fi
-
-    echo "${bold}install ${site}.service${regular}"
-    if [ ${runtime} = "go" ]; then 
-        command="$(which go) run $(pwd)/app.go"
-        environment="GO_ENV=production"
-    elif [ ${runtime} = "python" ]; then
-        command="$(which python) $(pwd)/app.py"
-        environment="PYTHON_ENV=production"
-    else
-        command="$(which node) $(pwd)/app.js"
-        environment="NODE_ENV=production"
-    fi
-cat > "${site}.service" << EOF
-[Unit]
-Description=${site}.service
-[Service]
-WorkingDirectory=$(pwd)
-ExecStart=${command}
-Environment=${environment}
-Restart=always
-RestartSec=10
-User=$(whoami)
-Group=$(whoami)
-SyslogIdentifier=${site}.service
-[Install]
-WantedBy=multi-user.target
-EOF
-    sudo cp "${site}.service" "/etc/systemd/system/${site}.service"
-    rm "${site}.service"
-    sudo systemctl enable "${site}.service"
-    if [ $(systemctl is-enabled "${site}.service") != "enabled" ]; then
-        sudo systemctl status "${site}.service" --no-pager --lines=25 --full
-        echo "${bold}${error}${site}.service is not enabled.${regular}"
-        return
-    fi
 }
 
 server_uninstall() {
-    server_stop
     if [ -f "/etc/systemd/system/${site}-cert.timer" ]; then
         echo "${bold}uninstall ${site}-cert.timer${regular}"
         if [ $(systemctl is-active "${site}-cert.timer") = "active" ]; then
@@ -198,18 +181,6 @@ server_uninstall() {
         echo "${bold}uninstall ${site}-cert.service${regular}"
         sudo rm "/etc/systemd/system/${site}-cert.service"
     fi
-    if [ -f "/etc/systemd/system/${site}.service" ]; then
-        echo "${bold}uninstall ${site}.service${regular}"
-        if [ $(systemctl is-enabled ${site}.service) = "enabled" ]; then
-            sudo systemctl disable "${site}.service"
-            if [ $(systemctl is-enabled "${site}.service") != "disabled" ]; then
-                sudo systemctl status "${site}.service" --no-pager --lines=25 --full
-                echo "${bold}${error}${site}.service is not disabled.${regular}"
-                return
-            fi
-        fi
-        sudo rm "/etc/systemd/system/${site}.service"
-    fi
     if [ $(which nginx) ]; then
         nginx_conf=$(dirname $(nginx -V 2>&1 | grep -o '\-\-conf-path=\(.*conf\)' | cut -d '=' -f2))/conf.d
         if [ -f "${nginx_conf}/${site}.conf" ]; then
@@ -230,28 +201,12 @@ server_uninstall() {
 }
 
 server_start() {
-    echo "${bold}start ${site}.service${regular}"
-    sudo systemctl start ${site}.service
-    sleep 2
-    sudo systemctl status ${site}.service  --no-pager --lines=1000 --full
-    if [ $(systemctl is-active "${site}.service") != "active" ]; then
-        echo "${bold}${error}${site}.service is not active.${regular}"
-        return
-    fi
-}
-
-server_stop() {
-    if [ $(systemctl is-active "${site}.service") = "active" ]; then
-        echo "${bold}stop ${site}.service${regular}"
-        sudo systemctl stop "${site}.service"
-        if [ $(systemctl is-active "${site}.service") = "active" ]; then
-            sudo systemctl stop "${site}.service"
-            if [ $(systemctl is-active "${site}.service") != "inactive" ]; then
-                sudo systemctl status "${site}.service" --no-pager --lines=25 --full
-                echo "${bold}${error}${site}.service is not inactive.${regular}"
-                return
-            fi
-        fi
+    if [ ${runtime} = "go" ]; then 
+        go run ./app.go ${root}/www/${site}
+    elif [ ${runtime} = "python" ]; then
+        python ./app.py ${root}/www/${site}
+    else
+        node ./app.js ${root}/www/${site}
     fi
 }
 
@@ -265,10 +220,8 @@ server_cert() {
     sudo apt-get -qq update
     sudo apt-get -qq install --yes letsencrypt
 
-    server_stop
-    mkdir ./.well-known
-    server_start
-
+    pushd ${root}/www/${site}
+    mkdir .well-known
     if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
         echo "${bold}renew certificate${regular}"
         sudo letsencrypt renew
@@ -278,10 +231,8 @@ server_cert() {
         sudo letsencrypt certonly --webroot -w $(pwd) -d ${domain} -d www.${domain} --agree-tos --email ${email}
         rm letsencrypt.log
     fi
-
-    server_stop
-    rm -R ./.well-known
-    server_start
+    rm -R .well-known
+    popd
 
     echo "${bold}reload nginx.service${regular}"
     sudo systemctl stop "nginx.service"
@@ -293,7 +244,7 @@ server_cert() {
 }
 
 server_log() {
-    sudo systemctl status ${site}.service --no-pager --lines=1000 --full
+    cat ${root}/log/nginx/${site}/access.log
 }
 
 server_pull() {
@@ -305,37 +256,31 @@ server_pull() {
 }
 
 server_update() {
-    server_stop
     server_uninstall
     server_pull
     source "${configuration}"
-    server_install
     server_start
-}
-
-server_test() {
-    server_stop
-    client_test
+    server_install
 }
 
 client_start() {
     if [ ${1:-${runtime}} = "go" ]; then 
-        sleep 0.5 && git web--browse http://localhost:8080 & GO_ENV=${GO_ENV:-development} go run app.go
+        sleep 0.5 && ENVIRONMENT=development go run ./app.go ${root}/www/${site} && git web--browse http://localhost:8080
     elif [ ${1:-${runtime}} = "python" ]; then
-        sleep 0.5 && git web--browse http://localhost:8080 & PYTHON_ENV=${PYTHON_ENV:-development} python app.py
+        sleep 0.5 && ENVIRONMENT=development python ./app.py ${root}/www/${site} && git web--browse http://localhost:8080
     else
-        sleep 0.5 && git web--browse http://localhost:8080 & NODE_ENV=${NODE_ENV:-development} node app.js
+        sleep 0.5 && ENVIRONMENT=development node ./app.js ${root}/www/${site} && git web--browse http://localhost:8080
     fi
 }
 
 client_log() {
-    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin log"
+    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "${source}/admin log"
 }
 
 client_update() {
     client_push
     echo "${bold}ssh ${user}@${server} update${regular}"
-    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "/var/www/${site}/admin update" # | sed 's/^/    /'
+    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "${source}/admin update" # | sed 's/^/    /'
 }
 
 client_push() {
@@ -355,49 +300,20 @@ client_push() {
     fi
 }
 
-client_test() {
-    output="./.test"
-    mkdir -p ${output}
-    echo "${bold}node${regular}"
-    NODE_ENV=production node ./app.js & pid=$!
-    sleep 0.5
-    curl -s http://localhost:8080/ > ${output}/root_node.html
-    curl -s http://localhost:8080/blog/feed.atom > ${output}/feed_node.atom
-    curl -s http://localhost:8080/blog/feed.rss > ${output}/feed_node.rss
-    kill -9 ${pid}
-    wait ${pid} 2>/dev/null
-    echo "${bold}go${regular}"
-    GO_ENV=production go run app.go & pid=$!
-    sleep 0.5
-    curl -s http://localhost:8080/ > ${output}/root_go.html
-    curl -s http://localhost:8080/blog/feed.atom > ${output}/feed_go.atom
-    curl -s http://localhost:8080/blog/feed.rss > ${output}/feed_go.rss
-    kill -9 $(ps -ef | awk '$3 == '${pid}' { print $2 }')
-    kill -9 ${pid}
-    wait ${pid} 2>/dev/null
-    echo "${bold}python${regular}"
-    PYTHON_ENV=production python ./app.py & pid=$!
-    sleep 0.5
-    curl -s http://localhost:8080/ > ${output}/root_python.html
-    curl -s http://localhost:8080/blog/feed.atom > ${output}/feed_python.atom
-    curl -s http://localhost:8080/blog/feed.rss > ${output}/feed_python.rss
-    kill -9 ${pid}
-    wait ${pid} 2>/dev/null
-    echo "${bold}compare${regular}"
-    error_status=0
-    cmp "${output}/root_node.html" "${output}/root_go.html" || error_status=$?
-    cmp "${output}/root_node.html" "${output}/root_python.html" || error_status=$?
-    cmp "${output}/feed_node.atom" "${output}/feed_go.atom" || error_status=$?
-    cmp "${output}/feed_node.atom" "${output}/feed_python.atom" || error_status=$?
-    cmp "${output}/feed_node.rss" "${output}/feed_go.rss" || error_status=$?
-    cmp "${output}/feed_node.rss" "${output}/feed_python.rss" || error_status=$?
-    if [ ${error_status} == 0 ]; then 
-        rm -R ${output}
-    fi
+client_console() {
+    ssh -i ${identity} ${user}@${server} -t "cd ${source} && exec bash -l"
 }
 
-client_console() {
-    ssh -i ${identity} ${user}@${server} -t "cd /var/www/${site} && exec bash -l"
+client_test() {
+    echo "${bold}node${regular}"
+    ENVIRONMENT=production node ./app.js
+    echo "${bold}go${regular}"
+    ENVIRONMENT=production go run ./app.go
+    echo "${bold}python${regular}"
+    ENVIRONMENT=production python ./app.py
+    echo "${bold}compare${regular}"
+    diff --brief -r ./out/node/ ./out/go/
+    diff --brief -r ./out/node/ ./out/python/
 }
 
 description() {
@@ -418,21 +334,18 @@ server() {
         "cert") server_cert;;
         "pull") server_pull;;
         "start") server_start;;
-        "stop") server_stop;;
         "update") server_update;;
         "log") server_log;;
-        "test") server_test;;
         *)
             description;
             echo "Usage: ${bold}$(basename "$0")${regular} <server-command>"
             echo
             echo "    ${bold}install${regular}    Install NGINX and ${bold}${site}.service${regular}"
-            echo "    ${bold}start${regular}      Start service"
+            echo "    ${bold}start${regular}      Build the website"
             echo "    ${bold}update${regular}     Run stop, pull and start"
             echo "    ${bold}pull${regular}       Fetch Git repo and reset master branch"
             echo "    ${bold}log${regular}        Show server log"
             echo "    ${bold}cert${regular}       Create or renew SSL certificate"
-            echo "    ${bold}stop${regular}       Stop service"
             echo "    ${bold}uninstall${regular}  Stop and uninstall service"
             echo;
         ;;
@@ -453,7 +366,7 @@ client() {
             description;
             echo "Usage: ${bold}$(basename "$0")${regular} <client-command>"
             echo
-            echo "    ${bold}start${regular}      Start web server locally and open web browser"
+            echo "    ${bold}start${regular}      Build website and open web browser"
             echo "    ${bold}push${regular}       Amend last commit or add new commit, then push changes"
             echo "    ${bold}update${regular}     Run push command and update server"
             echo "    ${bold}log${regular}        Show server log"

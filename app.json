@@ -1,7 +1,9 @@
 {
+  "theme":       "default",
   "name":        "John Smith",
   "bio":         "I explore, I work, and I have hobbies.",
   "description": "Detailed description for search engines.",
+  "host":        "http://localhost",
   "feeds": [
     { "type": "application/atom+xml", "url": "{{{host}}}/blog/atom.xml"},
     { "type": "application/rss+xml",  "url": "{{{host}}}/blog/rss.xml"}
@@ -16,18 +18,5 @@
   "pages": [
     { "name": "Blog",     "url": "{{/}}" },
     { "name": "Projects", "url": "{{/}}projects" }
-  ],
-  "redirects": [
-    { "pattern": "/.git/?*",        "target": "/" },
-    { "pattern": "/.vscode/?*",     "target": "/" },
-    { "pattern": "/admin*",         "target": "/" },
-    { "pattern": "/app.*",          "target": "/" },
-    { "pattern": "/build.js",       "target": "/" },
-    { "pattern": "/header.html",    "target": "/" },
-    { "pattern": "/meta.html",      "target": "/" },
-    { "pattern": "/package.json",   "target": "/" },
-    { "pattern": "/site.css",       "target": "/" },
-    { "pattern": "/blog/post.*",    "target": "/" },
-    { "pattern": "/blog/blog.html", "target": "/" }
   ]
 }

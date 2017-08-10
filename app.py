@@ -8,19 +8,28 @@ import os
 import re
 import platform
 import sys
+import shutil
 import dateutil.parser
 import dateutil.tz
 
 if sys.version_info[0] > 2:
     from urllib.parse import urlparse
     from urllib.parse import parse_qs
-    from http.server import HTTPServer
-    from http.server import BaseHTTPRequestHandler
 else:
     from urlparse import urlparse
     from urlparse import parse_qs
-    from BaseHTTPServer import HTTPServer
-    from BaseHTTPServer import BaseHTTPRequestHandler
+
+def get_relative_root(file):
+    root = os.path.relpath("content/", os.path.dirname(file))
+    if len(root) > 0:
+        if root == ".":
+            root = ""
+        else:
+            root += "/"
+    return root
+
+def theme():
+    return "themes/" + (configuration["theme"] if "theme" in configuration else "default");
 
 entity_map = {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;",
@@ -80,17 +89,9 @@ def read_file(path):
     with codecs.open(path, "r", "utf-8") as open_file:
         return open_file.read()
 
-def host(request):
-    if "host" in configuration:
-        return configuration["host"]
-    scheme = "http"
-    value = request.headers.get("x-forwarded-proto")
-    if value and len(value) > 0:
-        scheme = value
-    value = request.headers.get("x-forwarded-protocol")
-    if value and len(value) > 0:
-        scheme = value
-    return scheme + "://" + request.headers.get("host")
+def write_file(path, data):
+    with codecs.open(path, "w", "utf-8") as open_file:
+        open_file.write(data)
 
 def redirect(request, status, location):
     request.send_response(status)
@@ -106,54 +107,12 @@ def format_date(date, format):
         return date.strftime("%b %d, %Y").replace(" 0", " ")
     return ""
 
-cache_data = {}
-
-def cache(key, callback):
-    if environment == "production":
-        if not key in cache_data:
-            cache_data[key] = callback()
-        return cache_data[key]
-    return callback()
-
-path_cache = {}
-
-def init_path_cache(directory):
-    if environment == "production":
-        for path in os.listdir(directory):
-            if not path.startswith("."):
-                path = directory + "/" + path
-                if os.path.isdir(path):
-                    path_cache[path + "/"] = True
-                    init_path_cache(path)
-                elif os.path.isfile(path):
-                    path_cache[path] = True
-            if directory == "." and path == ".well-known" and os.path.isdir(path):
-                path_cache["./" + path + "/"] = True
-                print("certificate")
-
-def exists(path):
-    if environment == "production":
-        path = "./" + path
-        return path in path_cache or (not path.endswith("/") and path + "/" in path_cache)
-    return os.path.exists(path)
-
-def isdir(path):
-    if environment == "production":
-        if path.endswith("/"):
-            path = "./" + path
-        else:
-            path = "./" + path + "/"
-        return path in path_cache
-    return os.path.isdir(path)
-
 def posts():
-    def get_posts():
-        folders = []
-        for post in sorted(os.listdir("./blog"), reverse=True):
-            if os.path.isdir("./blog/" + post) and os.path.exists("./blog/" + post + "/index.html"):
-                folders.append(post)
-        return folders
-    return list(cache("blog:*", get_posts))
+    folders = []
+    for post in sorted(os.listdir("content/blog"), reverse=True):
+        if os.path.isdir("content/blog/" + post) and os.path.exists("content/blog/" + post + "/index.html"):
+            folders.append(post)
+    return folders
 
 tag_regexp = re.compile(r"<(\w+)[^>]*>")
 entity_regexp = re.compile(r"(#?[A-Za-z0-9]+;)")
@@ -210,7 +169,7 @@ def truncate(text, length):
     return "".join(output)
 
 def load_post(path):
-    if exists(path) and not isdir(path):
+    if os.path.exists(path) and not os.path.isdir(path):
         data = read_file(path)
         item = {}
         content = []
@@ -234,30 +193,33 @@ def load_post(path):
         return item
     return None
 
-def render_blog(folders, start):
+def render_blog(folders, root, page):
     view = { "items": [] }
     count = 10
-    index = 0
-    while len(folders) > 0 and index < start + count:
+    while count > 0 and len(folders) > 0:
         folder = folders.pop(0)
-        item = load_post("blog/" + folder + "/index.html")
+        item = load_post("content/blog/" + folder + "/index.html")
         if item and (item["state"] == "post" or environment != "production"):
-            if index >= start:
-                item["url"] = "/blog/" + folder + "/"
-                if "date" in item:
-                    date = dateutil.parser.parse(item["date"])
-                    item["date"] = format_date(date, "user")
-                content = item["content"]
-                content = re.sub(r"\s\s", " ", content)
-                truncated = truncate(content, 250)
-                item["content"] = truncated
-                item["more"] = truncated != content
-                view["items"].append(item)
-            index += 1
+            item["url"] = "blog/" + folder + "/"
+            if "date" in item:
+                date = dateutil.parser.parse(item["date"])
+                item["date"] = format_date(date, "user")
+            content = item["content"]
+            content = re.sub(r"\s\s", " ", content)
+            truncated = truncate(content, 250)
+            item["content"] = truncated
+            item["more"] = truncated != content
+            view["items"].append(item)
+            count -= 1
     view["placeholder"] = []
     if len(folders) > 0:
-        view["placeholder"].append({ "url": "/blog/page" + str(index) + ".html" })
-    template = read_file("./blog/feed.html")
+        page += 1
+        location = "blog/page" + str(page) + ".html";
+        view["placeholder"].append({ "url": "/" + location })
+        destination = root + "/" + location
+        data = render_blog(folders, root, page)
+        write_file(destination, data)
+    template = read_file(theme() + "/feed.html")
     return mustache(template, view, None)
 
 def write_string(request, content_type, data):
@@ -274,53 +236,9 @@ def root_handler(request):
     request.send_header("Location", "/")
     request.end_headers()
 
-def feed_handler(request):
-    pathname = urlparse(request.path).path.lower()
-    filename = os.path.basename(pathname)
-    format = os.path.splitext(filename)[1].replace(".", "")
-    url = host(request) + pathname
-    def render_feed():
-        count = 10
-        feed = {
-            "name": configuration["name"],
-            "description": configuration["description"],
-            "author": configuration["name"],
-            "host": host(request),
-            "url": url,
-            "items": [] 
-        }
-        recent_found = False
-        recent = datetime.datetime.now()
-        folders = posts()
-        while len(folders) > 0 and count > 0:
-            folder = folders.pop(0)
-            item = load_post("blog/" + folder + "/index.html")
-            if item and (item["state"] == "post" or environment != "production"):
-                item["url"] = host(request) + "/blog/" + folder + "/"
-                if not "author" in item or item["author"] == configuration["name"]:
-                    item["author"] = False
-                if "date" in item:
-                    date = dateutil.parser.parse(item["date"])
-                    updated = date
-                    if "updated" in item:
-                        updated = dateutil.parser.parse(item["updated"])
-                    item["date"] = format_date(date, format)
-                    item["updated"] = format_date(updated, format)
-                    if not recent_found or recent < updated:
-                        recent = updated
-                        recent_found = True
-                item["content"] = escape_html(truncate(item["content"], 10000));
-                feed["items"].append(item)
-                count -= 1
-        feed["updated"] = format_date(recent, format)
-        template = read_file("./blog/" + filename)
-        return mustache(template, feed, None)
-    data = cache("feed:" + url, render_feed)
-    write_string(request, "application/" + format + "+xml", data)
-
-def render_post(file, host):
-    if file.startswith("blog/") and file.endswith("/index.html"):
-        item = load_post(file)
+def render_post(source, destination):
+    if source.startswith("content/blog/") and source.endswith("/index.html"):
+        item = load_post(source)
         if item:
             if not "author" in item:
                 item["author"] = configuration["name"]
@@ -328,36 +246,12 @@ def render_post(file, host):
                 date = dateutil.parser.parse(item["date"])
                 item["date"] = format_date(date, "user")
             view = merge([ configuration, item ])
-            view["/"] = "/"
-            view["host"] = host;
-            template = read_file("./blog/post.html")
-            return mustache(template, view, lambda name: read_file(name))
-    return ""
-
-blog_regexp = re.compile("/blog/page(.*).html$")
-
-def blog_handler(request):
-    pathname = urlparse(request.path).path.lower()
-    match = blog_regexp.match(pathname) 
-    if match and match.group(1).isdigit():
-        start = int(match.group(1))
-        folders = posts()
-        data = ""
-        if start < len(folders):
-            data = cache("default:" + pathname, lambda: render_blog(folders, start))
-        write_string(request, "text/html", data)
-        return
-    root_handler(request)
-
-def cert_handler(request):
-    filename = urlparse(request.path).path
-    if exists(".well-known/") and isdir(".well-known/"):
-        if os.path.exists(filename) and os.path.isfile(filename):
-            data = read_file(filename)
-            return write_string(request, "text/plain; charset=utf-8", data)
-            return
-    request.send_response(404)
-    request.end_headers()
+            view["/"] = get_relative_root(source)
+            template = read_file(theme() + "/post.html")
+            data = mustache(template, view, lambda name: read_file(theme() + "/" + name))
+            write_file(destination, data)
+            return True
+    return False
 
 def default_handler(request):
     pathname = urlparse(request.path).path.lower()
@@ -376,90 +270,99 @@ def default_handler(request):
         return
     extension = os.path.splitext(filename)[1]
     content_type = mimetypes.types_map[extension]
-    if content_type and content_type != "text/html":
-        def content():
-            with open(os.path.join("./", filename), "rb") as binary:
-                return binary.read()
-        buffer = cache("default:" + filename, content)
-        request.send_response(200)
-        request.send_header("Content-Type", content_type)
-        request.send_header("Content-Length", len(buffer))
-        request.send_header("Cache-Control", "private, max-age=0")
-        request.send_header("Expires", -1)
-        request.end_headers()
-        if request.command != "HEAD":
-            request.wfile.write(buffer)
-        return
-    def content():
-        post = render_post(filename, host(request))
-        if len(post) > 0:
-            return post
-        template = read_file(os.path.join("./", filename))
-        view = merge([ configuration ])
-        view["/"] = "/"
-        view["host"] = host(request)
-        view["blog"] = lambda: render_blog(posts(), 0)
-        return mustache(template, view, lambda name: read_file(name))
-    data = cache("default:" + filename, content)
-    write_string(request, "text/html", data)
 
-class Router(object):
-    def __init__(self, configuration):
-        self.routes = []
-        if "redirects" in configuration:
-            for redirect in configuration["redirects"]:
-                self.get(redirect["pattern"], redirect["target"])
-    def get(self, pattern, handler):
-        self.route(pattern)["handlers"]["GET"] = handler
-    def route(self, pattern):
-        route = next((route for route in self.routes if route["pattern"] == pattern), None)
-        if not route:
-            route = {
-                "pattern": pattern,
-                "regexp": re.compile("^" + pattern.replace(".", "\.").replace("*", "(.*)") + "$"),
-                "handlers": {}
-            }
-            self.routes.append(route)
-        return route
-    def handle(self, request):
-        url = urlparse(request.path)
-        for route in self.routes:
-            if route["regexp"].match(url.path):
-                method = request.command
-                if method == "HEAD" and not "HEAD" in route["handlers"]:
-                    method = "GET"
-                handler = route["handlers"][method]
-                if callable(handler): 
-                    handler(request)
-                else:
-                    request.send_response(301)
-                    request.send_header("Location", handler)
-                    request.end_headers()
-                return
+    if len(post) > 0:
+        return post
 
-class HTTPRequestHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        print(self.command + " " + self.path)
-        router.handle(self)
-    def do_HEAD(self):
-        print(self.command + " " + self.path)
-        router.handle(self)
-    def log_message(self, format, *args):
+
+def render_feed(source, destination):
+    host = configuration["host"]
+    format = os.path.splitext(source)[1].replace(".", "")
+    url = host + "/blog/feed." + format
+    count = 10
+    feed = {
+        "name": configuration["name"],
+        "description": configuration["description"],
+        "author": configuration["name"],
+        "host": host,
+        "url": url,
+        "items": [] 
+    }
+    recent_found = False
+    recent = datetime.datetime.now()
+    folders = posts()
+    while len(folders) > 0 and count > 0:
+        folder = folders.pop(0)
+        item = load_post("content/blog/" + folder + "/index.html")
+        if item and (item["state"] == "post" or environment != "production"):
+            item["url"] = host + "/blog/" + folder + "/"
+            if not "author" in item or item["author"] == configuration["name"]:
+                item["author"] = False
+            if "date" in item:
+                date = dateutil.parser.parse(item["date"])
+                updated = date
+                if "updated" in item:
+                    updated = dateutil.parser.parse(item["updated"])
+                item["date"] = format_date(date, format)
+                item["updated"] = format_date(updated, format)
+                if not recent_found or recent < updated:
+                    recent = updated
+                    recent_found = True
+            item["content"] = escape_html(truncate(item["content"], 10000));
+            feed["items"].append(item)
+            count -= 1
+    feed["updated"] = format_date(recent, format)
+    template = read_file(source)
+    data = mustache(template, feed, None)
+    write_file(destination, data)
+
+def render_page(source, destination):
+    if render_post(source, destination):
         return
+    template = read_file(os.path.join("./", source))
+    view = merge([ configuration ])
+    view["/"] = get_relative_root(source)
+    view["host"] = configuration["host"]
+    view["blog"] = lambda: render_blog(posts(), os.path.dirname(destination), 0)
+    data = mustache(template, view, lambda name: read_file(theme() + "/" + name))
+    write_file(destination, data)
+
+def render(source, destination):
+    print destination
+    extension = os.path.splitext(source)[1]
+    if extension == ".rss" or extension == ".atom":
+        render_feed(source, destination)
+    elif extension == ".html":
+        render_page(source, destination)
+    else:
+        shutil.copyfile(source, destination)
+
+def render_directory(source, destination):
+    if not os.path.exists(destination):
+        os.makedirs(destination)
+    for item in os.listdir(source):
+        if not item.startswith("."):
+            if os.path.isdir(source + item):
+                render_directory(source + item + "/", destination + item + "/")
+            else:
+                render(source + item, destination + item)
+
+def clean_directory(directory):
+    if os.path.exists(directory) and os.path.isdir(directory):
+        for item in os.listdir(directory):
+            item = directory + "/" + item
+            if os.path.isdir(item):
+                shutil.rmtree(item)
+            else:
+                os.remove(item)
 
 print("python " + platform.python_version())
 with open("./app.json") as configurationFile:
     configuration = json.load(configurationFile)
-environment = os.getenv("PYTHON_ENV")
+environment = os.getenv("ENVIRONMENT")
 print(environment)
-init_path_cache(".")
-router = Router(configuration)
-router.get("/blog/feed.atom", feed_handler)
-router.get("/blog/feed.rss", feed_handler)
-router.get("/blog/page*.html", blog_handler)
-router.get("/.well-known/acme-challenge/*", cert_handler)
-router.get("/*", default_handler)
-port = 8080
-print("http://" + "localhost" + ":" + str(port))
-server = HTTPServer(("localhost", port), HTTPRequestHandler)
-server.serve_forever()
+destination = "out/python"
+if len(sys.argv) > 1 and len(sys.argv[1]) > 0:
+    destination = sys.argv[1]
+clean_directory(destination)
+render_directory("content/", destination + "/") ;

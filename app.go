@@ -6,21 +6,43 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"mime"
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
 var configuration map[string]interface{}
 var environment string
+
+func getRelativeRoot(file string) string {
+	root, err := filepath.Rel(path.Dir(file), "content/");
+	if err != nil {
+		fmt.Println(err)
+		return ""
+	}
+	if len(root) > 0 {
+		if root == "." {
+			root = ""
+		} else {
+			root += "/"
+		}
+	}
+	return root
+}
+
+func theme() string {
+	if value, ok := configuration["theme"]; ok {
+		return path.Join("themes", value.(string))
+	}
+	return "themes/default"
+}
 
 var entityMap = strings.NewReplacer(
 	`&`, "&amp;", `<`, "&lt;", `>`, "&gt;", `"`, "&quot;", `'`, "&#39;", `/`, "&#x2F;", "`", "&#x60;", `=`, "&#x3D;",
@@ -132,99 +154,6 @@ func formatDate(date time.Time, format string) string {
 	return ""
 }
 
-var cacheData = make(map[string]interface{})
-var cacheLock = &sync.Mutex{}
-
-func cache(key string, callback func() interface{}) interface{} {
-	if environment == "production" {
-		cacheLock.Lock()
-		value, ok := cacheData[key]
-		cacheLock.Unlock()
-		if !ok {
-			value = callback()
-			cacheLock.Lock()
-			cacheData[key] = value
-			cacheLock.Unlock()
-		}
-		return value
-	}
-	return callback()
-}
-
-func cacheString(key string, callback func() string) string {
-	return cache(key, func() interface{} {
-		return callback()
-	}).(string)
-}
-
-func cacheBuffer(key string, callback func() []byte) []byte {
-	return cache(key, func() interface{} {
-		return callback()
-	}).([]byte)
-}
-
-var pathCache = make(map[string]bool)
-
-func initPathCache(dir string) {
-	if environment == "production" {
-		fileInfos, err := ioutil.ReadDir(dir)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			for _, fileInfo := range fileInfos {
-				file := fileInfo.Name()
-				if !strings.HasPrefix(file, ".") {
-					file = dir + "/" + file
-					if fileInfo.IsDir() {
-						pathCache[file+"/"] = true
-						initPathCache(file)
-					} else {
-						pathCache[file] = true
-					}
-				}
-				if dir == "." && file == ".well-known" && fileInfo.IsDir() {
-					pathCache["./"+file+"/"] = true
-					fmt.Println("certificate")
-				}
-			}
-		}
-	}
-}
-
-func exists(path string) bool {
-	if environment == "production" {
-		path = "./" + path
-		if _, ok := pathCache[path]; ok {
-			return true
-		}
-		if !strings.HasSuffix(path, "/") {
-			if _, ok := pathCache[path+"/"]; ok {
-				return true
-			}
-		}
-		return false
-	}
-	_, err := os.Stat(path)
-	return !os.IsNotExist(err)
-}
-
-func isDir(path string) bool {
-	if environment == "production" {
-		path = "./" + path
-		if !strings.HasSuffix(path, "/") {
-			path = path + "/"
-		}
-		_, ok := pathCache[path]
-		return ok
-	}
-	stat, err := os.Stat(path)
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
-	return stat.IsDir()
-}
-
 var tagRegexp = regexp.MustCompile("<(\\w+)[^>]*>")
 var entityRegexp = regexp.MustCompile("(#?[A-Za-z0-9]+;)")
 var truncateMap = map[string]bool{
@@ -301,24 +230,22 @@ func truncate(text string, length int) string {
 }
 
 func posts() []string {
-	return append([]string{}, cache("blog:*", func() interface{} {
-		folders := []string{}
-		fileInfos, _ := ioutil.ReadDir("blog/")
-		for i := len(fileInfos) - 1; i >= 0; i-- {
-			if fileInfos[i].IsDir() {
-				post := fileInfos[i].Name()
-				_, err := os.Stat("blog/" + post + "/index.html")
-				if (!os.IsNotExist(err)) {
-					folders = append(folders, post)
-				}
+	folders := []string{}
+	items, _ := ioutil.ReadDir("content/blog/")
+	for i := len(items) - 1; i >= 0; i-- {
+		item := items[i]
+		if item.IsDir() {
+			post := item.Name()
+			if _, err := os.Stat("content/blog/" + post + "/index.html"); !os.IsNotExist(err) {
+				folders = append(folders, post)
 			}
 		}
-		return folders
-	}).([]string)...)
+	}
+	return folders
 }
 
 func loadPost(path string) map[string]interface{} {
-	if exists(path) && !isDir(path) {
+	if stat, err := os.Stat(path); !os.IsNotExist(err) && !stat.IsDir() {
 		data, err := ioutil.ReadFile(path)
 		if err != nil {
 			fmt.Println(err)
@@ -350,73 +277,42 @@ func loadPost(path string) map[string]interface{} {
 	return nil
 }
 
-func renderPost(file string, host string) string {
-	if strings.HasPrefix(file, "blog/") && strings.HasSuffix(file, "/index.html") {
-		item := loadPost(file)
-		if item != nil {
+func renderBlog(folders []string, root string, page int) string {
+	items := make([]interface{}, 0)
+	view := make(map[string]interface{})
+	count := 10
+	for count > 0 && len(folders) > 0 {
+		folder := folders[0]
+		folders = folders[1:]
+		item := loadPost("content/blog/" + folder + "/index.html")
+		if item != nil && (item["state"] == "post" || environment != "production") {
+			item["url"] = "blog/" + folder + "/"
 			if _, ok := item["date"]; ok {
 				if date, e := time.Parse("2006-01-02 15:04:05 -07:00", item["date"].(string)); e == nil {
 					item["date"] = formatDate(date, "user")
 				}
 			}
-			if _, ok := item["author"]; !ok {
-				item["author"] = configuration["name"].(string)
-			}
-			view := merge(configuration, item)
-			view["/"] = "/"
-			view["host"] = host
-			template, err := ioutil.ReadFile("./blog/post.html")
-			if err != nil {
-				fmt.Println(err)
-			} else {
-				return mustache(string(template), view, func(name string) string {
-					data, err := ioutil.ReadFile(name)
-					if err != nil {
-						fmt.Println(err)
-						return ""
-					}
-					return string(data)
-				})
-			}
-		}
-	}
-	return ""
-}
-
-func renderBlog(folders []string, start int) string {
-	items := make([]interface{}, 0)
-	view := make(map[string]interface{})
-	count := 10
-	index := 0
-	for len(folders) > 0 && index < start+count {
-		folder := folders[0]
-		folders = folders[1:]
-		item := loadPost("blog/" + folder + "/index.html")
-		if item != nil && (item["state"] == "post" || environment != "production") {
-			if index >= start {
-				item["url"] = "/blog/" + folder + "/"
-				if _, ok := item["date"]; ok {
-					if date, e := time.Parse("2006-01-02 15:04:05 -07:00", item["date"].(string)); e == nil {
-						item["date"] = formatDate(date, "user")
-					}
-				}
-				content := item["content"].(string)
-				content = regexp.MustCompile("\\s\\s").ReplaceAllString(content, " ")
-				truncated := truncate(content, 250)
-				item["content"] = truncated
-				item["more"] = truncated != content
-				items = append(items, item)
-			}
-			index++
+			content := item["content"].(string)
+			content = regexp.MustCompile("\\s\\s").ReplaceAllString(content, " ")
+			truncated := truncate(content, 250)
+			item["content"] = truncated
+			item["more"] = truncated != content
+			items = append(items, item)
+			count--;
 		}
 	}
 	view["items"] = items
 	placeholder := make([]interface{}, 0)
 	if len(folders) > 0 {
-		placeholder = append(placeholder, map[string]interface{}{"url": "/blog/page" + strconv.Itoa(index) + ".html" })
+		page++
+		location := "blog/page" + strconv.Itoa(page) + ".html"
+		placeholder = append(placeholder, map[string]interface{}{"url": "/" + location })
+		destination := root + "/" + location
+		data := renderBlog(folders, root, page)
+		ioutil.WriteFile(destination, []byte(data), os.ModePerm)
 	}
 	view["placeholder"] = placeholder
-	template, err := ioutil.ReadFile("./blog/feed.html")
+	template, err := ioutil.ReadFile(path.Join(theme(), "feed.html"))
 	if err != nil {
 		fmt.Println(err)
 		return ""
@@ -432,247 +328,165 @@ func writeString(response http.ResponseWriter, request *http.Request, contentTyp
 	}
 }
 
-func rootHandler(response http.ResponseWriter, request *http.Request) {
-	http.Redirect(response, request, "/", http.StatusFound)
-}
-
-func feedHandler(response http.ResponseWriter, request *http.Request) {
-	pathname := request.URL.Path
-	filename := path.Base(pathname)
-	format := strings.TrimPrefix(path.Ext(filename), ".")
-	host := host(request)
-	url := host + pathname
-	data := cacheString("feed:"+url, func() string {
-		count := 10
-		items := make([]interface{}, 0)
-		feed := map[string]interface{}{
-			"name":        configuration["name"],
-			"description": configuration["description"],
-			"author":      configuration["name"],
-			"host":        host,
-			"url":         url,
-		}
-		recentFound := false
-		recent := time.Now()
-		folders := posts()
-		for len(folders) > 0 && count > 0 {
-			folder := folders[0]
-			folders = folders[1:]
-			item := loadPost("blog/" + folder + "/index.html")
-			if item != nil && (item["state"] == "post" || environment != "production") {
-				item["url"] = host + "/blog/" + folder + "/"
-				if author, ok := item["author"]; !ok || author.(string) == configuration["name"].(string) {
-					item["author"] = false
+func renderPost(source string, destination string) bool {
+	if strings.HasPrefix(source, "content/blog/") && strings.HasSuffix(source, "/index.html") {
+		item := loadPost(source)
+		if item != nil {
+			if _, ok := item["date"]; ok {
+				if date, e := time.Parse("2006-01-02 15:04:05 -07:00", item["date"].(string)); e == nil {
+					item["date"] = formatDate(date, "user")
 				}
-				if _, ok := item["date"]; ok {
-					if date, err := time.Parse("2006-01-02 15:04:05 -07:00", item["date"].(string)); err == nil {
-						updated := date
-						if _, ok := item["updated"]; ok {
-							if temp, err := time.Parse("2006-01-02 15:04:05 -07:00", item["updated"].(string)); err == nil {
-								updated = temp
-							}
-						}
-						item["date"] = formatDate(date, format)
-						item["updated"] = formatDate(updated, format)
-						if !recentFound || recent.Before(updated) {
-							recent = updated
-							recentFound = true;
-						}
-					}
-				}
-				item["content"] = escapeHTML(truncate(item["content"].(string), 4000))
-				items = append(items, item)
-				count--
 			}
-		}
-		feed["updated"] = formatDate(recent, format)
-		feed["items"] = items
-		template, err := ioutil.ReadFile("./blog/" + filename)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			return mustache(string(template), feed, nil)
-		}
-		return ""
-	})
-	writeString(response, request, "application/"+format+"+xml", data)
-}
-
-var blogRegexp = regexp.MustCompile("/blog/page(.*).html")
-
-func blogHandler(response http.ResponseWriter, request *http.Request) {
-	pathname := strings.ToLower(path.Clean(request.URL.Path))
-	if match := blogRegexp.FindStringIndex(pathname); match != nil {
-		id := blogRegexp.FindStringSubmatch(pathname[match[0] : match[1]])[1]
-		if start, e := strconv.Atoi(id); e == nil {
-			folders := posts()
-			data := ""
-			if start < len(folders) {
-				data = cacheString("default:"+pathname, func() string {
-					return renderBlog(folders, start)
-				})
+			if _, ok := item["author"]; !ok {
+				item["author"] = configuration["name"].(string)
 			}
-			writeString(response, request, "text/html", data)
-			return
-		}
-	}
-	rootHandler(response, request)
-}
-
-func defaultHandler(response http.ResponseWriter, request *http.Request) {
-	urlpath := request.URL.Path
-	pathname := strings.ToLower(path.Clean(urlpath))
-	if pathname != "/" && strings.HasSuffix(urlpath, "/") {
-		pathname += "/"
-	}
-	if strings.HasSuffix(pathname, "/index.html") {
-		http.Redirect(response, request, "/"+strings.TrimLeft(pathname[0:len(pathname)-11], "/"), http.StatusMovedPermanently)
-		return
-	}
-	file := pathname
-	if strings.HasSuffix(pathname, "/") {
-		file = path.Join(pathname, "index.html")
-	}
-	file = strings.TrimLeft(file, "/")
-	if !exists(file) {
-		http.Redirect(response, request, path.Dir(pathname), http.StatusFound)
-		return
-	}
-	if isDir(file) {
-		http.Redirect(response, request, pathname+"/", http.StatusFound)
-		return
-	}
-	extension := path.Ext(file)
-	contentType := mime.TypeByExtension(extension)
-	if len(contentType) > 0 && strings.Split(contentType, ";")[0] != "text/html" {
-		buffer := cacheBuffer("default:"+file, func() []byte {
-			data, err := ioutil.ReadFile(file)
-			if err != nil {
-				fmt.Println(err)
-				return []byte{}
-			}
-			return data
-		})
-		if request.Method != "HEAD" {
-			response.Write(buffer)
-		}
-		response.Header().Set("Content-Type", contentType)
-		response.Header().Set("Content-Length", strconv.Itoa(len(buffer)))
-		response.Header().Set("Cache-Control", "private, max-age=0")
-		response.Header().Set("Expires", "-1")
-		return
-	}
-	data := cacheString("default:"+file, func() string {
-		post := renderPost(file, host(request))
-		if len(post) > 0 {
-			return post
-		}
-		template, err := ioutil.ReadFile(file)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			view := merge(configuration)
-			view["/"] = "/"
-			view["host"] = host(request)
-			view["blog"] = func() string {
-				return renderBlog(posts(), 0)
-			}
-			return mustache(string(template), view, func(name string) string {
-				data, err := ioutil.ReadFile(name)
-				if err != nil {
-					fmt.Println(err)
-					return ""
-				}
-				return string(data)
-			})
-		}
-		return ""
-	})
-	writeString(response, request, "text/html", data)
-}
-
-func certHandler(response http.ResponseWriter, request *http.Request) {
-	file := strings.TrimLeft(path.Clean(request.URL.Path), "/")
-	if exists(".well-known/") && isDir(".well-known/") {
-		if stat, e := os.Stat(file); !os.IsNotExist(e) && !stat.IsDir() {
-			data, err := ioutil.ReadFile(file)
+			view := merge(configuration, item)
+			view["/"] = getRelativeRoot(source)
+			template, err := ioutil.ReadFile(theme() + "/post.html")
 			if err != nil {
 				fmt.Println(err)
 			} else {
-				writeString(response, request, "text/plain; charset=utf-8", string(data))
-				return
+				data := mustache(string(template), view, func(name string) string {
+					data, err := ioutil.ReadFile(theme() + "/" + name)
+					if err != nil {
+						fmt.Println(err)
+						return ""
+					}
+					return string(data)
+				})
+				ioutil.WriteFile(destination, []byte(data), os.ModePerm)
+				return true
 			}
 		}
 	}
-	response.WriteHeader(http.StatusNotFound)
+	return false;
 }
 
-type router struct {
-	routes []*route
-}
-
-type route struct {
-	pattern  string
-	regexp   *regexp.Regexp
-	handlers map[string]interface{}
-}
-
-func newRouter(configuration map[string]interface{}) *router {
-	router := &router{make([]*route, 0)}
-	if redirects, ok := configuration["redirects"]; ok {
-		for _, redirect := range redirects.([]interface{}) {
-			pattern := redirect.(map[string]interface{})["pattern"].(string)
-			target := redirect.(map[string]interface{})["target"].(string)
-			router.Get(pattern, target)
-		}
+func renderFile(source string, destination string) {
+	data, err := ioutil.ReadFile(source);
+	if err == nil {
+		err = ioutil.WriteFile(destination, data, os.ModePerm)
 	}
-	return router
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
-func (router *router) Get(pattern string, handler interface{}) {
-	router.route(pattern).handlers["GET"] = handler
-}
-
-func (router *router) route(pattern string) *route {
-	for _, route := range router.routes {
-		if pattern == route.pattern {
-			return route
-		}
+func renderFeed(source string, destination string) {
+	host := configuration["host"].(string)
+	format := strings.TrimPrefix(path.Ext(source), ".")
+	url := host + "/blog/feed." + format
+	count := 10
+	items := make([]interface{}, 0)
+	feed := map[string]interface{}{
+		"name":        configuration["name"],
+		"description": configuration["description"],
+		"author":      configuration["name"],
+		"host":        host,
+		"url":         url,
 	}
-	route := &route{
-		pattern,
-		regexp.MustCompile("^" + strings.Replace(strings.Replace(pattern, ".", "\\.", -1), "*", "(.*)", -1) + "$"),
-		make(map[string]interface{}),
-	}
-	router.routes = append(router.routes, route)
-	return route
-}
-
-func (router *router) ServeHTTP(response http.ResponseWriter, request *http.Request) {
-	fmt.Println(request.Method + " " + request.RequestURI)
-	urlpath := request.URL.Path
-	pathname := strings.ToLower(path.Clean(urlpath))
-	if pathname != "/" && strings.HasSuffix(urlpath, "/") {
-		pathname += "/"
-	}
-	for _, route := range router.routes {
-		if route.regexp.MatchString(pathname) {
-			method := strings.ToUpper(request.Method)
-			if method == "HEAD" {
-				if _, ok := route.handlers["HEAD"]; !ok {
-					method = "GET"
+	recentFound := false
+	recent := time.Now()
+	folders := posts()
+	for len(folders) > 0 && count > 0 {
+		folder := folders[0]
+		folders = folders[1:]
+		item := loadPost("content/blog/" + folder + "/index.html")
+		if item != nil && item["state"] == "post" {
+			item["url"] = host + "/blog/" + folder + "/"
+			if author, ok := item["author"]; !ok || author.(string) == configuration["name"].(string) {
+				item["author"] = false
+			}
+			if _, ok := item["date"]; ok {
+				if date, err := time.Parse("2006-01-02 15:04:05 -07:00", item["date"].(string)); err == nil {
+					updated := date
+					if _, ok := item["updated"]; ok {
+						if temp, err := time.Parse("2006-01-02 15:04:05 -07:00", item["updated"].(string)); err == nil {
+							updated = temp
+						}
+					}
+					item["date"] = formatDate(date, format)
+					item["updated"] = formatDate(updated, format)
+					if !recentFound || recent.Before(updated) {
+						recent = updated
+						recentFound = true;
+					}
 				}
 			}
-			if handler, ok := route.handlers[method]; ok {
-				if callback, ok := handler.(func(response http.ResponseWriter, request *http.Request)); ok {
-					callback(response, request)
-					return
-				}
-				if redirect, ok := handler.(string); ok {
-					http.Redirect(response, request, redirect, http.StatusMovedPermanently)
-					return
+			item["content"] = escapeHTML(truncate(item["content"].(string), 4000))
+			items = append(items, item)
+			count--
+		}
+	}
+	feed["updated"] = formatDate(recent, format)
+	feed["items"] = items
+	template, err := ioutil.ReadFile("content/blog/feed." + format)
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		data := mustache(string(template), feed, nil)
+		ioutil.WriteFile(destination, []byte(data), os.ModePerm)
+	}
+}
+
+func renderPage(source string, destination string) {
+	if renderPost(source, destination) {
+		return
+	}
+	template, err := ioutil.ReadFile(source)
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		view := merge(configuration)
+		view["/"] = getRelativeRoot(source)
+		view["blog"] = func() string {
+			return renderBlog(posts(), path.Dir(destination), 0)
+		}
+		data := mustache(string(template), view, func(name string) string {
+			data, err := ioutil.ReadFile(path.Join(theme(), name))
+			if err != nil {
+				fmt.Println(err)
+			}
+			return string(data)
+		})
+		ioutil.WriteFile(destination, []byte(data), os.ModePerm)
+	}
+}
+
+func render(source string, destination string) {
+	fmt.Println(destination)
+	extension := path.Ext(source);
+	switch (extension) {
+		case ".html":
+			renderPage(source, destination);
+		case ".rss", ".atom":
+			renderFeed(source, destination);
+		default:
+			renderFile(source, destination);
+	}
+}
+
+func renderDir(source string, destination string) { 
+	os.MkdirAll(destination, os.ModePerm)
+	location := source
+	if items, err := ioutil.ReadDir(location); err == nil {
+		for _, item := range items {
+			name := item.Name()
+			if !strings.HasPrefix(name, ".") {
+				if item.IsDir() {
+					renderDir(source + name + "/", destination + "/" + name)
+				} else {
+					render(source + name, destination + "/" + name)
 				}
 			}
+		}
+	}
+}
+
+func cleanDir(directory string) {
+	if items, err := ioutil.ReadDir(directory); err == nil {
+		for _, item := range items {
+			os.RemoveAll(directory + "/" + item.Name())
 		}
 	}
 }
@@ -689,16 +503,12 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	environment = os.Getenv("GO_ENV")
+	environment = os.Getenv("ENVIRONMENT")
 	fmt.Println(environment)
-	initPathCache(".")
-	router := newRouter(configuration)
-	router.Get("/blog/feed.atom", feedHandler)
-	router.Get("/blog/feed.rss", feedHandler)
-	router.Get("/blog/page*.html", blogHandler)
-	router.Get("/.well-known/acme-challenge/*", certHandler)
-	router.Get("/*", defaultHandler)
-	port := 8080
-	fmt.Println("http://localhost:" + strconv.Itoa(port))
-	http.ListenAndServe(":"+strconv.Itoa(port), router)
+	destination := "out/go"
+	if len(os.Args) >= 2 && len(os.Args[1]) > 0{
+		destination = os.Args[1];
+	}
+	cleanDir(destination);
+	renderDir("content/", destination);
 }

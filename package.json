@@ -1,9 +1,0 @@
-{
-  "name": "Minimal",
-  "version": "1.0.0",
-  "private": true,
-  "main": "app.js",
-  "engines": {
-    "node": "7.2.0"
-  }
-}
