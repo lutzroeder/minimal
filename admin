@@ -356,7 +356,7 @@ client_push() {
 }
 
 client_test() {
-    output="./test"
+    output="./.test"
     mkdir -p ${output}
     echo "${bold}node${regular}"
     NODE_ENV=production node ./app.js & pid=$!
