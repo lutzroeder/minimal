@@ -16,14 +16,14 @@ else:
 
 class HTTPRequestHandler(BaseHTTPRequestHandler):
     def handler(self):
-        pathname = urlparse(self.path).path.lstrip("/")
-        location = os.path.join(root, pathname);
+        pathname = urlparse(self.path).path
+        location = root + pathname;
         status_code = 404
         headers = {}
         if os.path.exists(location) and os.path.isdir(location):
             if not location.endswith("/"):
                 status_code = 302
-                headers = { "Location": "/" + pathname + "/" }
+                headers = { "Location": pathname + "/" }
             else:
                 location += "index.html"
         buffer = None
@@ -43,7 +43,7 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
         for key in headers:
             self.send_header(key, headers[key])
         self.end_headers()
-        if buffer and self.command != "HEAD":
+        if status_code == 200 and self.command != "HEAD":
             self.wfile.write(buffer)
     def do_GET(self):
         self.handler();
@@ -73,6 +73,5 @@ if browse:
         command = "open"
     elif platform.system() == "Windows":
         command = 'start ""'
-    if len(command) > 0:
-        os.system(command + ' "' + url.replace('"', '\"') + '"')
+    os.system(command + ' "' + url.replace('"', '\"') + '"')
 server.serve_forever()

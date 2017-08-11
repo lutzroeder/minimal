@@ -40,7 +40,7 @@ while (args.length > 0) {
 
 var server = http.createServer(function (request, response) {
     var pathname = url.parse(request.url, true).pathname;
-    var location = path.join(root, pathname);
+    var location = root + pathname;
     var statusCode = 404;
     var headers = {};
     if (fs.existsSync(location) && fs.statSync(location).isDirectory()) {
@@ -56,7 +56,7 @@ var server = http.createServer(function (request, response) {
     if (fs.existsSync(location) && !fs.statSync(location).isDirectory()) {
         var extension = path.extname(location);
         var contentType = mimeTypeMap[extension];
-        if (contentType && fs.existsSync(location)) {
+        if (contentType) {
             buffer = fs.readFileSync(location, "binary");
             statusCode = 200;
             headers = {
@@ -67,7 +67,7 @@ var server = http.createServer(function (request, response) {
     }
     console.log(statusCode + " " + request.method + " " + request.url);
     response.writeHead(statusCode, headers);
-    if (buffer && request.method !== "HEAD") {
+    if (statusCode == 200 && request.method !== "HEAD") {
         response.write(buffer, "binary");
     }
     response.end();
@@ -84,10 +84,8 @@ server.listen(port, function(error) {
         var command = "xdg-open";
         switch (process.platform) {
             case "darwin": command = "open"; break;
-            case 'win32': command = 'start ""'; break;
+            case "win32": command = 'start ""'; break;
         }
-        if (command) {
-            child_process.exec(command + ' "' + url.replace(/"/g, '\\\"') + '"');
-        }
+        child_process.exec(command + ' "' + url.replace(/"/g, '\\\"') + '"');
     }
 })

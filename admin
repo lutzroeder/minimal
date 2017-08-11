@@ -33,15 +33,15 @@ server_start() {
     if [ ${runtime} = "go" ]; then 
         echo "${bold}apt-get install golang${regular}"
         sudo apt-get -qq install --yes golang
-        go run ./tools/generator.go ${root}/www/${site}
+        go run tools/generator.go ${root}/www/${site}
     elif [ ${runtime} = "python" ]; then
         echo "${bold}apt-get install python${regular}"
         sudo apt-get -qq install --yes python python-dateutil
-        python ./tools/generator.py ${root}/www/${site}
+        python tools/generator.py ${root}/www/${site}
     else
         echo "${bold}apt-get install nodejs${regular}"
         sudo apt-get -qq install --yes nodejs
-        node ./tools/generator.js ${root}/www/${site}
+        node tools/generator.js ${root}/www/${site}
     fi
 
     echo "${bold}apt-get install nginx${regular}"
@@ -89,8 +89,8 @@ cat << EOF >> "${site}.conf"
         access_log ${root}/log/nginx/${site}/access.log ${site}_format;
         error_log ${root}/log/nginx/${site}/access.log;
 EOF
-if [ -f "./admin.map" ]; then
-    sed 's/^/        /' ./admin.map >> "${site}.conf"
+if [ -f "admin.map" ]; then
+    sed 's/^/        /' admin.map >> "${site}.conf"
 fi
 cat << EOF >> "${site}.conf"
         location ~ ^(.*)/index.html\$ {
@@ -257,23 +257,17 @@ server_update() {
 
 client_start() {
     if [ ${1:-${runtime}} = "go" ]; then 
-        echo "${bold}go${regular}"
-        root=./build/go
-        ENVIRONMENT=development go run ./tools/generator.go ${root}
-        echo "${bold}start server${regular}"
-        go run ./tools/server.go ${root} --port 8080 --browse
+        root=build/go
+        ENVIRONMENT=development go run tools/generator.go ${root}
+        go run tools/server.go ${root} --port 8080 --browse
     elif [ ${1:-${runtime}} = "python" ]; then
-        echo "${bold}python${regular}"
-        root=./build/python
-        ENVIRONMENT=development python ./tools/generator.py ${root}
-        echo "${bold}start server${regular}"
-        python ./tools/server.py ${root} --port 8080 --browse
+        root=build/python
+        ENVIRONMENT=development python tools/generator.py ${root}
+        python tools/server.py ${root} --port 8080 --browse
     else
-        echo "${bold}node${regular}"
-        root=./build/node
-        ENVIRONMENT=development node ./tools/generator.js ${root}
-        echo "${bold}start server${regular}"
-        node ./tools/server.js ${root} --port 8080 --browse
+        root=build/node
+        ENVIRONMENT=development node tools/generator.js ${root}
+        node tools/server.js ${root} --port 8080 --browse
     fi
 }
 
@@ -310,14 +304,14 @@ client_console() {
 
 client_test() {
     echo "${bold}node${regular}"
-    ENVIRONMENT=production node ./tools/generator.js
+    ENVIRONMENT=production node tools/generator.js
     echo "${bold}go${regular}"
-    ENVIRONMENT=production go run ./tools/generator.go
+    ENVIRONMENT=production go run tools/generator.go
     echo "${bold}python${regular}"
-    ENVIRONMENT=production python ./tools/generator.py
+    ENVIRONMENT=production python tools/generator.py
     echo "${bold}compare${regular}"
-    diff --brief -r ./build/node/ ./build/go/
-    diff --brief -r ./build/node/ ./build/python/
+    diff --brief -r build/node/ build/go/
+    diff --brief -r build/node/ build/python/
 }
 
 description() {
