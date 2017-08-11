@@ -16,8 +16,8 @@ case "${OSTYPE}" in
     msys*) root=/c ;;
 esac
 
-server_install() {
-    server_uninstall
+server_start() {
+    server_stop
 
     sudo rm -rf ${root}/log/nginx/${site}
     sudo mkdir -p ${root}/log/nginx/${site}
@@ -33,12 +33,15 @@ server_install() {
     if [ ${runtime} = "go" ]; then 
         echo "${bold}apt-get install golang${regular}"
         sudo apt-get -qq install --yes golang
+        go run ./tools/generator.go ${root}/www/${site}
     elif [ ${runtime} = "python" ]; then
         echo "${bold}apt-get install python${regular}"
         sudo apt-get -qq install --yes python python-dateutil
+        python ./tools/generator.py ${root}/www/${site}
     else
         echo "${bold}apt-get install nodejs${regular}"
         sudo apt-get -qq install --yes nodejs
+        node ./tools/generator.js ${root}/www/${site}
     fi
 
     echo "${bold}apt-get install nginx${regular}"
@@ -156,7 +159,7 @@ EOF
     fi
 }
 
-server_uninstall() {
+server_stop() {
     if [ -f "/etc/systemd/system/${site}-cert.timer" ]; then
         echo "${bold}uninstall ${site}-cert.timer${regular}"
         if [ $(systemctl is-active "${site}-cert.timer") = "active" ]; then
@@ -197,16 +200,6 @@ server_uninstall() {
                 return
             fi
         fi
-    fi
-}
-
-server_start() {
-    if [ ${runtime} = "go" ]; then 
-        go run ./app.go ${root}/www/${site}
-    elif [ ${runtime} = "python" ]; then
-        python ./app.py ${root}/www/${site}
-    else
-        node ./app.js ${root}/www/${site}
     fi
 }
 
@@ -256,30 +249,29 @@ server_pull() {
 }
 
 server_update() {
-    server_uninstall
+    server_stop
     server_pull
     source "${configuration}"
     server_start
-    server_install
 }
 
 client_start() {
     if [ ${1:-${runtime}} = "go" ]; then 
         echo "${bold}go${regular}"
         root=./build/go
-        ENVIRONMENT=development go run ./app.go ${root}
-        # echo "${bold}start server${regular}"
-        # go run ./tools/server.go ${root} --port 8080 --browse
+        ENVIRONMENT=development go run ./tools/generator.go ${root}
+        echo "${bold}start server${regular}"
+        go run ./tools/server.go ${root} --port 8080 --browse
     elif [ ${1:-${runtime}} = "python" ]; then
         echo "${bold}python${regular}"
         root=./build/python
-        ENVIRONMENT=development python ./app.py ${root}
+        ENVIRONMENT=development python ./tools/generator.py ${root}
         echo "${bold}start server${regular}"
         python ./tools/server.py ${root} --port 8080 --browse
     else
         echo "${bold}node${regular}"
         root=./build/node
-        ENVIRONMENT=development node ./app.js ${root}
+        ENVIRONMENT=development node ./tools/generator.js ${root}
         echo "${bold}start server${regular}"
         node ./tools/server.js ${root} --port 8080 --browse
     fi
@@ -318,11 +310,11 @@ client_console() {
 
 client_test() {
     echo "${bold}node${regular}"
-    ENVIRONMENT=production node ./app.js
+    ENVIRONMENT=production node ./tools/generator.js
     echo "${bold}go${regular}"
-    ENVIRONMENT=production go run ./app.go
+    ENVIRONMENT=production go run ./tools/generator.go
     echo "${bold}python${regular}"
-    ENVIRONMENT=production python ./app.py
+    ENVIRONMENT=production python ./tools/generator.py
     echo "${bold}compare${regular}"
     diff --brief -r ./build/node/ ./build/go/
     diff --brief -r ./build/node/ ./build/python/
@@ -341,24 +333,22 @@ server() {
     command="$1"
     shift
     case "${command}" in
-        "install") server_install;;
-        "uninstall") server_uninstall;;
+        "start") server_start;;
+        "stop") server_stop;;
         "cert") server_cert;;
         "pull") server_pull;;
-        "start") server_start;;
         "update") server_update;;
         "log") server_log;;
         *)
             description;
             echo "Usage: ${bold}$(basename "$0")${regular} <server-command>"
             echo
-            echo "    ${bold}install${regular}    Install NGINX and ${bold}${site}.service${regular}"
-            echo "    ${bold}start${regular}      Build the website"
-            echo "    ${bold}update${regular}     Run stop, pull and start"
+            echo "    ${bold}start${regular}      Build website and install NGINX server"
+            echo "    ${bold}stop${regular}       Uninstall NGINX site"
             echo "    ${bold}pull${regular}       Fetch Git repo and reset master branch"
+            echo "    ${bold}update${regular}     Run stop, pull and start"
             echo "    ${bold}log${regular}        Show server log"
             echo "    ${bold}cert${regular}       Create or renew SSL certificate"
-            echo "    ${bold}uninstall${regular}  Stop and uninstall service"
             echo;
         ;;
     esac
