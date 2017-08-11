@@ -6,24 +6,6 @@ var path = require("path");
 var url = require("url");
 var child_process = require('child_process');
 
-var root = ".";
-var port = 8080;
-var browse = false;
-
-var args = process.argv.slice(2)
-while (args.length > 0) {
-    var arg = args.shift();
-    if (arg == "--browse" || arg == "-b") { 
-        browse = true;
-    }
-    else if ((arg == "--port" || arg == "-p") && args.length > 0 && !isNaN(args[0])) {
-        port = Number(args.shift());
-    }
-    else {
-        root = arg;
-    }
-}
-
 var mimeTypeMap = {
     ".html": "text/html",
     ".js":   "text/javascript",
@@ -38,13 +20,31 @@ var mimeTypeMap = {
     ".zip":  "application/zip"
 };
 
+var root = ".";
+var port = 8080;
+var browse = false;
+
+var args = process.argv.slice(2)
+while (args.length > 0) {
+    var arg = args.shift();
+    if ((arg == "--port" || arg == "-p") && args.length > 0 && !isNaN(args[0])) {
+        port = Number(args.shift());
+    }
+    else if (arg == "--browse" || arg == "-b") { 
+        browse = true;
+    }
+    else {
+        root = arg;
+    }
+}
+
 var server = http.createServer(function (request, response) {
     var pathname = url.parse(request.url, true).pathname;
     var location = path.join(root, pathname);
     var statusCode = 404;
     var headers = {};
     if (fs.existsSync(location) && fs.statSync(location).isDirectory()) {
-        if (!pathname.endsWith("/")) {
+        if (!location.endsWith("/")) {
             statusCode = 302;
             headers = { "Location": pathname + "/" };
         }
@@ -57,25 +57,15 @@ var server = http.createServer(function (request, response) {
         var extension = path.extname(location);
         var contentType = mimeTypeMap[extension];
         if (contentType && fs.existsSync(location)) {
-            try {
-                var size = fs.statSync(location).size;
-                var buffer = new Buffer(size);
-                var descriptor = fs.openSync(location, "r");
-                fs.readSync(descriptor, buffer, 0, buffer.length, 0);
-                fs.closeSync(descriptor);
-                statusCode = 200;
-                headers = {
-                    "Content-Type": contentType,
-                    "Content-Length": buffer.length
-                };
-            }
-            catch (error) {
-                buffer = null;
-                console.log("ERROR: " + error);
-            }
+            buffer = fs.readFileSync(location, "binary");
+            statusCode = 200;
+            headers = {
+                "Content-Type": contentType,
+                "Content-Length": buffer.length
+            };
         }
     }
-    console.log(statusCode + " " + request.method + " " + request.url + " ");
+    console.log(statusCode + " " + request.method + " " + request.url);
     response.writeHead(statusCode, headers);
     if (buffer && request.method !== "HEAD") {
         response.write(buffer, "binary");
@@ -91,11 +81,10 @@ server.listen(port, function(error) {
     var url = "http://localhost:" + port;
     console.log("Serving '" + root + "' at " + url + "...");
     if (browse) {
-        var command = "";
+        var command = "xdg-open";
         switch (process.platform) {
             case "darwin": command = "open"; break;
             case 'win32': command = 'start ""'; break;
-            default: command = "xdg-open"; break;
         }
         if (command) {
             child_process.exec(command + ' "' + url.replace(/"/g, '\\\"') + '"');
