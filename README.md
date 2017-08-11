@@ -8,11 +8,11 @@ To get started, [fork](https://help.github.com/articles/fork-a-repo) this reposi
 
 Modify `./app.json` to your liking (symbol codes for social links can be found [here](http://drinchev.github.io/monosocialiconsfont)). 
 
-To launch the web server locally run **either** of the following: 
+To build locally and launch a simple web server run **either** of the following: 
 
 * Install [Node.js](https://nodejs.org/en/download) and run `./admin start node`.
-* Install [Go](https://golang.org/doc/install) and run `go run app.go && cd out/go && python -m SimpleHTTPServer 8080`.
-* Install [Python](https://www.python.org/downloads/) and run `python app.py && cd out/python && python -m SimpleHTTPServer 8080`.
+* Install [Go](https://golang.org/doc/install) and run `./admin start go`.
+* Install [Python](https://www.python.org/downloads/) and run `./admin start python`.
 
 Finally, navigate to ``http://localhost:8080` in your web browser to see the result.
 

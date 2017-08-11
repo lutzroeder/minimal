@@ -356,12 +356,11 @@ def clean_directory(directory):
             else:
                 os.remove(item)
 
-print("python " + platform.python_version())
+environment = os.getenv("ENVIRONMENT")
+print("python " + platform.python_version() + " " + environment)
 with open("./app.json") as configurationFile:
     configuration = json.load(configurationFile)
-environment = os.getenv("ENVIRONMENT")
-print(environment)
-destination = "out/python"
+destination = "build/python"
 if len(sys.argv) > 1 and len(sys.argv[1]) > 0:
     destination = sys.argv[1]
 clean_directory(destination)

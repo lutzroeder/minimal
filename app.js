@@ -6,7 +6,6 @@ var fs = require("fs");
 var http = require("http");
 var path = require("path");
 var process = require("process");
-var url = require("url");
 
 function getRelativeRoot(file) {
     var root = path.relative(path.dirname(file), "content/");
@@ -368,11 +367,10 @@ function cleanDirectory(directory) {
     }
 }
 
-console.log("node " + process.version);
+var environment = process.env["ENVIRONMENT"];
+console.log("node " + process.version + " " + environment);
 var configuration = JSON.parse(fs.readFileSync("./app.json", "utf-8"));
-var environment = process.env.ENVIRONMENT;
-console.log(environment);
-var destination = "out/node";
+var destination = "build/node";
 if (process.argv.length > 2 && process.argv[2]) {
     destination = process.argv[2];
 }

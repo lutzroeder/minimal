@@ -492,7 +492,8 @@ func cleanDir(directory string) {
 }
 
 func main() {
-	fmt.Println(runtime.Version())
+	environment = os.Getenv("ENVIRONMENT")
+	fmt.Println("go " + strings.TrimPrefix(runtime.Version(), "go") + " " + environment)
 	file, err := ioutil.ReadFile("./app.json")
 	if err != nil {
 		fmt.Println(err)
@@ -503,9 +504,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	environment = os.Getenv("ENVIRONMENT")
-	fmt.Println(environment)
-	destination := "out/go"
+	destination := "build/go"
 	if len(os.Args) >= 2 && len(os.Args[1]) > 0{
 		destination = os.Args[1];
 	}

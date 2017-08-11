@@ -265,11 +265,23 @@ server_update() {
 
 client_start() {
     if [ ${1:-${runtime}} = "go" ]; then 
-        sleep 0.5 && ENVIRONMENT=development go run ./app.go ${root}/www/${site} && git web--browse http://localhost:8080
+        echo "${bold}go${regular}"
+        root=./build/go
+        ENVIRONMENT=development go run ./app.go ${root}
+        # echo "${bold}start server${regular}"
+        # go run ./tools/server.go ${root} --port 8080 --browse
     elif [ ${1:-${runtime}} = "python" ]; then
-        sleep 0.5 && ENVIRONMENT=development python ./app.py ${root}/www/${site} && git web--browse http://localhost:8080
+        echo "${bold}python${regular}"
+        root=./build/python
+        ENVIRONMENT=development python ./app.py ${root}
+        echo "${bold}start server${regular}"
+        python ./tools/server.py ${root} --port 8080 --browse
     else
-        sleep 0.5 && ENVIRONMENT=development node ./app.js ${root}/www/${site} && git web--browse http://localhost:8080
+        echo "${bold}node${regular}"
+        root=./build/node
+        ENVIRONMENT=development node ./app.js ${root}
+        echo "${bold}start server${regular}"
+        node ./tools/server.js ${root} --port 8080 --browse
     fi
 }
 
@@ -312,8 +324,8 @@ client_test() {
     echo "${bold}python${regular}"
     ENVIRONMENT=production python ./app.py
     echo "${bold}compare${regular}"
-    diff --brief -r ./out/node/ ./out/go/
-    diff --brief -r ./out/node/ ./out/python/
+    diff --brief -r ./build/node/ ./build/go/
+    diff --brief -r ./build/node/ ./build/python/
 }
 
 description() {
