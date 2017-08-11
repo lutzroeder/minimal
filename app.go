@@ -454,6 +454,9 @@ func renderPage(source string, destination string) {
 }
 
 func render(source string, destination string) {
+	if source == "content/content.json" {
+		return
+	}
 	fmt.Println(destination)
 	extension := path.Ext(source);
 	switch (extension) {
@@ -494,7 +497,7 @@ func cleanDir(directory string) {
 func main() {
 	environment = os.Getenv("ENVIRONMENT")
 	fmt.Println("go " + strings.TrimPrefix(runtime.Version(), "go") + " " + environment)
-	file, err := ioutil.ReadFile("./app.json")
+	file, err := ioutil.ReadFile("./content/content.json")
 	if err != nil {
 		fmt.Println(err)
 		return

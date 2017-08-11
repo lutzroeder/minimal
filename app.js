@@ -312,6 +312,9 @@ function renderPage(source, destination) {
 }
 
 function render(source, destination) {
+    if (source == "content/content.json") {
+        return;
+    }
     console.log(destination);
     var extension = path.extname(source);
     switch (extension) {
@@ -369,7 +372,7 @@ function cleanDirectory(directory) {
 
 var environment = process.env["ENVIRONMENT"];
 console.log("node " + process.version + " " + environment);
-var configuration = JSON.parse(fs.readFileSync("./app.json", "utf-8"));
+var configuration = JSON.parse(fs.readFileSync("content/content.json", "utf-8"));
 var destination = "build/node";
 if (process.argv.length > 2 && process.argv[2]) {
     destination = process.argv[2];
