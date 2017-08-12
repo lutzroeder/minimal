@@ -43,7 +43,9 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
         for key in headers:
             self.send_header(key, headers[key])
         self.end_headers()
-        if status_code == 200 and self.command != "HEAD":
+        if status_code != 200:
+            self.wfile.write(str(status_code))
+        elif self.command != "HEAD":
             self.wfile.write(buffer)
     def do_GET(self):
         self.handler();

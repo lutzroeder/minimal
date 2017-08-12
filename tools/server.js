@@ -67,7 +67,10 @@ var server = http.createServer(function (request, response) {
     }
     console.log(statusCode + " " + request.method + " " + request.url);
     response.writeHead(statusCode, headers);
-    if (statusCode == 200 && request.method !== "HEAD") {
+    if (statusCode != 200) {
+        response.write(statusCode.toString());
+    }
+    else if (request.method !== "HEAD") {
         response.write(buffer, "binary");
     }
     response.end();

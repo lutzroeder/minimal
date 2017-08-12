@@ -55,7 +55,9 @@ func (handler *httpHandler) ServeHTTP(response http.ResponseWriter, request *htt
 		response.Header().Set(key, value)
 	}
 	response.WriteHeader(statusCode)
-	if statusCode == 200 && request.Method != "HEAD" {
+	if statusCode != 200 {
+		response.Write([]byte(strconv.Itoa(statusCode)))
+	} else if request.Method != "HEAD" {
 		response.Write(buffer)
 	}
 }
