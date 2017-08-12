@@ -28,6 +28,14 @@ server_start() {
             curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
         fi
     fi
+    if [ ! -f "/etc/apt/sources.list.d/nginxsource.list" ]; then
+cat << EOF >> "nginxsource.list"
+deb http://nginx.org/packages/ubuntu/ xenial nginx
+deb-src http://nginx.org/packages/ubuntu/ xenial nginx
+EOF
+        sudo mv nginxsource.list /etc/apt/sources.list.d/nginxsource.list
+        sudo chown root:root /etc/apt/sources.list.d/nginxsource.list
+    fi
     sudo apt-get -qq update
 
     if [ ${runtime} = "go" ]; then 
