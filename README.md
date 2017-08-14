@@ -1,6 +1,6 @@
 # Minimal
 
-Minimal is a personal website generator and blog template for Go, Node.js and Python. It has no external dependencies and requires only a few hundred lines of code to run. Everything is minimal, easy to take appart and rewrite.
+Minimal is a personal static website and blog generator for Go, Node.js and Python. It has no external dependencies and requires only a few hundred lines of code to run. Everything is minimal, easy to take appart and rewrite.
 
 ## Getting Started
 
@@ -18,6 +18,6 @@ To build locally and launch a simple web server run **either** of the following:
 
 `./admin` is a [Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) script automating common tasks to run the website (on Windows use Git Bash or [WLS](https://en.wikipedia.org/wiki/Windows_Subsystem_for_Linux)). 
 
-The script can be configured via `./admin.cfg` and provides two sets of commmands, one for local development and another for running the website on an actual Linux server.
+The script can be configured via `./admin.cfg` and provides two sets of commmands, one for local client development and another for running the website on an actual Linux server.
 
-After cloning the repository on an Ubuntu Linux server modify `/etc/environment` to include `ENVIRONMENT=production` and run `./admin start` to run the site via an [NGINX](https://www.nginx.com).
+After cloning the repository on an Ubuntu Linux server modify `/etc/environment` to include `ENVIRONMENT=production` and run `./admin start` to run the site via [NGINX](https://www.nginx.com).
