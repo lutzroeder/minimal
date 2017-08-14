@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"mime"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path"
 	"runtime"
 	"strconv"
@@ -14,7 +16,7 @@ import (
 )
 
 var root = "."
-var port = 8080
+var port = ":8080"
 var browse = false
 
 type httpHandler struct {
@@ -68,8 +70,8 @@ func main() {
 		arg := args[0]
 		args = args[1:]
 		if (arg == "--port" || arg == "-p") && len(args) > 0 {
-			if value, err := strconv.Atoi(args[0]); err == nil {
-				port = value
+			if _, err := strconv.Atoi(args[0]); err == nil {
+				port = ":" + args[0]
 			}
 			args = args[1:]
 		} else if (arg == "--browse" || arg == "-b") {
@@ -78,15 +80,34 @@ func main() {
 			root = arg
 		}
 	}
-	url := "http://localhost:" + strconv.Itoa(port)
+	server := http.Server{}
+	server.Handler = &httpHandler{}
+	listener, err := net.Listen("tcp", port)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	go server.Serve(listener)
+	url := "http://localhost" + port
 	fmt.Println("Serving '" + root + "' at " + url + "...")
 	if browse {
 		command := "xdg-open"
+		arg := url
 		switch runtime.GOOS {
 			case "darwin": command = "open"
-			case "windows": command = "start \"\""
+			case "windows": command = "cmd"; arg = "/C start " + arg 
 		}
-		exec.Command(command, url).Run()
+		exec.Command(command, arg).Run()
 	}
-	http.ListenAndServe(":"+strconv.Itoa(port), &httpHandler{})
+	exit := make(chan struct{})
+	quit := make(chan os.Signal)
+	signal.Notify(quit, os.Interrupt)
+	go func() {
+		select {
+		case <-quit:
+			server.Shutdown(nil)
+			close(exit)
+		}
+	}()
+	<-exit
 }

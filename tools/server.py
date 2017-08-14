@@ -39,6 +39,7 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
                     "Content-Length": len(buffer)
                 }
         print(str(status_code) + " " + self.command + " " + self.path)
+        sys.stdout.flush()
         self.send_response(status_code)
         for key in headers:
             self.send_header(key, headers[key])
@@ -76,4 +77,5 @@ if browse:
     elif platform.system() == "Windows":
         command = 'start ""'
     os.system(command + ' "' + url.replace('"', '\"') + '"')
+sys.stdout.flush()
 server.serve_forever()

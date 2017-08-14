@@ -359,7 +359,7 @@ def clean_directory(directory):
                 os.remove(item)
 
 environment = os.getenv("ENVIRONMENT")
-print("python " + platform.python_version() + " " + environment)
+print("python " + platform.python_version() + " " + (environment if environment else ""))
 with open("./content/content.json") as configurationFile:
     configuration = json.load(configurationFile)
 destination = "build/python"

@@ -332,8 +332,8 @@ function render(source, destination) {
 }
 
 function makeDirectory(directory) { 
-    directory.split(path.sep).reduce((current, folder) => {
-        current += folder + path.sep;
+    directory.split("/").reduce((current, folder) => {
+        current += folder + "/";
         if (!fs.existsSync(current)) {
             fs.mkdirSync(current);
         }
