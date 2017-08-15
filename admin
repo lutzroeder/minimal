@@ -28,28 +28,28 @@ server_start() {
             curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
         fi
     fi
-    if [ ! -f "/etc/apt/sources.list.d/nginxsource.list" ]; then
-cat << EOF >> "nginxsource.list"
-deb http://nginx.org/packages/ubuntu/ xenial nginx
-deb-src http://nginx.org/packages/ubuntu/ xenial nginx
-EOF
-        sudo mv nginxsource.list /etc/apt/sources.list.d/nginxsource.list
-        sudo chown root:root /etc/apt/sources.list.d/nginxsource.list
+    if [ ! -f "/etc/apt/sources.list.d/nginx.list" ]; then
+        echo "deb http://nginx.org/packages/ubuntu/ xenial nginx" | sudo tee /etc/apt/sources.list.d/nginx.list
+        echo "deb-src http://nginx.org/packages/ubuntu/ xenial nginx" | sudo tee -a /etc/apt/sources.list.d/nginx.list
+        sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys ABF5BD827BD9BF62
     fi
     sudo apt-get -qq update
 
     if [ ${runtime} = "go" ]; then 
         echo "${bold}apt-get install golang${regular}"
         sudo apt-get -qq install --yes golang
-        go run tools/generator.go ${root}/www/${site}
+        echo "${bold}node build ${root}/www/${site}${regular}"
+        sudo go run tools/generator.go ${root}/www/${site}
     elif [ ${runtime} = "python" ]; then
         echo "${bold}apt-get install python${regular}"
         sudo apt-get -qq install --yes python python-dateutil
-        python tools/generator.py ${root}/www/${site}
+        echo "${bold}python build ${root}/www/${site}${regular}"
+        sudo python tools/generator.py ${root}/www/${site}
     else
         echo "${bold}apt-get install nodejs${regular}"
         sudo apt-get -qq install --yes nodejs
-        node tools/generator.js ${root}/www/${site}
+        echo "${bold}go build ${root}/www/${site}${regular}"
+        sudo node tools/generator.js ${root}/www/${site}
     fi
 
     echo "${bold}apt-get install nginx${regular}"
