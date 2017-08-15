@@ -229,7 +229,7 @@ server_cert() {
     else
         echo "${bold}create certificate${regular}"
         mkdir -p .well-known/acme-challenge
-        sudo letsencrypt certonly --webroot -w $(pwd) -d ${domain} -d www.${domain} --agree-tos --email ${email}
+        sudo letsencrypt certonly --webroot -w $(pwd) -d ${domain} -d www.${domain} -d cdn.${domain} --agree-tos --email ${email}
         rm letsencrypt.log
     fi
     rm -R .well-known
