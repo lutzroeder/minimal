@@ -10,17 +10,11 @@ regular=$(tty -s && tput sgr0)
 underline=$(tty -s && tput smul)
 error=$(tty -s && tput setaf 1)
 
-case "${OSTYPE}" in
-    linux-gnu*) root=/var ;;
-    darwin*) root=/usr/local/var ;;
-    msys*) root=/c ;;
-esac
-
 server_start() {
     server_stop
 
-    sudo rm -rf ${root}/log/nginx/${site}
-    sudo mkdir -p ${root}/log/nginx/${site}
+    sudo rm -rf /var/log/nginx/${site}
+    sudo mkdir -p /var/log/nginx/${site}
 
     echo "${bold}apt-get update${regular}"
     if [ ${runtime} = "node" ]; then
@@ -38,18 +32,18 @@ server_start() {
     if [ ${runtime} = "go" ]; then 
         echo "${bold}apt-get install golang${regular}"
         sudo apt-get -qq install --yes golang
-        echo "${bold}node build ${root}/www/${site}${regular}"
-        sudo go run tools/generator.go ${root}/www/${site}
+        echo "${bold}node build /var/www/${site}${regular}"
+        sudo go run tools/generator.go /var/www/${site}
     elif [ ${runtime} = "python" ]; then
         echo "${bold}apt-get install python${regular}"
         sudo apt-get -qq install --yes python python-dateutil
-        echo "${bold}python build ${root}/www/${site}${regular}"
-        sudo python tools/generator.py ${root}/www/${site}
+        echo "${bold}python build /var/www/${site}${regular}"
+        sudo python tools/generator.py /var/www/${site}
     else
         echo "${bold}apt-get install nodejs${regular}"
         sudo apt-get -qq install --yes nodejs
-        echo "${bold}go build ${root}/www/${site}${regular}"
-        sudo node tools/generator.js ${root}/www/${site}
+        echo "${bold}go build /var/www/${site}${regular}"
+        sudo node tools/generator.js /var/www/${site}
     fi
 
     echo "${bold}apt-get install nginx${regular}"
@@ -93,9 +87,9 @@ cat << EOF >> "${site}.conf"
     gzip on; gzip_proxied any; gzip_min_length 1000; gzip_http_version 1.0; gzip_disable 'msie6'; gzip_vary on;
     gzip_types text/plain text/css text/javascript application/json application/atom+xml application/rss+xml;
     location / {
-        root ${root}/www/${site};
-        access_log ${root}/log/nginx/${site}/access.log ${site}_format;
-        error_log ${root}/log/nginx/${site}/access.log;
+        root /var/www/${site};
+        access_log /var/log/nginx/${site}/access.log ${site}_format;
+        error_log /var/log/nginx/${site}/access.log;
 EOF
 if [ -f "admin.map" ]; then
     sed 's/^/        /' admin.map >> "${site}.conf"
@@ -221,7 +215,7 @@ server_cert() {
     sudo apt-get -qq update
     sudo apt-get -qq install --yes letsencrypt
 
-    pushd ${root}/www/${site}
+    pushd /var/www/${site} > /dev/null
     mkdir .well-known
     if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
         echo "${bold}renew certificate${regular}"
@@ -233,7 +227,7 @@ server_cert() {
         rm letsencrypt.log
     fi
     rm -R .well-known
-    popd
+    popd > /dev/null
 
     echo "${bold}reload nginx.service${regular}"
     sudo systemctl stop "nginx.service"
@@ -245,7 +239,7 @@ server_cert() {
 }
 
 server_log() {
-    cat ${root}/log/nginx/${site}/access.log
+    cat /var/log/nginx/${site}/access.log
 }
 
 server_pull() {
@@ -263,20 +257,44 @@ server_update() {
     server_start
 }
 
-client_start() {
+client_build() {
     if [ ${1:-${runtime}} = "go" ]; then 
-        root=build/go
-        ENVIRONMENT=development go run tools/generator.go ${root}
-        go run tools/server.go ${root} --port 8080 --browse
+        go run tools/generator.go build/go
     elif [ ${1:-${runtime}} = "python" ]; then
-        root=build/python
-        ENVIRONMENT=development python tools/generator.py ${root}
-        python tools/server.py ${root} --port 8080 --browse
+        python tools/generator.py build/python
     else
-        root=build/node
-        ENVIRONMENT=development node tools/generator.js ${root}
-        node tools/server.js ${root} --port 8080 --browse
+        node tools/generator.js build/node
     fi
+}
+
+client_start() {
+    export ENVIRONMENT=development
+    client_build ${1}
+
+    if [ ${1:-${runtime}} = "go" ]; then 
+        go run tools/server.go build/go --port 8080 --browse
+    elif [ ${1:-${runtime}} = "python" ]; then
+        python tools/server.py build/python --port 8080 --browse
+    else
+        node tools/server.js build/node --port 8080 --browse
+    fi
+}
+
+client_deploy() {
+    export ENVIRONMENT=production
+    echo $ENVIRONMENT
+    echo "${bold}build${regular}"
+    client_build ${1}
+    runtime=${1:-${runtime}}
+    echo "${bold}archive${regular}"
+    pushd build/${runtime} > /dev/null
+    zip -r ../${site}.zip *
+    popd > /dev/null
+    echo "${bold}secure copy${regular}"
+    scp -i ${identity} -r build/lutzroeder.zip ${user}@${server}:~
+    echo "${bold}server deploy${regular}"
+    ssh -i ${identity} ${user}@${server} -t "sudo rm -rf /var/www/${site}/* && sudo unzip ${site}.zip -d /var/www/lutzroeder && rm ~/${site}.zip"
+    rm build/${site}.zip
 }
 
 client_log() {
@@ -360,7 +378,9 @@ client() {
     command="$1"
     shift
     case "${command}" in
+        "build") client_build $@;;
         "start") client_start $@;;
+        "deploy") client_deploy $@;;
         "push") client_push $@;;
         "update") client_update $@;;
         "log") client_log;;
@@ -370,7 +390,9 @@ client() {
             description;
             echo "Usage: ${bold}$(basename "$0")${regular} <client-command>"
             echo
-            echo "    ${bold}start${regular}      Build website and open web browser"
+            echo "    ${bold}build${regular}      Build the website"
+            echo "    ${bold}start${regular}      Launch a simple local web server and open web browser"
+            echo "    ${bold}deploy${regular}     Build website and push to production server"
             echo "    ${bold}push${regular}       Amend last commit or add new commit, then push changes"
             echo "    ${bold}update${regular}     Run push command and update server"
             echo "    ${bold}log${regular}        Show server log"
