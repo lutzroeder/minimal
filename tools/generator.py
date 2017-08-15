@@ -93,11 +93,6 @@ def write_file(path, data):
     with codecs.open(path, "w", "utf-8") as open_file:
         open_file.write(data)
 
-def redirect(request, status, location):
-    request.send_response(status)
-    request.send_header("Location", location)
-    request.end_headers()
-
 def format_date(date, format):
     if format == "atom":
         return date.astimezone(dateutil.tz.gettz("UTC")).isoformat("T").split("+")[0] + "Z"
@@ -222,20 +217,6 @@ def render_blog(folders, root, page):
     template = read_file(theme() + "/feed.html")
     return mustache(template, view, None)
 
-def write_string(request, content_type, data):
-    encoded = data.encode("utf-8")
-    request.send_response(200)
-    request.send_header("Content-Type", content_type)
-    request.send_header("Content-Length", len(encoded))
-    request.end_headers()
-    if request.command != "HEAD":
-        request.wfile.write(encoded)
-
-def root_handler(request):
-    request.send_response(301)
-    request.send_header("Location", "/")
-    request.end_headers()
-
 def render_post(source, destination):
     if source.startswith("content/blog/") and source.endswith("/index.html"):
         item = load_post(source)
@@ -252,28 +233,6 @@ def render_post(source, destination):
             write_file(destination, data)
             return True
     return False
-
-def default_handler(request):
-    pathname = urlparse(request.path).path.lower()
-    if pathname.endswith("/index.html"):
-        redirect(request, 301, "/" + pathname[0:len(pathname) - 11].lstrip("/"))
-        return
-    filename = pathname
-    if pathname.endswith("/"):
-        filename = os.path.join(pathname, "index.html")
-    filename = filename.lstrip("/")
-    if not exists(filename):
-        redirect(request, 302, os.path.dirname(pathname))
-        return
-    if isdir(filename):
-        redirect(request, 302, pathname + "/")
-        return
-    extension = os.path.splitext(filename)[1]
-    content_type = mimetypes.types_map[extension]
-
-    if len(post) > 0:
-        return post
-
 
 def render_feed(source, destination):
     host = configuration["host"]
@@ -328,7 +287,7 @@ def render_page(source, destination):
     write_file(destination, data)
 
 def render(source, destination):
-    if source == "content/content.json":
+    if source == "content/content.json" or source == "content/redirect.map":
         return;
     print destination
     extension = os.path.splitext(source)[1]

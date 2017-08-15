@@ -72,7 +72,7 @@ cat << EOF >> "${site}.conf"
 server {
     listen 80;
     server_name www.${domain};
-    return 301 https://www.${domain}\$request_uri;
+    return 301 https://\$host\$request_uri;
 }
 server {
     listen 443 ssl;
@@ -91,8 +91,8 @@ cat << EOF >> "${site}.conf"
         access_log /var/log/nginx/${site}/access.log ${site}_format;
         error_log /var/log/nginx/${site}/access.log;
 EOF
-if [ -f "admin.map" ]; then
-    sed 's/^/        /' admin.map >> "${site}.conf"
+if [ -f "content/redirect.map" ]; then
+    sed 's/\([^ ]*\)\( *\)\([^ ]*\)/        location ~ \1\2{ return 301 \3; }/g' content/redirect.map >> "${site}.conf"
 fi
 cat << EOF >> "${site}.conf"
         location ~ ^(.*)/index.html\$ {
@@ -259,11 +259,11 @@ server_update() {
 
 client_build() {
     if [ ${1:-${runtime}} = "go" ]; then 
-        go run tools/generator.go build/go
+        go run tools/generator.go
     elif [ ${1:-${runtime}} = "python" ]; then
-        python tools/generator.py build/python
+        python tools/generator.py
     else
-        node tools/generator.js build/node
+        node tools/generator.js
     fi
 }
 

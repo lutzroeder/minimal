@@ -312,7 +312,7 @@ function renderPage(source, destination) {
 }
 
 function render(source, destination) {
-    if (source == "content/content.json") {
+    if (source == "content/content.json" || source == "content/redirect.map") {
         return;
     }
     console.log(destination);

@@ -454,7 +454,7 @@ func renderPage(source string, destination string) {
 }
 
 func render(source string, destination string) {
-	if source == "content/content.json" {
+	if source == "content/content.json" || source == "content/redirect.map" {
 		return
 	}
 	fmt.Println(destination)
