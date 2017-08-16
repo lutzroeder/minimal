@@ -20,4 +20,4 @@ To build locally and launch a simple web server run **either** of the following:
 
 The script can be configured via `./admin.cfg` and provides two sets of commmands, one for local client development and another for running the website on an actual Linux server.
 
-After cloning the repository on an Ubuntu Linux server modify `/etc/environment` to include `ENVIRONMENT=production` and run `./admin start` to run the site via [NGINX](https://www.nginx.com).
+After cloning the repository on an Ubuntu Linux server, run `./admin server start` to host the site via [NGINX](https://www.nginx.com).

@@ -287,8 +287,6 @@ def render_page(source, destination):
     write_file(destination, data)
 
 def render(source, destination):
-    if source == "content/content.json" or source == "content/redirect.map":
-        return;
     print destination
     extension = os.path.splitext(source)[1]
     if extension == ".rss" or extension == ".atom":
@@ -319,7 +317,7 @@ def clean_directory(directory):
 
 environment = os.getenv("ENVIRONMENT")
 print("python " + platform.python_version() + " " + (environment if environment else ""))
-with open("./content/content.json") as configurationFile:
+with open("content.json") as configurationFile:
     configuration = json.load(configurationFile)
 destination = "build/python"
 if len(sys.argv) > 1 and len(sys.argv[1]) > 0:

@@ -29,25 +29,28 @@ server_start() {
     fi
     sudo apt-get -qq update
 
+    echo "${bold}apt-get install nginx${regular}"
+    sudo apt-get -qq install --yes nginx
+
     if [ ${runtime} = "go" ]; then 
         echo "${bold}apt-get install golang${regular}"
         sudo apt-get -qq install --yes golang
-        echo "${bold}node build /var/www/${site}${regular}"
-        sudo go run tools/generator.go /var/www/${site}
     elif [ ${runtime} = "python" ]; then
         echo "${bold}apt-get install python${regular}"
         sudo apt-get -qq install --yes python python-dateutil
-        echo "${bold}python build /var/www/${site}${regular}"
-        sudo python tools/generator.py /var/www/${site}
     else
         echo "${bold}apt-get install nodejs${regular}"
         sudo apt-get -qq install --yes nodejs
-        echo "${bold}go build /var/www/${site}${regular}"
-        sudo node tools/generator.js /var/www/${site}
     fi
 
-    echo "${bold}apt-get install nginx${regular}"
-    sudo apt-get -qq install --yes nginx
+    export ENVIRONMENT=production
+    echo "${bold}build${regular}"
+    client_build
+
+    echo "${bold}deploy${regular}"
+    sudo rm -rf /var/www/${site}/*
+    sudo mkdir -p /var/www/${site}
+    sudo cp -R build/${runtime}/* /var/www/${site}/
 
     echo "${bold}install nginx.service${regular}"
     sudo systemctl stop nginx.service
@@ -91,8 +94,8 @@ cat << EOF >> "${site}.conf"
         access_log /var/log/nginx/${site}/access.log ${site}_format;
         error_log /var/log/nginx/${site}/access.log;
 EOF
-if [ -f "content/redirect.map" ]; then
-    sed 's/\([^ ]*\)\( *\)\([^ ]*\)/        location ~ \1\2{ return 301 \3; }/g' content/redirect.map >> "${site}.conf"
+if [ -f "redirect.map" ]; then
+    sed 's/\([^ ]*\)\( *\)\([^ ]*\)/        location ~ \1\2{ return 301 \3; }/g' redirect.map >> "${site}.conf"
 fi
 cat << EOF >> "${site}.conf"
         location ~ ^(.*)/index.html\$ {
@@ -130,7 +133,7 @@ Description=${site}-cert.service
 [Service]
 Type=oneshot
 WorkingDirectory=$(pwd)
-ExecStart=/bin/bash $(pwd)/admin cert
+ExecStart=/bin/bash $(pwd)/admin server cert
 User=$(whoami)
 Group=$(whoami)
 SyslogIdentifier=${site}-cert.service
@@ -254,7 +257,7 @@ server_update() {
     server_stop
     server_pull
     source "${configuration}"
-    server_start
+    ./admin server start
 }
 
 client_build() {
@@ -280,31 +283,14 @@ client_start() {
     fi
 }
 
-client_deploy() {
-    export ENVIRONMENT=production
-    echo $ENVIRONMENT
-    echo "${bold}build${regular}"
-    client_build ${1}
-    runtime=${1:-${runtime}}
-    echo "${bold}archive${regular}"
-    pushd build/${runtime} > /dev/null
-    zip -r ../${site}.zip *
-    popd > /dev/null
-    echo "${bold}secure copy${regular}"
-    scp -i ${identity} -r build/lutzroeder.zip ${user}@${server}:~
-    echo "${bold}server deploy${regular}"
-    ssh -i ${identity} ${user}@${server} -t "sudo rm -rf /var/www/${site}/* && sudo unzip ${site}.zip -d /var/www/lutzroeder && rm ~/${site}.zip"
-    rm build/${site}.zip
-}
-
 client_log() {
-    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "${source}/admin log"
+    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "${source}/admin server log"
 }
 
 client_update() {
     client_push
-    echo "${bold}ssh ${user}@${server} update${regular}"
-    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "${source}/admin update" # | sed 's/^/    /'
+    echo "${bold}ssh ./admin server update${regular}"
+    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "${source}/admin server update"
 }
 
 client_push() {
@@ -324,6 +310,25 @@ client_push() {
     fi
 }
 
+client_deploy() {
+    export ENVIRONMENT=production
+    echo $ENVIRONMENT
+    echo "${bold}build${regular}"
+    client_build ${1}
+    runtime=${1:-${runtime}}
+    echo "${bold}archive${regular}"
+    pushd build/${runtime} > /dev/null
+    zip ../../${site}-build.zip -r *
+    popd > /dev/null
+    zip ${site}-admin.zip admin admin.cfg redirect.map
+    echo "${bold}secure copy${regular}"
+    scp -i ${identity} -r ${site}-build.zip ${site}-admin.zip ${user}@${server}:~
+    echo "${bold}server deploy${regular}"
+    ssh -i ${identity} ${user}@${server} -t "sudo rm -rf /var/www/${site}/* && sudo rm -rf /opt/www/${site}/* && sudo mkdir -p /var/www/${site} && sudo mkdir -p /opt/www/${site} && sudo unzip ${site}-build.zip -d /var/www/lutzroeder && sudo unzip ${site}-admin.zip -d /opt/www/lutzroeder && rm ~/${site}-build.zip && rm ~/${site}-admin.zip"
+    rm ${site}-build.zip
+    rm ${site}-admin.zip
+}
+
 client_console() {
     ssh -i ${identity} ${user}@${server} -t "cd ${source} && exec bash -l"
 }
@@ -340,15 +345,6 @@ client_test() {
     diff --brief -r build/node/ build/python/
 }
 
-description() {
-    echo
-    echo "  This script automates common tasks to run this website."
-    echo "  It can be configured via ${underline}${configuration}${regular} and provides two sets of commmands,"
-    echo "  for local development and for running the website on a Linux server."
-    echo "  Your computer is considered a server if \$ENVIRONMENT=production."
-    echo
-}
-
 server() {
     command="$1"
     shift
@@ -360,11 +356,11 @@ server() {
         "update") server_update;;
         "log") server_log;;
         *)
-            description;
-            echo "Usage: ${bold}$(basename "$0")${regular} <server-command>"
+            echo;
+            echo "Usage: ${bold}$(basename "$0")${regular} server <command>"
             echo
             echo "    ${bold}start${regular}      Build website and install NGINX server"
-            echo "    ${bold}stop${regular}       Uninstall NGINX site"
+            echo "    ${bold}stop${regular}       Disable NGINX configuration"
             echo "    ${bold}pull${regular}       Fetch Git repo and reset master branch"
             echo "    ${bold}update${regular}     Run stop, pull and start"
             echo "    ${bold}log${regular}        Show server log"
@@ -374,38 +370,33 @@ server() {
     esac
 }
 
-client() {
-    command="$1"
-    shift
-    case "${command}" in
-        "build") client_build $@;;
-        "start") client_start $@;;
-        "deploy") client_deploy $@;;
-        "push") client_push $@;;
-        "update") client_update $@;;
-        "log") client_log;;
-        "console") client_console;;
-        "test") client_test;;
-        *)
-            description;
-            echo "Usage: ${bold}$(basename "$0")${regular} <client-command>"
-            echo
-            echo "    ${bold}build${regular}      Build the website"
-            echo "    ${bold}start${regular}      Launch a simple local web server and open web browser"
-            echo "    ${bold}deploy${regular}     Build website and push to production server"
-            echo "    ${bold}push${regular}       Amend last commit or add new commit, then push changes"
-            echo "    ${bold}update${regular}     Run push command and update server"
-            echo "    ${bold}log${regular}        Show server log"
-            echo "    ${bold}console${regular}    Connect via SSH to server"
-            echo;
-        ;;
-    esac
-}
+command="$1"
+shift
+case "${command}" in
+    "build") client_build $@;;
+    "start") client_start $@;;
+    "deploy") client_deploy $@;;
+    "push") client_push $@;;
+    "update") client_update $@;;
+    "log") client_log;;
+    "console") client_console;;
+    "test") client_test;;
+    "server") server $@;;
 
-if [ "${ENVIRONMENT}" = "production" ]; then 
-    server $@
-else
-    client $@
-fi
+    *)
+        echo;
+        echo "Usage: ${bold}$(basename "$0")${regular} <command>"
+        echo
+        echo "    ${bold}build${regular}      Build the website"
+        echo "    ${bold}start${regular}      Build and launch simple web server"
+        echo "    ${bold}deploy${regular}     Build and push to production server"
+        echo "    ${bold}push${regular}       Amend last commit or add new commit, then push changes"
+        echo "    ${bold}update${regular}     Run push command and update production server"
+        echo "    ${bold}log${regular}        Show production server log"
+        echo "    ${bold}console${regular}    Connect to production server via SSH"
+        echo "    ${bold}server${regular}     Run server command"
+        echo;
+    ;;
+esac
 
 popd > /dev/null
