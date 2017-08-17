@@ -43,15 +43,6 @@ server_start() {
         sudo apt-get -qq install --yes nodejs
     fi
 
-    export ENVIRONMENT=production
-    echo "${bold}build${regular}"
-    client_build
-
-    echo "${bold}deploy${regular}"
-    sudo rm -rf /var/www/${site}/*
-    sudo mkdir -p /var/www/${site}
-    sudo cp -R build/${runtime}/* /var/www/${site}/
-
     echo "${bold}install nginx.service${regular}"
     sudo systemctl stop nginx.service
 
@@ -132,8 +123,8 @@ cat > "${site}-cert.service" << EOF
 Description=${site}-cert.service
 [Service]
 Type=oneshot
-WorkingDirectory=$(pwd)
-ExecStart=/bin/bash $(pwd)/admin server cert
+WorkingDirectory=/opt/www/${site}
+ExecStart=/bin/bash /opt/www/${site}/admin server cert
 User=$(whoami)
 Group=$(whoami)
 SyslogIdentifier=${site}-cert.service
@@ -256,8 +247,25 @@ server_pull() {
 server_update() {
     server_stop
     server_pull
-    source "${configuration}"
+    ./admin server deploy
     ./admin server start
+}
+
+server_deploy() {
+    export ENVIRONMENT=production
+    echo "${bold}build${regular}"
+    client_build
+
+    echo "${bold}deploy${regular}"
+    sudo rm -rf /var/www/${site}/*
+    sudo mkdir -p /var/www/${site}
+    sudo cp -R build/${runtime}/* /var/www/${site}/
+    sudo rm -rf /opt/www/${site}/*
+
+    sudo mkdir -p /opt/www/${site}
+    sudo cp admin /opt/www/${site}/
+    sudo cp admin.cfg /opt/www/${site}/
+    sudo cp redirect.map /opt/www/${site}/
 }
 
 client_build() {
@@ -273,7 +281,6 @@ client_build() {
 client_start() {
     export ENVIRONMENT=development
     client_build ${1}
-
     if [ ${1:-${runtime}} = "go" ]; then 
         go run tools/server.go build/go --port 8080 --browse
     elif [ ${1:-${runtime}} = "python" ]; then
@@ -284,7 +291,7 @@ client_start() {
 }
 
 client_log() {
-    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "${source}/admin server log"
+    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "/opt/www/${site}/admin server log"
 }
 
 client_update() {
@@ -312,7 +319,6 @@ client_push() {
 
 client_deploy() {
     export ENVIRONMENT=production
-    echo $ENVIRONMENT
     echo "${bold}build${regular}"
     client_build ${1}
     runtime=${1:-${runtime}}
@@ -325,8 +331,8 @@ client_deploy() {
     scp -i ${identity} -r ${site}-build.zip ${site}-admin.zip ${user}@${server}:~
     echo "${bold}server deploy${regular}"
     ssh -i ${identity} ${user}@${server} -t "sudo rm -rf /var/www/${site}/* && sudo rm -rf /opt/www/${site}/* && sudo mkdir -p /var/www/${site} && sudo mkdir -p /opt/www/${site} && sudo unzip ${site}-build.zip -d /var/www/lutzroeder && sudo unzip ${site}-admin.zip -d /opt/www/lutzroeder && rm ~/${site}-build.zip && rm ~/${site}-admin.zip"
-    rm ${site}-build.zip
-    rm ${site}-admin.zip
+    rm ${site}-*.zip
+    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "sudo /opt/www/${site}/admin server stop && sudo /opt/www/${site}/admin server start"
 }
 
 client_console() {
@@ -354,15 +360,17 @@ server() {
         "cert") server_cert;;
         "pull") server_pull;;
         "update") server_update;;
+        "deploy") server_deploy;;
         "log") server_log;;
         *)
             echo;
-            echo "Usage: ${bold}$(basename "$0")${regular} server <command>"
+            echo "Usage: ${bold}$(basename "$0")${regular} ${underline}server${regular} <command>"
             echo
             echo "    ${bold}start${regular}      Build website and install NGINX server"
             echo "    ${bold}stop${regular}       Disable NGINX configuration"
             echo "    ${bold}pull${regular}       Fetch Git repo and reset master branch"
-            echo "    ${bold}update${regular}     Run stop, pull and start"
+            echo "    ${bold}deploy${regular}     Build and deploy from server Git clone"
+            echo "    ${bold}update${regular}     Run stop, pull, deploy and start"
             echo "    ${bold}log${regular}        Show server log"
             echo "    ${bold}cert${regular}       Create or renew SSL certificate"
             echo;
@@ -382,19 +390,17 @@ case "${command}" in
     "console") client_console;;
     "test") client_test;;
     "server") server $@;;
-
     *)
         echo;
         echo "Usage: ${bold}$(basename "$0")${regular} <command>"
         echo
         echo "    ${bold}build${regular}      Build the website"
         echo "    ${bold}start${regular}      Build and launch simple web server"
-        echo "    ${bold}deploy${regular}     Build and push to production server"
-        echo "    ${bold}push${regular}       Amend last commit or add new commit, then push changes"
-        echo "    ${bold}update${regular}     Run push command and update production server"
+        echo "    ${bold}deploy${regular}     Build locally and scp deploy to production server"
+        echo "    ${bold}update${regular}     Git push then pull, build and deploy on production server"
         echo "    ${bold}log${regular}        Show production server log"
         echo "    ${bold}console${regular}    Connect to production server via SSH"
-        echo "    ${bold}server${regular}     Run server command"
+        echo "    ${bold}server${regular}     Run Ubuntu server commands"
         echo;
     ;;
 esac

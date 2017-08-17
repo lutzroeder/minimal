@@ -6,7 +6,7 @@ Minimal is a personal static website and blog generator for Go, Node.js and Pyth
 
 To get started, [fork](https://help.github.com/articles/fork-a-repo) this repository and create a local [clone](https://help.github.com/articles/cloning-a-repository).
 
-Modify `./content/content.json` to your liking (symbol codes for social links can be found [here](http://drinchev.github.io/monosocialiconsfont)). 
+Modify `./content.json` to your liking (symbol codes for social links can be found [here](http://drinchev.github.io/monosocialiconsfont)). 
 
 To build locally and launch a simple web server run **either** of the following: 
 
@@ -16,8 +16,8 @@ To build locally and launch a simple web server run **either** of the following:
 
 ## Admin Script
 
-`./admin` is a [Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) script automating common tasks to run the website (on Windows use Git Bash or [WLS](https://en.wikipedia.org/wiki/Windows_Subsystem_for_Linux)). 
+`./admin` is a [Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) script automating common tasks for local development (on Windows use Git Bash or [WLS](https://en.wikipedia.org/wiki/Windows_Subsystem_for_Linux)) and to deploy the website to an actual Ubuntu Linux server (server settings are provided via `./admin.cfg`).
 
-The script can be configured via `./admin.cfg` and provides two sets of commmands, one for local client development and another for running the website on an actual Linux server.
+`./admin deploy` will build the site locally, upload the build output and admin scripts via `scp` to a production server and host the site via [NGINX](https://www.nginx.com).
 
-After cloning the repository on an Ubuntu Linux server, run `./admin server start` to host the site via [NGINX](https://www.nginx.com).
+`./admin update` will commit or amend changes to the Git repository, use `ssh` to pull, build and deploy the changes via a Git enlistment on the production server and host the site via [NGINX](https://www.nginx.com).
