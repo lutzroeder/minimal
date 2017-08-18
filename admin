@@ -330,9 +330,15 @@ client_deploy() {
     echo "${bold}secure copy${regular}"
     scp -i ${identity} -r ${site}-build.zip ${site}-admin.zip ${user}@${server}:~
     echo "${bold}server deploy${regular}"
-    ssh -i ${identity} ${user}@${server} -t "sudo rm -rf /var/www/${site}/* && sudo rm -rf /opt/www/${site}/* && sudo mkdir -p /var/www/${site} && sudo mkdir -p /opt/www/${site} && sudo unzip ${site}-build.zip -d /var/www/lutzroeder && sudo unzip ${site}-admin.zip -d /opt/www/lutzroeder && rm ~/${site}-build.zip && rm ~/${site}-admin.zip"
-    rm ${site}-*.zip
-    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "sudo /opt/www/${site}/admin server stop && sudo /opt/www/${site}/admin server start"
+    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" " \
+        sudo rm -rf /var/www/${site}/* /opt/www/${site}/* && \
+        sudo mkdir -p /var/www/${site} /opt/www/${site} && \
+        sudo unzip ${site}-build.zip -d /var/www/lutzroeder && \
+        sudo unzip ${site}-admin.zip -d /opt/www/lutzroeder && \
+        rm ~/${site}-build.zip && rm ~/${site}-admin.zip && \
+        sudo /opt/www/${site}/admin server stop && \
+        sudo /opt/www/${site}/admin server start"
+    rm ${site}-build.zip ${site}-admin.zip
 }
 
 client_console() {
