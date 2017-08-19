@@ -16,7 +16,7 @@
     { "name": "Feed",     "symbol": "&#xe271;", "url": "http://feeds.feedburner.com/lutzroeder" }
   ],
   "pages": [
-    { "name": "Blog",     "url": "{{/}}" },
-    { "name": "Projects", "url": "{{/}}projects" }
+    { "name": "Blog",     "url": "/" },
+    { "name": "Projects", "url": "/projects" }
   ]
 }

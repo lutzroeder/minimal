@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
@@ -20,22 +19,6 @@ import (
 
 var configuration map[string]interface{}
 var environment string
-
-func getRelativeRoot(file string) string {
-	root, err := filepath.Rel(path.Dir(file), "content/");
-	if err != nil {
-		fmt.Println(err)
-		return ""
-	}
-	if len(root) > 0 {
-		if root == "." {
-			root = ""
-		} else {
-			root += "/"
-		}
-	}
-	return root
-}
 
 func theme() string {
 	if value, ok := configuration["theme"]; ok {
@@ -341,7 +324,6 @@ func renderPost(source string, destination string) bool {
 				item["author"] = configuration["name"].(string)
 			}
 			view := merge(configuration, item)
-			view["/"] = getRelativeRoot(source)
 			template, err := ioutil.ReadFile(theme() + "/post.html")
 			if err != nil {
 				fmt.Println(err)
@@ -438,7 +420,6 @@ func renderPage(source string, destination string) {
 		fmt.Println(err)
 	} else {
 		view := merge(configuration)
-		view["/"] = getRelativeRoot(source)
 		view["blog"] = func() string {
 			return renderBlog(posts(), path.Dir(destination), 0)
 		}

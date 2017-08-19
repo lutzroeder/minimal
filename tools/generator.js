@@ -7,14 +7,6 @@ var http = require("http");
 var path = require("path");
 var process = require("process");
 
-function getRelativeRoot(file) {
-    var root = path.relative(path.dirname(file), "content/");
-    if (root) {
-        root += "/";
-    }
-    return root;
-}
-
 function theme() {
     return "themes/" + (configuration["theme"] || "default");
 }
@@ -283,7 +275,6 @@ function renderPost(source, destination) {
             }
             item["author"] = item["author"] || configuration["name"];
             var view = merge(configuration, item);
-            view["/"] = getRelativeRoot(source);
             var template = fs.readFileSync(theme() + "/post.html", "utf-8");
             var data = mustache(template, view, function(name) {
                 return fs.readFileSync(theme() + "/" + name, "utf-8");
@@ -301,7 +292,6 @@ function renderPage(source, destination) {
     }
     var template = fs.readFileSync(source, "utf-8");
     var view = merge(configuration);
-    view["/"] = getRelativeRoot(source);
     view["blog"] = function() {
         return renderBlog(posts(), path.dirname(destination), 0);
     };

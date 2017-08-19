@@ -19,15 +19,6 @@ else:
     from urlparse import urlparse
     from urlparse import parse_qs
 
-def get_relative_root(file):
-    root = os.path.relpath("content/", os.path.dirname(file))
-    if len(root) > 0:
-        if root == ".":
-            root = ""
-        else:
-            root += "/"
-    return root
-
 def theme():
     return "themes/" + (configuration["theme"] if "theme" in configuration else "default");
 
@@ -227,7 +218,6 @@ def render_post(source, destination):
                 date = dateutil.parser.parse(item["date"])
                 item["date"] = format_date(date, "user")
             view = merge([ configuration, item ])
-            view["/"] = get_relative_root(source)
             template = read_file(theme() + "/post.html")
             data = mustache(template, view, lambda name: read_file(theme() + "/" + name))
             write_file(destination, data)
@@ -280,7 +270,6 @@ def render_page(source, destination):
         return
     template = read_file(os.path.join("./", source))
     view = merge([ configuration ])
-    view["/"] = get_relative_root(source)
     view["host"] = configuration["host"]
     view["blog"] = lambda: render_blog(posts(), os.path.dirname(destination), 0)
     data = mustache(template, view, lambda name: read_file(theme() + "/" + name))
