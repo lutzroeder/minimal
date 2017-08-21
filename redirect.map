@@ -1,0 +1,3 @@
+^/wp-login.php$                             /
+^/atom.xml$                                 /blog/feed.atom
+^/rss.xml$                                  /blog/feed.rss
