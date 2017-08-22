@@ -41,7 +41,7 @@ while (args.length > 0) {
             var line = lines.shift();
             match = line.match("([^ ]*) *([^ ]*)");
             if (match && match[1] && match[2]) {
-                redirects.push({ "regexp": new RegExp(match[1], "i"), "location": match[2] });
+                redirects.push({ "regexp": new RegExp(match[1]), "location": match[2] });
             }
         }
     }
