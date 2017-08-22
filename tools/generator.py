@@ -217,6 +217,10 @@ def render_post(source, destination):
             if "date" in item:
                 date = dateutil.parser.parse(item["date"])
                 item["date"] = format_date(date, "user")
+            if not "telemetry" in item:
+                item["telemetry"] = ""
+            if "telemetry" in configuration:
+                item["telemetry"] = mustache(configuration["telemetry"], item, None)
             view = merge([ configuration, item ])
             template = read_file(theme() + "/post.html")
             data = mustache(template, view, lambda name: read_file(theme() + "/" + name))
