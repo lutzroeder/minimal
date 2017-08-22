@@ -345,6 +345,19 @@ client_console() {
     ssh -i ${identity} ${user}@${server} -t "cd ${source} && exec bash -l"
 }
 
+client_watch() {
+    export ENVIRONMENT=development
+    client_build ${1}
+    case "$(uname -s)" in
+        Darwin*) 
+            if [ -z "$(which fswatch)" ]; then
+                brew install fswatch
+            fi
+            fswatch -r -o . -e build | xargs -n1 ./admin build
+            ;;
+    esac
+}
+
 client_test() {
     echo "${bold}node${regular}"
     ENVIRONMENT=production node tools/generator.js
@@ -394,6 +407,7 @@ case "${command}" in
     "update") client_update $@;;
     "log") client_log;;
     "console") client_console;;
+    "watch") client_watch $@;;
     "test") client_test;;
     "server") server $@;;
     *)
