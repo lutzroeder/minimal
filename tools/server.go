@@ -10,14 +10,21 @@ import (
 	"os/exec"
 	"os/signal"
 	"path"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
 )
 
+type redirect struct {
+	Regexp   *regexp.Regexp
+	Location string;
+}
+
 var root = "."
 var port = ":8080"
 var browse = false
+var redirects = make([]redirect, 0)
 
 type httpHandler struct {
 }
@@ -27,27 +34,36 @@ func (handler *httpHandler) ServeHTTP(response http.ResponseWriter, request *htt
 	location := root + pathname
 	statusCode := 404
 	headers := map[string]string { }
-	if stat, err := os.Stat(location); !os.IsNotExist(err) && stat.IsDir() {
-		if !strings.HasSuffix(location, "/") {
+	buffer := make([]byte, 0)
+	for _, redirect := range redirects {
+		if (redirect.Regexp.MatchString(pathname)) {
 			statusCode = 302
-			headers = map[string]string { 
-				"Location": pathname + "/",
-			}
-		} else {
-			location += "index.html"
+			headers = map[string]string { "Location": redirect.Location }
+			break;
 		}
 	}
-	buffer := make([]byte, 0)
-	if stat, err := os.Stat(location); !os.IsNotExist(err) && !stat.IsDir() {
-		extension := path.Ext(location)
-		contentType := mime.TypeByExtension(extension)
-		if len(contentType) > 0 {
-			if data, err := ioutil.ReadFile(location); err == nil {
-				buffer = data
-				statusCode = 200
-				headers = map[string]string { 
-					"Content-Type": contentType,
-					"Content-Length": strconv.Itoa(len(buffer)),
+	if statusCode != 302 {
+		if stat, err := os.Stat(location); !os.IsNotExist(err) && stat.IsDir() {
+			if strings.HasSuffix(location, "/") {
+				location += "index.html"
+			} else {
+				statusCode = 302
+				headers = map[string]string { "Location": pathname + "/" }
+			}
+		}
+	}
+	if statusCode != 302 {
+		if stat, err := os.Stat(location); !os.IsNotExist(err) && !stat.IsDir() {
+			extension := path.Ext(location)
+			contentType := mime.TypeByExtension(extension)
+			if len(contentType) > 0 {
+				if data, err := ioutil.ReadFile(location); err == nil {
+					buffer = data
+					statusCode = 200
+					headers = map[string]string { 
+						"Content-Type": contentType,
+						"Content-Length": strconv.Itoa(len(buffer)),
+					}
 				}
 			}
 		}
@@ -76,7 +92,24 @@ func main() {
 			args = args[1:]
 		} else if (arg == "--browse" || arg == "-b") {
 			browse = true
-		} else {
+		} else if (arg == "--redirect-map" || arg == "-r") && len(args) > 0 {
+			path := args[0]
+			args = args[1:]
+			data, err := ioutil.ReadFile(path)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			lines := regexp.MustCompile("\\r\\n?|\\n").Split(string(data), -1)
+			for len(lines) > 0 {
+				line := lines[0]
+				lines = lines[1:]
+				match := regexp.MustCompile("([^ ]*) *([^ ]*)").FindAllStringSubmatch(line, -1)
+				if len(match) > 0 && len(match[0]) > 2 && len(match[0][1]) > 0 && len(match[0][2]) > 0 {
+					redirects = append(redirects, redirect{ regexp.MustCompile(match[0][1]), match[0][2] })
+				}
+			}
+		} else if !strings.HasPrefix(arg, "-") {
 			root = arg
 		}
 	}

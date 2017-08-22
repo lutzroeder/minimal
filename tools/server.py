@@ -1,8 +1,10 @@
-#!/usr/bin/python
+goitq#!/usr/bin/python
 
+import codecs
 import mimetypes
 import os
 import platform
+import re
 import sys
 
 if sys.version_info[0] > 2:
@@ -20,14 +22,18 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
         location = root + pathname;
         status_code = 404
         headers = {}
-        if os.path.exists(location) and os.path.isdir(location):
-            if not location.endswith("/"):
+        buffer = None
+        for redirect in redirects:
+            if redirect["regexp"].match(pathname):
+                status_code = 302
+                headers = { "Location": redirect["location"] }
+        if status_code != 302 and os.path.exists(location) and os.path.isdir(location):
+            if location.endswith("/"):
+                location += "index.html"
+            else:
                 status_code = 302
                 headers = { "Location": pathname + "/" }
-            else:
-                location += "index.html"
-        buffer = None
-        if os.path.exists(location) and not os.path.isdir(location):
+        if status_code != 302 and os.path.exists(location) and not os.path.isdir(location):
             extension = os.path.splitext(location)[1]
             content_type = mimetypes.types_map[extension]
             if content_type:
@@ -58,6 +64,7 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
 root = "."
 port = 8080
 browse = False
+redirects = []
 args = sys.argv[1:]
 while len(args) > 0:
     arg = args.pop(0)
@@ -65,7 +72,16 @@ while len(args) > 0:
         port = int(args.pop(0))
     elif arg == "--browse" or arg == "-b":
         browse = True
-    else:
+    elif (arg == "--redirect-map" or arg == "-r") and len(args) > 0:
+        with codecs.open(args.pop(0), "r", "utf-8") as open_file:
+            data = open_file.read()
+            lines = re.split(r"\r\n?|\n", data)
+            while len(lines) > 0:
+                line = lines.pop(0)
+                match = re.compile("([^ ]*) *([^ ]*)").match(line)
+                if match and len(match.groups()[0]) > 0 and len(match.groups()[1]) > 0:
+                    redirects.append({ "regexp": re.compile(match.groups()[0]), "location": match.groups()[1] })
+    elif not arg.startswith("-"):
         root = arg
 server = HTTPServer(("localhost", port), HTTPRequestHandler)
 url = "http://localhost:" + str(port)

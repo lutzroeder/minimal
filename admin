@@ -282,11 +282,11 @@ client_start() {
     export ENVIRONMENT=development
     client_build ${1}
     if [ ${1:-${runtime}} = "go" ]; then 
-        go run tools/server.go build/go --port 8080 --browse
+        go run tools/server.go build/go --port 8080 --redirect-map redirect.map --browse 
     elif [ ${1:-${runtime}} = "python" ]; then
-        python tools/server.py build/python --port 8080 --browse
+        python tools/server.py build/python --port 8080 --redirect-map redirect.map --browse 
     else
-        node tools/server.js build/node --port 8080 --browse
+        node tools/server.js build/node --port 8080 --redirect-map redirect.map --browse 
     fi
 }
 

@@ -23,6 +23,7 @@ var mimeTypeMap = {
 var root = ".";
 var port = 8080;
 var browse = false;
+var redirects = [];
 
 var args = process.argv.slice(2)
 while (args.length > 0) {
@@ -33,7 +34,18 @@ while (args.length > 0) {
     else if (arg == "--browse" || arg == "-b") { 
         browse = true;
     }
-    else {
+    else if ((arg == "--redirect-map" || arg == "-r") && args.length > 0) {
+        var data = fs.readFileSync(args.shift(), "utf-8");
+        var lines = data.split(/\r\n?|\n/g);
+        while (lines.length > 0) {
+            var line = lines.shift();
+            match = line.match("([^ ]*) *([^ ]*)");
+            if (match && match[1] && match[2]) {
+                redirects.push({ "regexp": new RegExp(match[1], "i"), "location": match[2] });
+            }
+        }
+    }
+    else if (!arg.startsWith("-")) {
         root = arg;
     }
 }
@@ -43,17 +55,24 @@ var server = http.createServer(function (request, response) {
     var location = root + pathname;
     var statusCode = 404;
     var headers = {};
-    if (fs.existsSync(location) && fs.statSync(location).isDirectory()) {
-        if (!location.endsWith("/")) {
+    var buffer = null;
+    for (var i = 0; i < redirects.length; i++) {
+        if (redirects[i]["regexp"].test(pathname)) {
+            statusCode = 302;
+            headers = { "Location": redirects[i]["location"] };
+            break;
+        }        
+    }
+    if (statusCode != 302 && fs.existsSync(location) && fs.statSync(location).isDirectory()) {
+        if (location.endsWith("/")) {
+            location += "index.html";
+        }
+        else {
             statusCode = 302;
             headers = { "Location": pathname + "/" };
         }
-        else {
-            location += "index.html";
-        }
     }
-    var buffer = null;
-    if (fs.existsSync(location) && !fs.statSync(location).isDirectory()) {
+    if (statusCode != 302 && fs.existsSync(location) && !fs.statSync(location).isDirectory()) {
         var extension = path.extname(location);
         var contentType = mimeTypeMap[extension];
         if (contentType) {
