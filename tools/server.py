@@ -1,4 +1,4 @@
-goitq#!/usr/bin/python
+#!/usr/bin/python
 
 import codecs
 import mimetypes

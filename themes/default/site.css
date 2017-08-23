@@ -62,6 +62,9 @@ body { margin: 0 0 65px 0; background-color: #f8f8f8; }
 .item h1 { font-size: 25px; margin-left: -1.75px; }
 .item { padding-left: 20px; padding-right: 20px; }
 }
+@media all and (max-width: 640px) {
+.item { max-width: 640px !important; border-radius: 0; border-left: 0; border-right: 0; }
+}
 @media all and (max-width: 550px) {
 .item .logo { display: none; }
 .item .date { display: none; }
