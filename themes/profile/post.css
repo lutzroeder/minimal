@@ -17,11 +17,11 @@ body { margin: 35px 0 35px 0; color: #24292e; background-color: #e9ebee; }
 .post .portrait { float: left; margin-right: 12px; width: 40px; position: relative; }
 .post .portrait:after { content: ''; border-radius: 50%; border: 1px solid rgba(0, 0, 0, .1); position: absolute; left: 0; right: 0; top: 0; bottom: 0; }
 .post .portrait img { display: block; overflow: hidden; border-radius: 50%; width: 40px !important; height: 40px; }
-.post .author { color: #365899; font-size: 14px; font-weight: bold; letter-spacing: -0.01em; line-height: 1.4; text-decoration: none; }
-.post .date { overflow: hidden; display: block; font-size: 12px; letter-spacing: -0.01em; line-height: 16px; color: #90949c; }
-.post h1 { font-weight: bold; font-size: 16px; line-height: 21px; margin: 15px 0 10px 0; }
-.post h2 { font-weight: bold; font-size: 16px; line-height: 21px; margin: 15px 0 10px 0; }
-.post h3 { font-weight: bold; font-size: 16px; line-height: 21px; margin: 15px 0 10px 0; }
+.post .content .author { display: block; color: #365899; font-size: 14px; font-weight: bold; letter-spacing: -0.01em; line-height: 1.4; text-decoration: none; }
+.post .content .date { display: block; font-size: 12px; letter-spacing: -0.01em; line-height: 16px; color: #90949c; }
+.post .content h1 { font-weight: bold; font-size: 16px; line-height: 21px; margin: 15px 0 10px 0; }
+.post .content h2 { font-weight: bold; font-size: 16px; line-height: 21px; margin: 15px 0 10px 0; }
+.post .content h3 { font-weight: bold; font-size: 16px; line-height: 21px; margin: 15px 0 10px 0; }
 .post .content { overflow: hidden; margin-right: 20px; font-size: 16px; line-height: 1.6; word-break: break-word; word-wrap: break-word; }
 .post .content p { margin: 10px 0 16px 0; }
 .post .content a, .post p a:visited, .post p a:link, .post p a:active { color: #0366d6; text-decoration: none; }
