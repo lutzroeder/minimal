@@ -1,0 +1,62 @@
+#!/bin/bash
+
+source "./admin.cfg"
+source "${BASH_SOURCE[0]}.cfg"
+
+bold=$(tty -s && tput bold)
+regular=$(tty -s && tput sgr0)
+underline=$(tty -s && tput smul)
+error=$(tty -s && tput setaf 1)
+
+deploy() {
+    target=$(basename ${repository})
+    target=build/${target%.*}
+    if [ ! -d "${target}" ]; then
+        echo "${bold}git clone ${repository} ${target}${regular}"
+        git clone ${repository} ${target}
+    elif [ "$(git -C "${target}" remote get-url origin)" != "${repository}" ]; then
+        echo "${bold}${error}'${target}' already exists.${regular}"
+        return
+    fi
+    echo "${bold}rm -rf ${target}/*${regular}"
+    rm -rf "${target}/*"
+    echo "${bold}cp -r build/${generator}/* ${target}/${regular}"
+    cp -r "build/${generator}/" "${target}/"
+    pushd "${target}" > /dev/null
+    echo "${bold}git add *${regular}"
+    git add --all --verbose *
+    message=$@
+    if [ -z "${message}" ]; then # if no description is provided amend last commit and push --force
+        echo "${bold}git commit --amend --no-edit${regular}"
+        git commit --amend --no-edit
+        echo "${bold}git push --force${regular}"
+        git push --force
+    else
+        echo "${bold}git commit -m '${message}'${regular}"
+        git commit -m "${message}"
+        echo "${bold}git push${regular}"
+        git push
+    fi
+    popd > /dev/null
+    echo "${bold}rm -rf ${target}${regular}"
+    rm -rf "${target}"
+}
+
+log() {
+    echo ...
+}
+
+console() {
+    echo ...
+}
+
+command="$1"
+shift
+case "${command}" in
+    "deploy") deploy $@;;
+    "log") echo "Not supported for GitHub Pages.";;
+    "console") echo "Not supported for GitHub Pages.";;
+    *)
+        echo "ERROR"
+    ;;
+esac

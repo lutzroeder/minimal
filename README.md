@@ -14,10 +14,6 @@ To build locally and launch a simple web server run **either** of the following:
 * Install [Go](https://golang.org/doc/install) and run `./admin start go`.
 * Install [Python](https://www.python.org/downloads/) and run `./admin start python`.
 
-## Admin Script
+## Deployment
 
-`./admin` is a [Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) script automating common tasks for local development (on Windows use Git Bash or [WLS](https://en.wikipedia.org/wiki/Windows_Subsystem_for_Linux)) and to deploy the website to an actual Ubuntu Linux server (server settings are provided via `./admin.cfg`).
-
-`./admin deploy` will build the site locally, upload the build output and admin scripts via `scp` to a production server and host the site via [NGINX](https://www.nginx.com).
-
-`./admin update` will commit or amend changes to the Git repository, use `ssh` to pull, build and deploy the changes via a Git enlistment on the production server and host the site via [NGINX](https://www.nginx.com).
+To deploy to a production enviroment set the `deployment` method in `./admin.cfg` and update the corresponding `.cfg` file in the `./deploy` folder, then run `./admin deploy` to initiate the build and deploy.

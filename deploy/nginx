@@ -1,0 +1,347 @@
+#!/bin/bash
+
+source "admin.cfg"
+source "${BASH_SOURCE[0]}.cfg"
+
+bold=$(tty -s && tput bold)
+regular=$(tty -s && tput sgr0)
+underline=$(tty -s && tput smul)
+error=$(tty -s && tput setaf 1)
+
+server_start() {
+    server_stop
+
+    sudo rm -rf /var/log/nginx/${site}
+    sudo mkdir -p /var/log/nginx/${site}
+
+    echo "${bold}apt-get update${regular}"
+    if [ ${generator} = "node" ]; then
+        if [ -z "$(which node)" ]; then
+            curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
+        fi
+    fi
+    if [ ! -f "/etc/apt/sources.list.d/nginx.list" ]; then
+        echo "deb http://nginx.org/packages/ubuntu/ xenial nginx" | sudo tee /etc/apt/sources.list.d/nginx.list
+        echo "deb-src http://nginx.org/packages/ubuntu/ xenial nginx" | sudo tee -a /etc/apt/sources.list.d/nginx.list
+        sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys ABF5BD827BD9BF62
+    fi
+    sudo apt-get -qq update
+
+    echo "${bold}apt-get install nginx${regular}"
+    sudo apt-get -qq install --yes nginx
+
+    if [ ${generator} = "go" ]; then 
+        echo "${bold}apt-get install golang${regular}"
+        sudo apt-get -qq install --yes golang
+    elif [ ${generator} = "python" ]; then
+        echo "${bold}apt-get install python${regular}"
+        sudo apt-get -qq install --yes python python-dateutil
+    else
+        echo "${bold}apt-get install nodejs${regular}"
+        sudo apt-get -qq install --yes nodejs
+    fi
+
+    echo "${bold}install nginx.service${regular}"
+    sudo systemctl stop nginx.service
+
+cat << EOF >> "${site}.conf"
+
+log_format ${site}_format '[\$time_local] \$status \$request_uri';
+
+server {
+    listen 80;
+EOF
+    if test -n "${domain}" && sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
+cat << EOF >> "${site}.conf"
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/${domain}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
+    server_name ${domain};
+    return 301 https://www.${domain}\$request_uri;
+}
+server {
+    listen 80;
+    server_name www.${domain};
+    return 301 https://\$host\$request_uri;
+}
+server {
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/${domain}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
+    server_name www.${domain};
+EOF
+    fi
+cat << EOF >> "${site}.conf"
+    gzip on; gzip_proxied any; gzip_min_length 1000; gzip_http_version 1.0; gzip_disable 'msie6'; gzip_vary on;
+    gzip_types text/plain text/css text/javascript application/json application/atom+xml application/rss+xml;
+    location / {
+        root /var/www/${site};
+        access_log /var/log/nginx/${site}/access.log ${site}_format;
+        error_log /var/log/nginx/${site}/access.log;
+EOF
+if [ -f "redirect.map" ]; then
+    sed 's/\([^ ]*\)\( *\)\([^ ]*\)/        location ~ \1\2{ return 301 \3; }/g' redirect.map >> "${site}.conf"
+fi
+cat << EOF >> "${site}.conf"
+        location ~ ^(.*)/index.html\$ {
+            return 301 \$scheme://\$http_host\$1/;
+        }
+        location ~ ^(.*)/\$ {
+            try_files \$1/index.html =404;
+        }
+        location ~ ^(/.*)/[^/]+\$ {
+           error_page 404 =301 \$scheme://\$http_host\$1/;
+        }
+        error_page 404 =301 \$scheme://\$http_host/;
+    }
+}
+EOF
+    if [ $(which nginx) ]; then
+        nginx_conf=$(dirname $(nginx -V 2>&1 | grep -o '\-\-conf-path=\(.*conf\)' | cut -d '=' -f2))/conf.d
+        if sudo test -f "${nginx_conf}/default.conf"; then
+            sudo mv "${nginx_conf}/default.conf" "${nginx_conf}/default.conf.backup"
+        fi
+        sudo mv "${site}.conf" "${nginx_conf}/${site}.conf"
+        sudo systemctl start "nginx.service"
+        if [ $(systemctl is-active "nginx.service") != "active" ]; then
+            sudo systemctl status "nginx.service" --no-pager --lines=25 --full
+            echo "${bold}${error}ngnix.service is not active.${regular}"
+            return
+        fi
+    fi
+
+    if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
+        echo "${bold}install ${site}-cert.service${regular}"
+cat > "${site}-cert.service" << EOF
+[Unit]
+Description=${site}-cert.service
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/www/${site}
+ExecStart=/bin/bash /opt/www/${site}/nginx server cert
+User=$(whoami)
+Group=$(whoami)
+SyslogIdentifier=${site}-cert.service
+EOF
+        sudo cp "${site}-cert.service" "/etc/systemd/system/${site}-cert.service"
+        rm "${site}-cert.service"
+
+        echo "${bold}install ${site}-cert.timer${regular}"
+cat > "${site}-cert.timer" << EOF
+[Unit]
+Description=${site}-cert.timer
+[Timer]
+OnCalendar=Mon *-*-* 00:00:00
+Persistent=true
+Unit=${site}-cert.service
+[Install]
+WantedBy=timers.target
+EOF
+        sudo cp "${site}-cert.timer" "/etc/systemd/system/${site}-cert.timer"
+        rm "${site}-cert.timer"
+        sudo systemctl enable "${site}-cert.timer"
+        sudo systemctl start "${site}-cert.timer"
+        if [ $(systemctl is-active "${site}-cert.timer") != "active" ]; then
+            sudo systemctl status "${site}-cert.timer" --no-pager --lines=25 --full
+            echo "${bold}${error}${site}-cert.timer is not active.${regular}"
+            return
+        fi
+    fi
+}
+
+server_stop() {
+    if [ -f "/etc/systemd/system/${site}-cert.timer" ]; then
+        echo "${bold}uninstall ${site}-cert.timer${regular}"
+        if [ $(systemctl is-active "${site}-cert.timer") = "active" ]; then
+            sudo systemctl stop "${site}-cert.timer"
+            if [ $(systemctl is-active "${site}-cert.timer") != "inactive" ]; then
+                sudo systemctl status "${site}-cert.timer" --no-pager --lines=25 --full
+                echo "${bold}${error}${site}-cert.timer is not inactive.${regular}"
+                return
+            fi
+        fi
+        if [ $(systemctl is-enabled ${site}-cert.timer) = "enabled" ]; then
+            sudo systemctl disable "${site}-cert.timer"
+            if [ $(systemctl is-enabled "${site}-cert.timer") != "disabled" ]; then
+                sudo systemctl status "${site}-cert.timer" --no-pager --lines=25 --full
+                echo "${bold}${error}${site}-cert.timer is not disabled.${regular}"
+                return
+            fi
+        fi
+        sudo rm "/etc/systemd/system/${site}-cert.timer"
+    fi
+    if [ -f "/etc/systemd/system/${site}-cert.service" ]; then
+        echo "${bold}uninstall ${site}-cert.service${regular}"
+        sudo rm "/etc/systemd/system/${site}-cert.service"
+    fi
+    if [ $(which nginx) ]; then
+        nginx_conf=$(dirname $(nginx -V 2>&1 | grep -o '\-\-conf-path=\(.*conf\)' | cut -d '=' -f2))/conf.d
+        if [ -f "${nginx_conf}/${site}.conf" ]; then
+            echo "${bold}uninstall nginx.service${regular}"
+            sudo systemctl stop "nginx.service"
+            if sudo test -f "${nginx_conf}/default.conf"; then
+                sudo mv "${nginx_conf}/default.conf.backup" "${nginx_configuration}/default.conf"
+            fi
+            sudo rm "${nginx_conf}/${site}.conf"
+            sudo systemctl start "nginx.service"
+            if [ $(systemctl is-active "nginx.service") != "active" ]; then
+                sudo systemctl status ngnix.service --no-pager --lines=25 --full
+                echo "${bold}${error}ngnix.service is not active.${regular}"
+                return
+            fi
+        fi
+    fi
+}
+
+server_cert() {
+    if [ -z ${domain} ] || [ -z ${email} ]; then
+        echo "${bold}${error}Update 'domain' and 'email' in ${underline}${BASH_SOURCE[0]}.cfg${regular}."
+        return
+    fi
+
+    echo "${bold}apt-get install letsencrypt${regular}"
+    sudo apt-get -qq update
+    sudo apt-get -qq install --yes letsencrypt
+
+    pushd /var/www/${site} > /dev/null
+    mkdir .well-known
+    if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
+        echo "${bold}renew certificate${regular}"
+        sudo letsencrypt renew
+    else
+        echo "${bold}create certificate${regular}"
+        mkdir -p .well-known/acme-challenge
+        sudo letsencrypt certonly --webroot -w $(pwd) -d ${domain} -d www.${domain} -d cdn.${domain} --agree-tos --email ${email}
+        rm letsencrypt.log
+    fi
+    rm -R .well-known
+    popd > /dev/null
+
+    echo "${bold}reload nginx.service${regular}"
+    sudo systemctl stop "nginx.service"
+    sudo systemctl start "nginx.service"
+    if [ $(systemctl is-active "nginx.service") != "active" ]; then
+        sudo systemctl status "nginx.service" --no-pager --lines=25 --full
+        echo "${bold}${error}nginx.service is not active.${regular}"
+    fi
+}
+
+server_log() {
+    cat /var/log/nginx/${site}/access.log
+}
+
+server_pull() {
+    echo "${bold}git fetch -p${regular}"
+    git fetch -p
+    branch=origin/$(git rev-parse --abbrev-ref HEAD)
+    echo "${bold}git reset --hard ${branch}${regular}"
+    git reset --hard ${branch}
+}
+
+server_deploy() {
+    echo "${bold}build${regular}"
+    export ENVIRONMENT=production
+    if [ ${generator} = "go" ]; then 
+        go run tools/generator.go
+    elif [ ${generator} = "python" ]; then
+        python tools/generator.py
+    else
+        node tools/generator.js
+    fi
+
+    echo "${bold}deploy${regular}"
+    sudo rm -rf /var/www/${site}/*
+    sudo mkdir -p /var/www/${site}
+    sudo cp -R build/${generator}/* /var/www/${site}/
+    sudo rm -rf /opt/www/${site}/*
+
+    sudo mkdir -p /opt/www/${site}
+    sudo cp admin.cfg /opt/www/${site}/
+    sudo cp deploy/nginx /opt/www/${site}/
+    sudo cp deploy/nginx.cfg /opt/www/${site}/
+    sudo cp redirect.map /opt/www/${site}/
+}
+
+deploy() {
+    if [ "${repository}" == "" ]; then
+        # SCP deploy
+        echo "${bold}archive${regular}"
+        pushd build/${generator} > /dev/null
+        zip ../../${site}-build.zip -r *
+        popd > /dev/null
+        zip --junk-paths ${site}-admin.zip admin.cfg redirect.map deploy/nginx deploy/nginx.cfg
+        echo "${bold}secure copy${regular}"
+        scp -i ${identity} -r ${site}-build.zip ${site}-admin.zip ${user}@${server}:~
+        echo "${bold}server stop${regular}"
+        ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" " \
+            [ -f /opt/www/${site}/nginx ] && cd /opt/www/${site} && sudo ./nginx server stop"
+        echo "${bold}server deploy${regular}"
+        ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" " \
+            sudo rm -rf /var/www/${site}/* /opt/www/${site}/* && \
+            sudo mkdir -p /var/www/${site} /opt/www/${site} && \
+            sudo unzip ${site}-build.zip -d /var/www/${site} && \
+            sudo unzip ${site}-admin.zip -d /opt/www/${site} && \
+            rm ~/${site}-build.zip && rm ~/${site}-admin.zip && \
+            cd /opt/www/${site} && sudo ./nginx server start"
+        rm ${site}-build.zip ${site}-admin.zip
+    else
+        # Git deploy
+        message=$@
+        echo "${bold}git add -v *${regular}"
+        git add -v *
+        if [ -z "${message}" ]; then # if no description is provided amend last commit and push --force
+            echo "${bold}git commit --amend --no-edit${regular}"
+            git commit --amend --no-edit
+            echo "${bold}git push --force${regular}"
+            git push --force
+        else # if description is provided create new commit and push
+            echo "${bold}git commit -m '${message}'${regular}"
+            git commit -m "${message}"
+            echo "${bold}git push${regular}"
+            git push
+        fi
+        echo "${bold}ssh deploy/nginx${regular}"
+        ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" " \
+            cd ${repository} && \
+            deploy/nginx server stop && \
+            deploy/nginx server pull && \
+            deploy/nginx server deploy && \
+            deploy/nginx server start"
+    fi
+}
+
+log() {
+    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" "cd /opt/www/${site} && /opt/www/${site}/nginx server log"
+}
+
+console() {
+    ssh -i ${identity} ${user}@${server} -t "cd /opt/www/${site} && exec bash -l"
+}
+
+server() {
+    command="$1"
+    shift
+    case "${command}" in
+        "start") server_start;;
+        "stop") server_stop;;
+        "cert") server_cert;;
+        "pull") server_pull;;
+        "deploy") server_deploy;;
+        "log") server_log;;
+        *) ;;
+    esac
+}
+
+command="$1"
+shift
+case "${command}" in
+    "deploy") deploy $@;;
+    "log") log;;
+    "console") console;;
+    "server") server $@;;
+    *) ;;
+esac

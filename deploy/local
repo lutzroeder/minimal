@@ -1,0 +1,27 @@
+#!/bin/bash
+
+source "./admin.cfg"
+source "${BASH_SOURCE[0]}.cfg"
+
+bold=$(tty -s && tput bold)
+regular=$(tty -s && tput sgr0)
+underline=$(tty -s && tput smul)
+error=$(tty -s && tput setaf 1)
+
+deploy() {
+    if [ ${1:-${generator}} = "go" ]; then 
+        go run tools/server.go build/go --port ${port} --redirect-map redirect.map --browse 
+    elif [ ${1:-${generator}} = "python" ]; then
+        python tools/server.py build/python --port ${port} --redirect-map redirect.map --browse 
+    else
+        node tools/server.js build/node --port ${port} --redirect-map redirect.map --browse 
+    fi
+}
+
+command="$1"
+shift
+case "${command}" in
+    "deploy") deploy $@;;
+    "log") echo "Not supported for local deployment.";;
+    "console") echo "Not supported for local deployment.";;
+esac
