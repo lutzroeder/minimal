@@ -16,10 +16,19 @@ deploy() {
     aws s3 cp --recursive ${source} s3://${bucket} --region ${region}
 }
 
+console() {
+    url="https://s3.console.aws.amazon.com/s3/buckets/${bucket}"
+    case "$(uname -s)" in
+        Darwin*) open ${url};;
+        Linux*) xdg-open ${url};;
+        MINGW*) start "" ${url};;
+    esac
+}
+
 command="$1"
 shift
 case "${command}" in
     "deploy") deploy $@;;
     "log") echo "Not supported for S3.";;
-    "console") echo "Not supported for S3.";;
+    "console") console;;
 esac

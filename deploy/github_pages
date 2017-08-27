@@ -43,12 +43,15 @@ deploy() {
     rm -rf "${target}"
 }
 
-log() {
-    echo ...
-}
-
 console() {
-    echo ...
+    url=${repository%.*}
+    url=${url/://}
+    url=${url/git@/https://}
+    case "$(uname -s)" in
+        Darwin*) open ${url};;
+        Linux*) xdg-open ${url};;
+        MINGW*) start "" ${url};;
+    esac
 }
 
 command="$1"
@@ -56,8 +59,5 @@ shift
 case "${command}" in
     "deploy") deploy $@;;
     "log") echo "Not supported for GitHub Pages.";;
-    "console") echo "Not supported for GitHub Pages.";;
-    *)
-        echo "ERROR"
-    ;;
+    "console") console;;
 esac

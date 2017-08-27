@@ -85,10 +85,10 @@ case "${command}" in
         echo "Usage: ${bold}$(basename "$0")${regular} <command>"
         echo
         echo "    ${bold}build${regular}      Build the website"
-        echo "    ${bold}start${regular}      Build and launch simple web server"
-        echo "    ${bold}deploy${regular}     Build and deploy to production"
+        echo "    ${bold}start${regular}      Build and launch simple local web server"
+        echo "    ${bold}deploy${regular}     Build and deploy to production environment"
         echo "    ${bold}log${regular}        Show production log"
-        echo "    ${bold}console${regular}    Connect to production via SSH"
+        echo "    ${bold}console${regular}    Connect to production environment via SSH"
         echo;
     ;;
 esac
