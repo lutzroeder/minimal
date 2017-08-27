@@ -34,15 +34,21 @@ client_deploy() {
     echo "${bold}build${regular}"
     client_build ${generator}
     echo "${bold}deploy${regular}"
-    deploy/${deployment} deploy build/${generator} $@
+    if [ ! -z "${deployment}" ]; then
+        deploy/${deployment} deploy build/${generator} $@
+    fi
 }
 
 client_log() {
-    deploy/${deployment} log
+    if [ ! -z "${deployment}" ]; then
+        deploy/${deployment} log
+    fi
 }
 
 client_console() {
-    deploy/${deployment} console
+    if [ ! -z "${deployment}" ]; then
+        deploy/${deployment} console
+    fi
 }
 
 client_watch() {
