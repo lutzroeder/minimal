@@ -1,6 +1,5 @@
 #!/bin/bash
 
-source "./admin.cfg"
 source "${BASH_SOURCE[0]}.cfg"
 
 bold=$(tty -s && tput bold)
@@ -9,6 +8,8 @@ underline=$(tty -s && tput smul)
 error=$(tty -s && tput setaf 1)
 
 deploy() {
+    source="$1"
+    shift
     target=$(basename ${repository})
     target=build/${target%.*}
     if [ ! -d "${target}" ]; then
@@ -20,8 +21,8 @@ deploy() {
     fi
     echo "${bold}rm -rf ${target}/*${regular}"
     rm -rf "${target}/*"
-    echo "${bold}cp -r build/${generator}/* ${target}/${regular}"
-    cp -r "build/${generator}/" "${target}/"
+    echo "${bold}cp -r ${source}/* ${target}/${regular}"
+    cp -r "${source}/" "${target}/"
     pushd "${target}" > /dev/null
     echo "${bold}git add *${regular}"
     git add --all --verbose *

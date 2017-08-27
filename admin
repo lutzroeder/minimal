@@ -34,7 +34,7 @@ client_deploy() {
     echo "${bold}build${regular}"
     client_build ${generator}
     echo "${bold}deploy${regular}"
-    deploy/${deployment} deploy $@
+    deploy/${deployment} deploy build/${generator} $@
 }
 
 client_log() {

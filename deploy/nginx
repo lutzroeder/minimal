@@ -1,6 +1,5 @@
 #!/bin/bash
 
-source "admin.cfg"
 source "${BASH_SOURCE[0]}.cfg"
 
 bold=$(tty -s && tput bold)
@@ -15,11 +14,6 @@ server_start() {
     sudo mkdir -p /var/log/nginx/${site}
 
     echo "${bold}apt-get update${regular}"
-    if [ ${generator} = "node" ]; then
-        if [ -z "$(which node)" ]; then
-            curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
-        fi
-    fi
     if [ ! -f "/etc/apt/sources.list.d/nginx.list" ]; then
         echo "deb http://nginx.org/packages/ubuntu/ xenial nginx" | sudo tee /etc/apt/sources.list.d/nginx.list
         echo "deb-src http://nginx.org/packages/ubuntu/ xenial nginx" | sudo tee -a /etc/apt/sources.list.d/nginx.list
@@ -29,17 +23,6 @@ server_start() {
 
     echo "${bold}apt-get install nginx${regular}"
     sudo apt-get -qq install --yes nginx
-
-    if [ ${generator} = "go" ]; then 
-        echo "${bold}apt-get install golang${regular}"
-        sudo apt-get -qq install --yes golang
-    elif [ ${generator} = "python" ]; then
-        echo "${bold}apt-get install python${regular}"
-        sudo apt-get -qq install --yes python python-dateutil
-    else
-        echo "${bold}apt-get install nodejs${regular}"
-        sudo apt-get -qq install --yes nodejs
-    fi
 
     echo "${bold}install nginx.service${regular}"
     sudo systemctl stop nginx.service
@@ -234,84 +217,40 @@ server_log() {
     cat /var/log/nginx/${site}/access.log
 }
 
-server_pull() {
-    echo "${bold}git fetch -p${regular}"
-    git fetch -p
-    branch=origin/$(git rev-parse --abbrev-ref HEAD)
-    echo "${bold}git reset --hard ${branch}${regular}"
-    git reset --hard ${branch}
-}
-
 server_deploy() {
-    echo "${bold}build${regular}"
-    export ENVIRONMENT=production
-    if [ ${generator} = "go" ]; then 
-        go run tools/generator.go
-    elif [ ${generator} = "python" ]; then
-        python tools/generator.py
-    else
-        node tools/generator.js
-    fi
-
-    echo "${bold}deploy${regular}"
     sudo rm -rf /var/www/${site}/*
     sudo mkdir -p /var/www/${site}
     sudo cp -R build/${generator}/* /var/www/${site}/
     sudo rm -rf /opt/www/${site}/*
 
     sudo mkdir -p /opt/www/${site}
-    sudo cp admin.cfg /opt/www/${site}/
     sudo cp deploy/nginx /opt/www/${site}/
     sudo cp deploy/nginx.cfg /opt/www/${site}/
     sudo cp redirect.map /opt/www/${site}/
 }
 
 deploy() {
-    if [ "${repository}" == "" ]; then
-        # SCP deploy
-        echo "${bold}archive${regular}"
-        pushd build/${generator} > /dev/null
-        zip ../../${site}-build.zip -r *
-        popd > /dev/null
-        zip --junk-paths ${site}-admin.zip admin.cfg redirect.map deploy/nginx deploy/nginx.cfg
-        echo "${bold}secure copy${regular}"
-        scp -i ${identity} -r ${site}-build.zip ${site}-admin.zip ${user}@${server}:~
-        echo "${bold}server stop${regular}"
-        ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" " \
-            [ -f /opt/www/${site}/nginx ] && cd /opt/www/${site} && sudo ./nginx server stop"
-        echo "${bold}server deploy${regular}"
-        ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" " \
-            sudo rm -rf /var/www/${site}/* /opt/www/${site}/* && \
-            sudo mkdir -p /var/www/${site} /opt/www/${site} && \
-            sudo unzip ${site}-build.zip -d /var/www/${site} && \
-            sudo unzip ${site}-admin.zip -d /opt/www/${site} && \
-            rm ~/${site}-build.zip && rm ~/${site}-admin.zip && \
-            cd /opt/www/${site} && sudo ./nginx server start"
-        rm ${site}-build.zip ${site}-admin.zip
-    else
-        # Git deploy
-        message=$@
-        echo "${bold}git add -v *${regular}"
-        git add -v *
-        if [ -z "${message}" ]; then # if no description is provided amend last commit and push --force
-            echo "${bold}git commit --amend --no-edit${regular}"
-            git commit --amend --no-edit
-            echo "${bold}git push --force${regular}"
-            git push --force
-        else # if description is provided create new commit and push
-            echo "${bold}git commit -m '${message}'${regular}"
-            git commit -m "${message}"
-            echo "${bold}git push${regular}"
-            git push
-        fi
-        echo "${bold}ssh deploy/nginx${regular}"
-        ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" " \
-            cd ${repository} && \
-            deploy/nginx server stop && \
-            deploy/nginx server pull && \
-            deploy/nginx server deploy && \
-            deploy/nginx server start"
-    fi
+    source="$1"
+    shift
+    echo "${bold}archive${regular}"
+    pushd ${source} > /dev/null
+    zip ../../${site}-build.zip -r *
+    popd > /dev/null
+    zip --junk-paths ${site}-admin.zip redirect.map deploy/nginx deploy/nginx.cfg
+    echo "${bold}secure copy${regular}"
+    scp -i ${identity} -r ${site}-build.zip ${site}-admin.zip ${user}@${server}:~
+    echo "${bold}server stop${regular}"
+    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" " \
+        [ -f /opt/www/${site}/nginx ] && cd /opt/www/${site} && sudo ./nginx server stop"
+    echo "${bold}server deploy${regular}"
+    ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" " \
+        sudo rm -rf /var/www/${site}/* /opt/www/${site}/* && \
+        sudo mkdir -p /var/www/${site} /opt/www/${site} && \
+        sudo unzip ${site}-build.zip -d /var/www/${site} && \
+        sudo unzip ${site}-admin.zip -d /opt/www/${site} && \
+        rm ~/${site}-build.zip && rm ~/${site}-admin.zip && \
+        cd /opt/www/${site} && sudo ./nginx server start"
+    rm ${site}-build.zip ${site}-admin.zip
 }
 
 log() {

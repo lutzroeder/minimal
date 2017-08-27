@@ -1,6 +1,5 @@
 #!/bin/bash
 
-source "./admin.cfg"
 source "${BASH_SOURCE[0]}.cfg"
 
 bold=$(tty -s && tput bold)
@@ -9,12 +8,14 @@ underline=$(tty -s && tput smul)
 error=$(tty -s && tput setaf 1)
 
 deploy() {
-    if [ ${1:-${generator}} = "go" ]; then 
-        go run tools/server.go build/go --port ${port} --redirect-map redirect.map --browse 
-    elif [ ${1:-${generator}} = "python" ]; then
-        python tools/server.py build/python --port ${port} --redirect-map redirect.map --browse 
+    source="$1"
+    shift
+    if [ ${server} = "go" ]; then 
+        go run tools/server.go ${source} --port ${port} --redirect-map redirect.map --browse 
+    elif [ ${server} = "python" ]; then
+        python tools/server.py ${source} --port ${port} --redirect-map redirect.map --browse 
     else
-        node tools/server.js build/node --port ${port} --redirect-map redirect.map --browse 
+        node tools/server.js ${source} --port ${port} --redirect-map redirect.map --browse 
     fi
 }
 

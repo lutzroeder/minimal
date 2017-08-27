@@ -1,6 +1,5 @@
 #!/bin/bash
 
-source "./admin.cfg"
 source "${BASH_SOURCE[0]}.cfg"
 
 bold=$(tty -s && tput bold)
@@ -9,10 +8,12 @@ underline=$(tty -s && tput smul)
 error=$(tty -s && tput setaf 1)
 
 deploy() {
+    source="$1"
+    shift
     echo "${bold}aws s3 rm -r *${regular}"
     aws s3 rm --recursive s3://${bucket} --region ${region}
-    echo "${bold}aws s3 cp -r build/${generator} *${regular}"
-    aws s3 cp --recursive build/${generator} s3://${bucket} --region ${region}
+    echo "${bold}aws s3 cp -r ${source} *${regular}"
+    aws s3 cp --recursive ${source} s3://${bucket} --region ${region}
 }
 
 command="$1"
