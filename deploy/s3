@@ -7,13 +7,17 @@ regular=$(tty -s && tput sgr0)
 underline=$(tty -s && tput smul)
 error=$(tty -s && tput setaf 1)
 
+if [ ! -z "${region}" ]; then
+    region="--region ${region}"
+fi
+
 deploy() {
     source="$1"
     shift
-    echo "${bold}aws s3 rm -r *${regular}"
-    aws s3 rm --recursive s3://${bucket} --region ${region}
-    echo "${bold}aws s3 cp -r ${source} *${regular}"
-    aws s3 cp --recursive ${source} s3://${bucket} --region ${region}
+    echo "${bold}aws s3 rm --recursive s3://${bucket} ${region}${regular}"
+    aws s3 rm --recursive s3://${bucket} ${region}
+    echo "${bold}aws s3 cp --recursive ${source} s3://${bucket} ${region}${regular}"
+    aws s3 cp --recursive ${source} s3://${bucket} ${region}
 }
 
 console() {
