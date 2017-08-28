@@ -16,10 +16,34 @@ else:
     from BaseHTTPServer import HTTPServer
     from BaseHTTPServer import BaseHTTPRequestHandler
 
+folder = "."
+port = 8080
+browse = False
+redirects = []
+
+args = sys.argv[1:]
+while len(args) > 0:
+    arg = args.pop(0)
+    if (arg == "--port" or arg == "-p") and len(args) > 0 and args[0].isdigit(): 
+        port = int(args.pop(0))
+    elif arg == "--browse" or arg == "-b":
+        browse = True
+    elif (arg == "--redirect-map" or arg == "-r") and len(args) > 0:
+        with codecs.open(args.pop(0), "r", "utf-8") as open_file:
+            data = open_file.read()
+            lines = re.split(r"\r\n?|\n", data)
+            while len(lines) > 0:
+                line = lines.pop(0)
+                match = re.compile("([^ ]*) *([^ ]*)").match(line)
+                if match and len(match.groups()[0]) > 0 and len(match.groups()[1]) > 0:
+                    redirects.append({ "regexp": re.compile(match.groups()[0]), "location": match.groups()[1] })
+    elif not arg.startswith("-"):
+        folder = arg
+
 class HTTPRequestHandler(BaseHTTPRequestHandler):
     def handler(self):
         pathname = urlparse(self.path).path
-        location = root + pathname;
+        location = folder + pathname;
         status_code = 404
         headers = {}
         buffer = None
@@ -61,31 +85,10 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         return
 
-root = "."
-port = 8080
-browse = False
-redirects = []
-args = sys.argv[1:]
-while len(args) > 0:
-    arg = args.pop(0)
-    if (arg == "--port" or arg == "-p") and len(args) > 0 and args[0].isdigit(): 
-        port = int(args.pop(0))
-    elif arg == "--browse" or arg == "-b":
-        browse = True
-    elif (arg == "--redirect-map" or arg == "-r") and len(args) > 0:
-        with codecs.open(args.pop(0), "r", "utf-8") as open_file:
-            data = open_file.read()
-            lines = re.split(r"\r\n?|\n", data)
-            while len(lines) > 0:
-                line = lines.pop(0)
-                match = re.compile("([^ ]*) *([^ ]*)").match(line)
-                if match and len(match.groups()[0]) > 0 and len(match.groups()[1]) > 0:
-                    redirects.append({ "regexp": re.compile(match.groups()[0]), "location": match.groups()[1] })
-    elif not arg.startswith("-"):
-        root = arg
 server = HTTPServer(("localhost", port), HTTPRequestHandler)
 url = "http://localhost:" + str(port)
-print("Serving '" + root + "' at " + url + "...")
+print("Serving '" + folder + "' at " + url + "...")
+
 if browse:
     command = "xdg-open";
     if platform.system() == "Darwin":

@@ -21,7 +21,7 @@ type redirect struct {
 	Location string;
 }
 
-var root = "."
+var folder = "."
 var port = ":8080"
 var browse = false
 var redirects = make([]redirect, 0)
@@ -31,7 +31,7 @@ type httpHandler struct {
 
 func (handler *httpHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
 	pathname := request.URL.Path
-	location := root + pathname
+	location := folder + pathname
 	statusCode := 404
 	headers := map[string]string { }
 	buffer := make([]byte, 0)
@@ -110,7 +110,7 @@ func main() {
 				}
 			}
 		} else if !strings.HasPrefix(arg, "-") {
-			root = arg
+			folder = arg
 		}
 	}
 	server := http.Server{}
@@ -122,7 +122,7 @@ func main() {
 	}
 	go server.Serve(listener)
 	url := "http://localhost" + port
-	fmt.Println("Serving '" + root + "' at " + url + "...")
+	fmt.Println("Serving '" + folder + "' at " + url + "...")
 	if browse {
 		command := "xdg-open"
 		arg := url

@@ -20,7 +20,7 @@ var mimeTypeMap = {
     ".zip":  "application/zip"
 };
 
-var root = ".";
+var folder = ".";
 var port = 8080;
 var browse = false;
 var redirects = [];
@@ -41,25 +41,28 @@ while (args.length > 0) {
             var line = lines.shift();
             match = line.match("([^ ]*) *([^ ]*)");
             if (match && match[1] && match[2]) {
-                redirects.push({ "regexp": new RegExp(match[1]), "location": match[2] });
+                redirects.push({
+                    regexp: new RegExp(match[1]),
+                    location: match[2]
+                });
             }
         }
     }
     else if (!arg.startsWith("-")) {
-        root = arg;
+        folder = arg;
     }
 }
 
 var server = http.createServer(function (request, response) {
     var pathname = url.parse(request.url, true).pathname;
-    var location = root + pathname;
+    var location = folder + pathname;
     var statusCode = 404;
     var headers = {};
     var buffer = null;
     for (var i = 0; i < redirects.length; i++) {
-        if (redirects[i]["regexp"].test(pathname)) {
+        if (redirects[i].regexp.test(pathname)) {
             statusCode = 302;
-            headers = { "Location": redirects[i]["location"] };
+            headers = { "Location": redirects[i].location };
             break;
         }        
     }
@@ -101,7 +104,7 @@ server.listen(port, function(error) {
         return;
     }
     var url = "http://localhost:" + port;
-    console.log("Serving '" + root + "' at " + url + "...");
+    console.log("Serving '" + folder + "' at " + url + "...");
     if (browse) {
         var command = "xdg-open";
         switch (process.platform) {
