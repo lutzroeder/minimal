@@ -25,6 +25,8 @@ var folder = "."
 var port = ":8080"
 var browse = false
 var redirects = make([]redirect, 0)
+var indexPage = "index.html"
+var errorPage = ""
 
 type httpHandler struct {
 }
@@ -32,17 +34,17 @@ type httpHandler struct {
 func (handler *httpHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
 	pathname := request.URL.Path
 	location := folder + pathname
-	statusCode := 404
+	statusCode := 0
 	headers := map[string]string { }
 	buffer := make([]byte, 0)
 	for _, redirect := range redirects {
 		if (redirect.Regexp.MatchString(pathname)) {
-			statusCode = 302
+			statusCode = 301
 			headers = map[string]string { "Location": redirect.Location }
 			break;
 		}
 	}
-	if statusCode != 302 {
+	if statusCode == 0 {
 		if stat, err := os.Stat(location); !os.IsNotExist(err) && stat.IsDir() {
 			if strings.HasSuffix(location, "/") {
 				location += "index.html"
@@ -52,19 +54,22 @@ func (handler *httpHandler) ServeHTTP(response http.ResponseWriter, request *htt
 			}
 		}
 	}
-	if statusCode != 302 {
+	if statusCode == 0 {
+		if stat, err := os.Stat(location); !os.IsNotExist(err) && !stat.IsDir() {
+			statusCode = 200
+		} else {
+			statusCode = 404
+			location = folder + "/" + errorPage
+		}
 		if stat, err := os.Stat(location); !os.IsNotExist(err) && !stat.IsDir() {
 			extension := path.Ext(location)
 			contentType := mime.TypeByExtension(extension)
 			if len(contentType) > 0 {
-				if data, err := ioutil.ReadFile(location); err == nil {
-					buffer = data
-					statusCode = 200
-					headers = map[string]string { 
-						"Content-Type": contentType,
-						"Content-Length": strconv.Itoa(len(buffer)),
-					}
-				}
+				headers["Content-Type"] = contentType;
+			}
+			if data, err := ioutil.ReadFile(location); err == nil {
+				buffer = data
+				headers["Content-Length"] = strconv.Itoa(len(buffer));
 			}
 		}
 	}
@@ -73,10 +78,12 @@ func (handler *httpHandler) ServeHTTP(response http.ResponseWriter, request *htt
 		response.Header().Set(key, value)
 	}
 	response.WriteHeader(statusCode)
-	if statusCode != 200 {
-		response.Write([]byte(strconv.Itoa(statusCode)))
-	} else if request.Method != "HEAD" {
-		response.Write(buffer)
+	if request.Method != "HEAD" {
+		if _, ok := headers["Content-Length"]; !ok && statusCode == 404 {
+			response.Write([]byte(strconv.Itoa(statusCode)))
+		} else if _, ok := headers["Content-Length"]; ok && (statusCode == 200 || statusCode == 404) {
+			response.Write(buffer)
+		}
 	}
 }
 
@@ -89,6 +96,12 @@ func main() {
 			if _, err := strconv.Atoi(args[0]); err == nil {
 				port = ":" + args[0]
 			}
+			args = args[1:]
+		} else if (arg == "--index-page" || arg == "-i") && len(args) > 0 {
+			indexPage = args[0]
+			args = args[1:]
+		} else if (arg == "--error-page" || arg == "-i") && len(args) > 0 {
+			errorPage = args[0]
 			args = args[1:]
 		} else if (arg == "--browse" || arg == "-b") {
 			browse = true
@@ -109,6 +122,8 @@ func main() {
 					redirects = append(redirects, redirect{ regexp.MustCompile(match[0][1]), match[0][2] })
 				}
 			}
+		} else if (arg == "--browse" || arg == "-b") {
+			browse = true
 		} else if !strings.HasPrefix(arg, "-") {
 			folder = arg
 		}

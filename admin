@@ -12,7 +12,7 @@ client_build() {
         go run tools/generator.go
     elif [ ${1:-${generator}} = "python" ]; then
         python tools/generator.py
-    else
+    elif [ ${1:-${generator}} = "node" ]; then
         node tools/generator.js
     fi
 }
@@ -21,11 +21,15 @@ client_start() {
     export ENVIRONMENT=development
     client_build ${1}
     if [ ${1:-${generator}} = "go" ]; then 
-        go run tools/server.go build/${1:-${generator}} --port 8080 --redirect-map redirect.map --browse 
+        command="go run tools/server.go"
     elif [ ${1:-${generator}} = "python" ]; then
-        python tools/server.py build/${1:-${generator}} --port 8080 --redirect-map redirect.map --browse 
-    else
-        node tools/server.js build/${1:-${generator}} --port 8080 --redirect-map redirect.map --browse 
+        command="python tools/server.py" 
+    elif [ ${1:-${generator}} = "node" ]; then
+        command="node tools/server.js"
+    fi
+    if [ ! -z "$command" ]; then
+        command="${command} build/${1:-${generator}} --port 8080 --index-page index.html --error-page error.html --redirect-map redirect.map --browse"
+        ${command} 
     fi
 }
 

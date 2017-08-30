@@ -24,6 +24,8 @@ var folder = ".";
 var port = 8080;
 var browse = false;
 var redirects = [];
+var indexPage = "index.html";
+var errorPage = "";
 
 var args = process.argv.slice(2)
 while (args.length > 0) {
@@ -31,8 +33,11 @@ while (args.length > 0) {
     if ((arg == "--port" || arg == "-p") && args.length > 0 && !isNaN(args[0])) {
         port = Number(args.shift());
     }
-    else if (arg == "--browse" || arg == "-b") { 
-        browse = true;
+    else if ((arg == "--index-page" || arg == "-i") && args.length > 0) {
+        indexPage = args.shift();
+    }
+    else if ((arg == "--error-page" || arg == "-e") && args.length > 0) {
+        errorPage = args.shift();
     }
     else if ((arg == "--redirect-map" || arg == "-r") && args.length > 0) {
         var data = fs.readFileSync(args.shift(), "utf-8");
@@ -48,6 +53,9 @@ while (args.length > 0) {
             }
         }
     }
+    else if (arg == "--browse" || arg == "-b") { 
+        browse = true;
+    }
     else if (!arg.startsWith("-")) {
         folder = arg;
     }
@@ -56,44 +64,54 @@ while (args.length > 0) {
 var server = http.createServer(function (request, response) {
     var pathname = url.parse(request.url, true).pathname;
     var location = folder + pathname;
-    var statusCode = 404;
+    var statusCode = 0;
     var headers = {};
     var buffer = null;
     for (var i = 0; i < redirects.length; i++) {
         if (redirects[i].regexp.test(pathname)) {
-            statusCode = 302;
+            statusCode = 301;
             headers = { "Location": redirects[i].location };
             break;
         }        
     }
-    if (statusCode != 302 && fs.existsSync(location) && fs.statSync(location).isDirectory()) {
-        if (location.endsWith("/")) {
-            location += "index.html";
-        }
-        else {
-            statusCode = 302;
-            headers = { "Location": pathname + "/" };
+    if (statusCode == 0) {
+        if (fs.existsSync(location) && fs.statSync(location).isDirectory()) {
+            if (location.endsWith("/")) {
+                location += indexPage;
+            }
+            else {
+                statusCode = 302;
+                headers = { "Location": pathname + "/" };
+            }
         }
     }
-    if (statusCode != 302 && fs.existsSync(location) && !fs.statSync(location).isDirectory()) {
-        var extension = path.extname(location);
-        var contentType = mimeTypeMap[extension];
-        if (contentType) {
-            buffer = fs.readFileSync(location, "binary");
+    if (statusCode == 0) {
+        if (fs.existsSync(location) && !fs.statSync(location).isDirectory()) {
             statusCode = 200;
-            headers = {
-                "Content-Type": contentType,
-                "Content-Length": buffer.length
-            };
+        }
+        else {
+            statusCode = 404
+            location = folder + "/" + errorPage;
+        }
+        if (fs.existsSync(location) && !fs.statSync(location).isDirectory()) {
+            buffer = fs.readFileSync(location, "binary");
+            headers["Content-Length"] = buffer.length;
+            var extension = path.extname(location);
+            var contentType = mimeTypeMap[extension];
+            if (contentType) {
+                headers["Content-Type"] = contentType;
+            }
         }
     }
     console.log(statusCode + " " + request.method + " " + request.url);
     response.writeHead(statusCode, headers);
-    if (statusCode != 200) {
-        response.write(statusCode.toString());
-    }
-    else if (request.method !== "HEAD") {
-        response.write(buffer, "binary");
+    if (request.method !== "HEAD") {
+        if (statusCode == 404 && buffer == null) {
+            response.write(statusCode.toString());
+        }
+        else if ((statusCode == 200 || statusCode == 404) && buffer != null) {
+            response.write(buffer, "binary");
+        }
     }
     response.end();
 })

@@ -20,14 +20,18 @@ folder = "."
 port = 8080
 browse = False
 redirects = []
+index_page = "index.html"
+error_page = ""
 
 args = sys.argv[1:]
 while len(args) > 0:
     arg = args.pop(0)
     if (arg == "--port" or arg == "-p") and len(args) > 0 and args[0].isdigit(): 
         port = int(args.pop(0))
-    elif arg == "--browse" or arg == "-b":
-        browse = True
+    if (arg == "--index-page" or arg == "-i") and len(args) > 0: 
+        index_page = args.pop(0)
+    if (arg == "--error-page" or arg == "-e") and len(args) > 0: 
+        error_page = args.pop(0)
     elif (arg == "--redirect-map" or arg == "-r") and len(args) > 0:
         with codecs.open(args.pop(0), "r", "utf-8") as open_file:
             data = open_file.read()
@@ -37,6 +41,8 @@ while len(args) > 0:
                 match = re.compile("([^ ]*) *([^ ]*)").match(line)
                 if match and len(match.groups()[0]) > 0 and len(match.groups()[1]) > 0:
                     redirects.append({ "regexp": re.compile(match.groups()[0]), "location": match.groups()[1] })
+    elif arg == "--browse" or arg == "-b":
+        browse = True
     elif not arg.startswith("-"):
         folder = arg
 
@@ -44,40 +50,45 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
     def handler(self):
         pathname = urlparse(self.path).path
         location = folder + pathname;
-        status_code = 404
+        status_code = 0
         headers = {}
         buffer = None
         for redirect in redirects:
             if redirect["regexp"].match(pathname):
-                status_code = 302
+                status_code = 301
                 headers = { "Location": redirect["location"] }
-        if status_code != 302 and os.path.exists(location) and os.path.isdir(location):
-            if location.endswith("/"):
-                location += "index.html"
+        if status_code == 0:
+            if os.path.exists(location) and os.path.isdir(location):
+                if location.endswith("/"):
+                    location += index_page
+                else:
+                    status_code = 302
+                    headers = { "Location": pathname + "/" }
+        if status_code == 0:
+            if os.path.exists(location) and not os.path.isdir(location):
+                status_code = 200
             else:
-                status_code = 302
-                headers = { "Location": pathname + "/" }
-        if status_code != 302 and os.path.exists(location) and not os.path.isdir(location):
-            extension = os.path.splitext(location)[1]
-            content_type = mimetypes.types_map[extension]
-            if content_type:
+                status_code = 404
+                location = folder + "/" + error_page
+            if os.path.exists(location) and not os.path.isdir(location):
                 with open(location, "rb") as binary:
                     buffer = binary.read()
-                status_code = 200
-                headers = {
-                    "Content-Type": content_type,
-                    "Content-Length": len(buffer)
-                }
+                headers["Content-Length"] = len(buffer)
+                extension = os.path.splitext(location)[1]
+                content_type = mimetypes.types_map[extension]
+                if content_type:
+                    headers["Content-Type"] = content_type
         print(str(status_code) + " " + self.command + " " + self.path)
         sys.stdout.flush()
         self.send_response(status_code)
         for key in headers:
             self.send_header(key, headers[key])
         self.end_headers()
-        if status_code != 200:
-            self.wfile.write(str(status_code))
-        elif self.command != "HEAD":
-            self.wfile.write(buffer)
+        if self.command != "HEAD":
+            if status_code == 404 and buffer == None:
+                self.wfile.write(str(status_code))
+            elif (status_code == 200 or status_code == 404) and buffer != None:
+                self.wfile.write(buffer)
     def do_GET(self):
         self.handler();
     def do_HEAD(self):
