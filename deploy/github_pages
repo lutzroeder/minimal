@@ -23,6 +23,10 @@ deploy() {
     rm -rf "${target}/*"
     echo "${bold}cp -r ${source}/* ${target}/${regular}"
     cp -r "${source}/" "${target}/"
+    if [ "${redirects}" == "nelifly" ]; then
+        echo "${bold}cp redirect.map ${target}/_redirects${regular}"
+        cp redirect.map ${target}/_redirects
+    fi
     pushd "${target}" > /dev/null
     echo "${bold}git add *${regular}"
     git add --all --verbose *
