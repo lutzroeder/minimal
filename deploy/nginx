@@ -65,21 +65,13 @@ cat << EOF >> "${site}.conf"
         root /var/www/${site};
         access_log /var/log/nginx/${site}/access.log ${site}_format;
         error_log /var/log/nginx/${site}/access.log;
+        index index.html;
 EOF
 if [ -f "redirect.map" ]; then
-    sed 's/\([^ ]*\)\( *\)\([^ ]*\)/        location ~ \1\2{ return 301 \3; }/g' redirect.map >> "${site}.conf"
+    sed 's/\([^ ]*\)\( *\)\([^ ]*\)/        rewrite ^\1$ \3 permanent;/g' redirect.map >> "${site}.conf"
 fi
 cat << EOF >> "${site}.conf"
-        location ~ ^(.*)/index.html\$ {
-            return 301 \$scheme://\$http_host\$1/;
-        }
-        location ~ ^(.*)/\$ {
-            try_files \$1/index.html =404;
-        }
-        location ~ ^(/.*)/[^/]+\$ {
-           error_page 404 =301 \$scheme://\$http_host\$1/;
-        }
-        error_page 404 =301 \$scheme://\$http_host/;
+        error_page 404 error.html;
     }
 }
 EOF

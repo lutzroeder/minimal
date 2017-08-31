@@ -1,3 +1,5 @@
-^/wp-login.php$                             /
-^/atom.xml$                                 /blog/feed.atom
-^/rss.xml$                                  /blog/feed.rss
+/wp-login.php                             /
+/atom.xml                                 /blog/feed.atom
+/rss.xml                                  /blog/feed.rss
+/blog/atom.xml                            /blog/feed.atom
+/blog/rss.xml                             /blog/feed.rss
