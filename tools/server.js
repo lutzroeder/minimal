@@ -47,8 +47,8 @@ while (args.length > 0) {
             match = line.match("([^ ]*) *([^ ]*)");
             if (match && match[1] && match[2]) {
                 redirects.push({
-                    regexp: new RegExp(match[1]),
-                    location: match[2]
+                    source: match[1],
+                    target: match[2]
                 });
             }
         }
@@ -68,9 +68,9 @@ var server = http.createServer(function (request, response) {
     var headers = {};
     var buffer = null;
     for (var i = 0; i < redirects.length; i++) {
-        if (redirects[i].regexp.test(pathname)) {
+        if (redirects[i].source == pathname) {
             statusCode = 301;
-            headers = { "Location": redirects[i].location };
+            headers = { "Location": redirects[i].target };
             break;
         }        
     }

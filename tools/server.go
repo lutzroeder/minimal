@@ -17,8 +17,8 @@ import (
 )
 
 type redirect struct {
-	Regexp   *regexp.Regexp
-	Location string;
+	Source string
+	Target string
 }
 
 var folder = "."
@@ -38,9 +38,9 @@ func (handler *httpHandler) ServeHTTP(response http.ResponseWriter, request *htt
 	headers := map[string]string { }
 	buffer := make([]byte, 0)
 	for _, redirect := range redirects {
-		if (redirect.Regexp.MatchString(pathname)) {
+		if (redirect.Source == pathname) {
 			statusCode = 301
-			headers = map[string]string { "Location": redirect.Location }
+			headers = map[string]string { "Location": redirect.Target }
 			break;
 		}
 	}
@@ -119,7 +119,7 @@ func main() {
 				lines = lines[1:]
 				match := regexp.MustCompile("([^ ]*) *([^ ]*)").FindAllStringSubmatch(line, -1)
 				if len(match) > 0 && len(match[0]) > 2 && len(match[0][1]) > 0 && len(match[0][2]) > 0 {
-					redirects = append(redirects, redirect{ regexp.MustCompile(match[0][1]), match[0][2] })
+					redirects = append(redirects, redirect{ match[0][1], match[0][2] })
 				}
 			}
 		} else if (arg == "--browse" || arg == "-b") {

@@ -40,7 +40,9 @@ while len(args) > 0:
                 line = lines.pop(0)
                 match = re.compile("([^ ]*) *([^ ]*)").match(line)
                 if match and len(match.groups()[0]) > 0 and len(match.groups()[1]) > 0:
-                    redirects.append({ "regexp": re.compile(match.groups()[0]), "location": match.groups()[1] })
+                    redirects.append({ 
+                        "source": match.groups()[0], 
+                        "target": match.groups()[1] })
     elif arg == "--browse" or arg == "-b":
         browse = True
     elif not arg.startswith("-"):
@@ -54,9 +56,9 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
         headers = {}
         buffer = None
         for redirect in redirects:
-            if redirect["regexp"].match(pathname):
+            if redirect["source"] == pathname:
                 status_code = 301
-                headers = { "Location": redirect["location"] }
+                headers = { "Location": redirect["target"] }
         if status_code == 0:
             if os.path.exists(location) and os.path.isdir(location):
                 if location.endswith("/"):
