@@ -71,7 +71,7 @@ if [ -f "redirect.map" ]; then
     sed 's/\([^ ]*\)\( *\)\([^ ]*\)/        rewrite ^\1$ \3 permanent;/g' redirect.map >> "${site}.conf"
 fi
 cat << EOF >> "${site}.conf"
-        error_page 404 error.html;
+        error_page 404 /404.html;
     }
 }
 EOF
