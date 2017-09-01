@@ -2,10 +2,13 @@
 
 source "${BASH_SOURCE[0]}.cfg"
 
-bold=$(tty -s && tput bold)
-regular=$(tty -s && tput sgr0)
-underline=$(tty -s && tput smul)
-error=$(tty -s && tput setaf 1)
+bold() {
+    echo "$(tty -s && tput bold)$1$(tty -s && tput sgr0)"
+}
+
+error() {
+    echo "$(tty -s && tput bold)$(tty -s && tput setaf 1)$1$(tty -s && tput sgr0)"
+}
 
 server_start() {
     server_stop
@@ -13,7 +16,7 @@ server_start() {
     sudo rm -rf /var/log/nginx/${site}
     sudo mkdir -p /var/log/nginx/${site}
 
-    echo "${bold}apt-get update${regular}"
+    bold "apt-get update"
     if [ ! -f "/etc/apt/sources.list.d/nginx.list" ]; then
         echo "deb http://nginx.org/packages/ubuntu/ xenial nginx" | sudo tee /etc/apt/sources.list.d/nginx.list
         echo "deb-src http://nginx.org/packages/ubuntu/ xenial nginx" | sudo tee -a /etc/apt/sources.list.d/nginx.list
@@ -21,10 +24,10 @@ server_start() {
     fi
     sudo apt-get -qq update
 
-    echo "${bold}apt-get install nginx${regular}"
+    bold "apt-get install nginx"
     sudo apt-get -qq install --yes nginx
 
-    echo "${bold}install nginx.service${regular}"
+    bold "install nginx.service"
     sudo systemctl stop nginx.service
 
 cat << EOF >> "${site}.conf"
@@ -84,13 +87,13 @@ EOF
         sudo systemctl start "nginx.service"
         if [ $(systemctl is-active "nginx.service") != "active" ]; then
             sudo systemctl status "nginx.service" --no-pager --lines=25 --full
-            echo "${bold}${error}ngnix.service is not active.${regular}"
+            error "ngnix.service is not active."
             return
         fi
     fi
 
     if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
-        echo "${bold}install ${site}-cert.service${regular}"
+        bold "install ${site}-cert.service"
 cat > "${site}-cert.service" << EOF
 [Unit]
 Description=${site}-cert.service
@@ -105,7 +108,7 @@ EOF
         sudo cp "${site}-cert.service" "/etc/systemd/system/${site}-cert.service"
         rm "${site}-cert.service"
 
-        echo "${bold}install ${site}-cert.timer${regular}"
+        bold "install ${site}-cert.timer"
 cat > "${site}-cert.timer" << EOF
 [Unit]
 Description=${site}-cert.timer
@@ -122,7 +125,7 @@ EOF
         sudo systemctl start "${site}-cert.timer"
         if [ $(systemctl is-active "${site}-cert.timer") != "active" ]; then
             sudo systemctl status "${site}-cert.timer" --no-pager --lines=25 --full
-            echo "${bold}${error}${site}-cert.timer is not active.${regular}"
+            error "${site}-cert.timer is not active."
             return
         fi
     fi
@@ -130,12 +133,12 @@ EOF
 
 server_stop() {
     if [ -f "/etc/systemd/system/${site}-cert.timer" ]; then
-        echo "${bold}uninstall ${site}-cert.timer${regular}"
+        bold "uninstall ${site}-cert.timer"
         if [ $(systemctl is-active "${site}-cert.timer") = "active" ]; then
             sudo systemctl stop "${site}-cert.timer"
             if [ $(systemctl is-active "${site}-cert.timer") != "inactive" ]; then
                 sudo systemctl status "${site}-cert.timer" --no-pager --lines=25 --full
-                echo "${bold}${error}${site}-cert.timer is not inactive.${regular}"
+                error "${site}-cert.timer is not inactive."
                 return
             fi
         fi
@@ -143,20 +146,20 @@ server_stop() {
             sudo systemctl disable "${site}-cert.timer"
             if [ $(systemctl is-enabled "${site}-cert.timer") != "disabled" ]; then
                 sudo systemctl status "${site}-cert.timer" --no-pager --lines=25 --full
-                echo "${bold}${error}${site}-cert.timer is not disabled.${regular}"
+                error "${site}-cert.timer is not disabled."
                 return
             fi
         fi
         sudo rm "/etc/systemd/system/${site}-cert.timer"
     fi
     if [ -f "/etc/systemd/system/${site}-cert.service" ]; then
-        echo "${bold}uninstall ${site}-cert.service${regular}"
+        bold "uninstall ${site}-cert.service"
         sudo rm "/etc/systemd/system/${site}-cert.service"
     fi
     if [ $(which nginx) ]; then
         nginx_conf=$(dirname $(nginx -V 2>&1 | grep -o '\-\-conf-path=\(.*conf\)' | cut -d '=' -f2))/conf.d
         if [ -f "${nginx_conf}/${site}.conf" ]; then
-            echo "${bold}uninstall nginx.service${regular}"
+            bold "uninstall nginx.service"
             sudo systemctl stop "nginx.service"
             if sudo test -f "${nginx_conf}/default.conf"; then
                 sudo mv "${nginx_conf}/default.conf.backup" "${nginx_configuration}/default.conf"
@@ -165,7 +168,7 @@ server_stop() {
             sudo systemctl start "nginx.service"
             if [ $(systemctl is-active "nginx.service") != "active" ]; then
                 sudo systemctl status ngnix.service --no-pager --lines=25 --full
-                echo "${bold}${error}ngnix.service is not active.${regular}"
+                error "ngnix.service is not active."
                 return
             fi
         fi
@@ -174,34 +177,34 @@ server_stop() {
 
 server_cert() {
     if [ -z ${domain} ] || [ -z ${email} ]; then
-        echo "${bold}${error}Update 'domain' and 'email' in ${underline}${BASH_SOURCE[0]}.cfg${regular}."
+        error "Update 'domain' and 'email' in '${BASH_SOURCE[0]}'."
         return
     fi
 
-    echo "${bold}apt-get install letsencrypt${regular}"
+    bold "apt-get install letsencrypt"
     sudo apt-get -qq update
     sudo apt-get -qq install --yes letsencrypt
 
     pushd /var/www/${site} > /dev/null
-    mkdir .well-known
+    sudo mkdir .well-known
     if sudo test -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && sudo test -f "/etc/letsencrypt/live/${domain}/privkey.pem"; then
-        echo "${bold}renew certificate${regular}"
+        bold "renew certificate"
         sudo letsencrypt renew
     else
-        echo "${bold}create certificate${regular}"
-        mkdir -p .well-known/acme-challenge
-        sudo letsencrypt certonly --webroot -w $(pwd) -d ${domain} -d www.${domain} -d cdn.${domain} --agree-tos --email ${email}
-        rm letsencrypt.log
+        bold "create certificate"
+        sudo mkdir -p .well-known/acme-challenge
+        sudo letsencrypt certonly --webroot -w $(pwd) -d ${domain} -d www.${domain} -d --agree-tos --email ${email}
+        sudo rm letsencrypt.log
     fi
-    rm -R .well-known
+    sudo rm -R .well-known
     popd > /dev/null
 
-    echo "${bold}reload nginx.service${regular}"
+    bold "reload nginx.service"
     sudo systemctl stop "nginx.service"
     sudo systemctl start "nginx.service"
     if [ $(systemctl is-active "nginx.service") != "active" ]; then
         sudo systemctl status "nginx.service" --no-pager --lines=25 --full
-        echo "${bold}${error}nginx.service is not active.${regular}"
+        error "nginx.service is not active."
     fi
 }
 
@@ -224,17 +227,17 @@ server_deploy() {
 deploy() {
     source="$1"
     shift
-    echo "${bold}archive${regular}"
+    bold "archive"
     pushd ${source} > /dev/null
     zip ../../${site}-build.zip -r *
     popd > /dev/null
     zip --junk-paths ${site}-admin.zip redirect.map deploy/nginx deploy/nginx.cfg
-    echo "${bold}secure copy${regular}"
+    bold "secure copy"
     scp -i ${identity} -r ${site}-build.zip ${site}-admin.zip ${user}@${server}:~
-    echo "${bold}server stop${regular}"
+    bold "server stop"
     ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" " \
         [ -f /opt/www/${site}/nginx ] && cd /opt/www/${site} && sudo ./nginx server stop"
-    echo "${bold}server deploy${regular}"
+    bold "server deploy"
     ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" " \
         sudo rm -rf /var/www/${site}/* /opt/www/${site}/* && \
         sudo mkdir -p /var/www/${site} /opt/www/${site} && \

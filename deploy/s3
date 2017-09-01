@@ -2,21 +2,19 @@
 
 source "${BASH_SOURCE[0]}.cfg"
 
-bold=$(tty -s && tput bold)
-regular=$(tty -s && tput sgr0)
-underline=$(tty -s && tput smul)
-error=$(tty -s && tput setaf 1)
-
-if [ ! -z "${region}" ]; then
-    region="--region ${region}"
-fi
+bold() {
+    echo "$(tty -s && tput bold)$1$(tty -s && tput sgr0)"
+}
 
 deploy() {
+    if [ ! -z "${region}" ]; then
+        region="--region ${region}"
+    fi
     source="$1"
     shift
-    echo "${bold}aws s3 rm --recursive s3://${bucket} ${region}${regular}"
+    bold "aws s3 rm --recursive s3://${bucket} ${region}"
     aws s3 rm --recursive s3://${bucket} ${region}
-    echo "${bold}aws s3 cp --recursive ${source} s3://${bucket} ${region}${regular}"
+    bold "aws s3 cp --recursive ${source} s3://${bucket} ${region}"
     aws s3 cp --recursive ${source} s3://${bucket} ${region}
 }
 

@@ -2,10 +2,13 @@
 
 source "${BASH_SOURCE[0]}.cfg"
 
-bold=$(tty -s && tput bold)
-regular=$(tty -s && tput sgr0)
-underline=$(tty -s && tput smul)
-error=$(tty -s && tput setaf 1)
+bold() {
+    echo "$(tty -s && tput bold)$1$(tty -s && tput sgr0)" 
+}
+
+error() { 
+    echo "$(tty -s && tput bold)$(tty -s && tput setaf 1)$1$(tty -s && tput sgr0)" 
+}
 
 client_build() {
     if [ ${1:-${generator}} = "go" ]; then 
@@ -35,9 +38,9 @@ client_start() {
 
 client_deploy() {
     export ENVIRONMENT=production
-    echo "${bold}build${regular}"
+    bold "build"
     client_build ${generator}
-    echo "${bold}deploy${regular}"
+    bold "deploy"
     if [ ! -z "${deployment}" ]; then
         deploy/${deployment} deploy build/${generator} $@
     fi
@@ -69,13 +72,13 @@ client_watch() {
 }
 
 client_test() {
-    echo "${bold}node${regular}"
+    bold "node"
     ENVIRONMENT=production node tools/generator.js
-    echo "${bold}go${regular}"
+    bold "go"
     ENVIRONMENT=production go run tools/generator.go
-    echo "${bold}python${regular}"
+    bold "python"
     ENVIRONMENT=production python tools/generator.py
-    echo "${bold}compare${regular}"
+    bold "compare"
     diff --brief -r build/node/ build/go/
     diff --brief -r build/node/ build/python/
 }
@@ -92,13 +95,13 @@ case "${command}" in
     "test") client_test;;
     *)
         echo;
-        echo "Usage: ${bold}$(basename "$0")${regular} <command>"
+        echo "Usage: $(tty -s && tput bold)$(basename "$0")$(tty -s && tput sgr0) <command>"
         echo
-        echo "    ${bold}build${regular}      Build the website"
-        echo "    ${bold}start${regular}      Build and launch simple local web server"
-        echo "    ${bold}deploy${regular}     Build and deploy to production environment"
-        echo "    ${bold}log${regular}        Show production log"
-        echo "    ${bold}console${regular}    Connect to production environment via SSH"
+        echo "    build      Build the website"
+        echo "    start      Build and launch simple local web server"
+        echo "    deploy     Build and deploy to production environment"
+        echo "    log        Show production log"
+        echo "    console    Connect to production environment via SSH"
         echo;
     ;;
 esac

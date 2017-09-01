@@ -2,48 +2,52 @@
 
 source "${BASH_SOURCE[0]}.cfg"
 
-bold=$(tty -s && tput bold)
-regular=$(tty -s && tput sgr0)
-underline=$(tty -s && tput smul)
-error=$(tty -s && tput setaf 1)
+bold() {
+    echo "$(tty -s && tput bold)$1$(tty -s && tput sgr0)"
+}
+
+error() {
+    echo "$(tty -s && tput bold)$(tty -s && tput setaf 1)$1$(tty -s && tput sgr0)"
+}
 
 deploy() {
+    error=
     source="$1"
     shift
     target=$(basename ${repository})
     target=build/${target%.*}
     if [ ! -d "${target}" ]; then
-        echo "${bold}git clone ${repository} ${target}${regular}"
+        bold "git clone ${repository} ${target}${regular}"
         git clone ${repository} ${target}
     elif [ "$(git -C "${target}" remote get-url origin)" != "${repository}" ]; then
-        echo "${bold}${error}'${target}' already exists.${regular}"
+        error "'${target}' already exists."
         return
     fi
-    echo "${bold}rm -rf ${target}/*${regular}"
+    bold "rm -rf ${target}/*"
     rm -rf "${target}/*"
-    echo "${bold}cp -r ${source}/* ${target}/${regular}"
+    bold "cp -r ${source}/* ${target}/"
     cp -r "${source}/" "${target}/"
     if [ "${redirects}" == "nelifly" ]; then
-        echo "${bold}cp redirect.map ${target}/_redirects${regular}"
+        bold "cp redirect.map ${target}/_redirects"
         cp redirect.map ${target}/_redirects
     fi
     pushd "${target}" > /dev/null
-    echo "${bold}git add *${regular}"
+    bold "git add *"
     git add --all --verbose *
     message=$@
     if [ -z "${message}" ]; then # if no description is provided amend last commit and push --force
-        echo "${bold}git commit --amend --no-edit${regular}"
+        bold "git commit --amend --no-edit"
         git commit --amend --no-edit
-        echo "${bold}git push --force${regular}"
+        bold "git push --force"
         git push --force
     else
-        echo "${bold}git commit -m '${message}'${regular}"
+        bold "git commit -m '${message}'"
         git commit -m "${message}"
-        echo "${bold}git push${regular}"
+        bold "git push"
         git push
     fi
     popd > /dev/null
-    echo "${bold}rm -rf ${target}${regular}"
+    bold "rm -rf ${target}"
     rm -rf "${target}"
 }
 
