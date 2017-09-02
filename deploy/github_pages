@@ -26,25 +26,21 @@ deploy() {
     rm -rf "${target}/*"
     bold "cp -r ${source}/* ${target}/"
     cp -r "${source}/" "${target}/"
-    if [ "${redirects}" == "nelifly" ]; then
-        bold "cp redirect.map ${target}/_redirects"
-        cp redirect.map ${target}/_redirects
-    fi
     pushd "${target}" > /dev/null
     bold "git add *"
     git add --all --verbose *
-    message=$@
-    if [ -z "${message}" ]; then # if no description is provided amend last commit and push --force
+    # message=$@
+    #if [ -z "${message}" ]; then # if no description is provided amend last commit and push --force
         bold "git commit --amend --no-edit"
         git commit --amend --no-edit
         bold "git push --force"
         git push --force
-    else
-        bold "git commit -m '${message}'"
-        git commit -m "${message}"
-        bold "git push"
-        git push
-    fi
+    #else
+    #    bold "git commit -m '${message}'"
+    #    git commit -m "${message}"
+    #    bold "git push"
+    #    git push
+    #fi
     popd > /dev/null
     bold "rm -rf ${target}"
     rm -rf "${target}"

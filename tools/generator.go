@@ -492,9 +492,23 @@ func main() {
 		return
 	}
 	destination := "build"
-	if len(os.Args) >= 2 && len(os.Args[1]) > 0{
-		destination = os.Args[1];
+	args := os.Args[1:]
+	for len(args) > 0 {
+		arg := args[0]
+		args = args[1:]
+		if arg == "--redirect" && len(args) > 0 {
+			configuration["redirect"] = args[0]
+			args = args[1:]
+		} else if arg == "--theme" && len(args) > 0 {
+			configuration["theme"] = args[0]
+			args = args[1:]
+		} else {
+			destination = arg;
+		}
 	}
 	cleanDir(destination);
 	renderDir("content/", destination);
+	if (configuration["redirect"] == "netlify") {
+		render("redirect.map", destination + "/_redirects")
+	}
 }

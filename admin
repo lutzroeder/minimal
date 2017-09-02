@@ -11,35 +11,39 @@ error() {
 }
 
 client_build() {
-    if [ ${1:-${generator}} = "go" ]; then 
-        go run tools/generator.go
-    elif [ ${1:-${generator}} = "python" ]; then
-        python tools/generator.py
-    elif [ ${1:-${generator}} = "node" ]; then
-        node tools/generator.js
+    generator=${1:-${generator}}
+    shift
+    if [ ${generator} = "go" ]; then 
+        go run tools/generator.go $@
+    elif [ ${generator} = "python" ]; then
+        python tools/generator.py $@
+    elif [ ${generator} = "node" ]; then
+        node tools/generator.js $@
     fi
 }
 
 client_start() {
     export ENVIRONMENT=development
-    client_build ${1}
-    if [ ${1:-${generator}} = "go" ]; then 
-        command="go run tools/server.go"
-    elif [ ${1:-${generator}} = "python" ]; then
-        command="python tools/server.py" 
-    elif [ ${1:-${generator}} = "node" ]; then
-        command="node tools/server.js"
+    generator=${1:-${generator}}
+    shift
+    client_build ${generator} build $@
+    if [ ${generator} = "go" ]; then
+        start_command="go run tools/server.go"
+    elif [ ${generator} = "python" ]; then
+        start_command="python tools/server.py"
+    elif [ ${generator} = "node" ]; then
+        start_command="node tools/server.js"
     fi
-    if [ ! -z "$command" ]; then
-        command="${command} build --port 8080 --index-page index.html --error-page error.html --redirect-map redirect.map --browse"
-        ${command} 
+    if [ ! -z "$start_command" ]; then
+        start_command="${start_command} build --port 8080 --index-page index.html --error-page error.html --redirect-map redirect.map --browse"
+        ${start_command} 
     fi
 }
 
 client_deploy() {
     export ENVIRONMENT=production
     bold "build"
-    client_build ${generator}
+    client_build ${generator} build --redirect ${redirect}
     bold "deploy"
     if [ ! -z "${deployment}" ]; then
         deploy/${deployment} deploy build $@

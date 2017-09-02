@@ -279,6 +279,9 @@ def render_page(source, destination):
     data = mustache(template, view, lambda name: read_file(theme() + "/" + name))
     write_file(destination, data)
 
+def render_file(source, destination):
+    shutil.copyfile(source, destination)
+
 def render(source, destination):
     print destination
     extension = os.path.splitext(source)[1]
@@ -287,7 +290,7 @@ def render(source, destination):
     elif extension == ".html":
         render_page(source, destination)
     else:
-        shutil.copyfile(source, destination)
+        render_file(source, destination)
 
 def render_directory(source, destination):
     if not os.path.exists(destination):
@@ -313,7 +316,16 @@ print("python " + platform.python_version() + " " + (environment if environment 
 with open("content.json") as configurationFile:
     configuration = json.load(configurationFile)
 destination = "build"
-if len(sys.argv) > 1 and len(sys.argv[1]) > 0:
-    destination = sys.argv[1]
+args = sys.argv[1:]
+while len(args) > 0:
+    arg = args.pop(0)
+    if arg == "--redirect" and len(args) > 0: 
+        configuration["redirect"] = args.pop(0)
+    elif arg == "--profile" and len(args) > 0:
+        configuration["profile"] = args.pop(0)
+    else:
+        destination = arg
 clean_directory(destination)
 render_directory("content/", destination + "/") ;
+if "redirect" in configuration and configuration["redirect"] == "netlify":
+    render("redirect.map", destination + "/_redirects")

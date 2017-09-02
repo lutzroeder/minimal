@@ -305,6 +305,10 @@ function renderPage(source, destination) {
     fs.writeFileSync(destination, data);
 }
 
+function renderFile(source, destination) {
+    fs.createReadStream(source).pipe(fs.createWriteStream(destination));
+}
+
 function render(source, destination) {
     console.log(destination);
     var extension = path.extname(source);
@@ -314,10 +318,10 @@ function render(source, destination) {
             renderFeed(source, destination);
             break;
         case ".html":
-            renderPage(source, destination)
+            renderPage(source, destination);
             break;
         default:
-            fs.createReadStream(source).pipe(fs.createWriteStream(destination));
+            renderFile(source, destination);
             break;
     }
 }
@@ -365,8 +369,21 @@ var environment = process.env["ENVIRONMENT"];
 console.log("node " + process.version + " " + environment);
 var configuration = JSON.parse(fs.readFileSync("content.json", "utf-8"));
 var destination = "build";
-if (process.argv.length > 2 && process.argv[2]) {
-    destination = process.argv[2];
+var args = process.argv.slice(2)
+while (args.length > 0) {
+    var arg = args.shift();
+    if (arg == "--redirect" && args.length > 0) {
+        configuration["redirect"] = args.shift();
+    }
+    else if (arg == "--theme" && args.length > 0) {
+        configuration["theme"] = args.shift();
+    }
+    else {
+        destination = arg;
+    }
 }
-cleanDirectory(destination)
-renderDirectory("content/", destination + "/") ;
+cleanDirectory(destination);
+renderDirectory("content/", destination + "/");
+if (configuration["redirect"] == "netlify") {
+    render("redirect.map", destination + "/_redirects")
+}
