@@ -43,7 +43,10 @@ client_start() {
 client_deploy() {
     export ENVIRONMENT=production
     bold "build"
-    client_build ${generator} build --redirect ${redirect}
+    if [ ! -z ${redirect} ]; then
+        redirect="--redirect ${redirect}"
+    fi
+    client_build ${generator} build
     bold "deploy"
     if [ ! -z "${deployment}" ]; then
         deploy/${deployment} deploy build $@
@@ -70,7 +73,7 @@ client_watch() {
             if [ -z "$(which fswatch)" ]; then
                 brew install fswatch
             fi
-            fswatch -r -o . -e build | xargs -n1 ./admin build
+            fswatch -r -o . -e build | xargs -n1 ./task build
             ;;
     esac
 }

@@ -10,10 +10,10 @@ Modify `./content.json` to your liking (symbol codes for social links can be fou
 
 To build locally and launch a simple web server run **either** of the following: 
 
-* Install [Node.js](https://nodejs.org/en/download) and run `./admin start node`.
-* Install [Go](https://golang.org/doc/install) and run `./admin start go`.
-* Install [Python](https://www.python.org/downloads/) and run `./admin start python`.
+* Install [Node.js](https://nodejs.org/en/download) and run `./task start node`.
+* Install [Go](https://golang.org/doc/install) and run `./task start go`.
+* Install [Python](https://www.python.org/downloads/) and run `./task start python`.
 
 ## Deployment
 
-To deploy to a production enviroment set the `deployment` method in `./admin.cfg` and update the corresponding `.cfg` file in the `./deploy` folder, then run `./admin deploy` to initiate the build and deploy.
+To deploy to a production enviroment set the `deployment` method in `./task.cfg` and update the corresponding `.cfg` file in the `./deploy` folder, then run `./task deploy` to initiate the build and deploy.
