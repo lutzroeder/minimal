@@ -312,7 +312,7 @@ environment = os.getenv("ENVIRONMENT")
 print("python " + platform.python_version() + " " + (environment if environment else ""))
 with open("content.json") as configurationFile:
     configuration = json.load(configurationFile)
-destination = "build/python"
+destination = "build"
 if len(sys.argv) > 1 and len(sys.argv[1]) > 0:
     destination = sys.argv[1]
 clean_directory(destination)

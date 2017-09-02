@@ -491,7 +491,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	destination := "build/go"
+	destination := "build"
 	if len(os.Args) >= 2 && len(os.Args[1]) > 0{
 		destination = os.Args[1];
 	}

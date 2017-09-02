@@ -364,7 +364,7 @@ function cleanDirectory(directory) {
 var environment = process.env["ENVIRONMENT"];
 console.log("node " + process.version + " " + environment);
 var configuration = JSON.parse(fs.readFileSync("content.json", "utf-8"));
-var destination = "build/node";
+var destination = "build";
 if (process.argv.length > 2 && process.argv[2]) {
     destination = process.argv[2];
 }

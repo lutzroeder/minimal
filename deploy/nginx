@@ -228,12 +228,13 @@ deploy() {
     source="$1"
     shift
     bold "archive"
+    target=$(mktemp -d)
     pushd ${source} > /dev/null
-    zip ../../${site}-build.zip -r *
+    zip ${target}/${site}-build.zip -r *
     popd > /dev/null
-    zip --junk-paths ${site}-admin.zip redirect.map deploy/nginx deploy/nginx.cfg
+    zip --junk-paths ${target}/${site}-admin.zip redirect.map deploy/nginx deploy/nginx.cfg
     bold "secure copy"
-    scp -i ${identity} -r ${site}-build.zip ${site}-admin.zip ${user}@${server}:~
+    scp -i ${identity} -r ${target}/${site}-build.zip ${target}/${site}-admin.zip ${user}@${server}:~
     bold "server stop"
     ssh -i ${identity} ${user}@${server} -tq -o "BatchMode yes" " \
         [ -f /opt/www/${site}/nginx ] && cd /opt/www/${site} && sudo ./nginx server stop"
@@ -245,7 +246,7 @@ deploy() {
         sudo unzip ${site}-admin.zip -d /opt/www/${site} && \
         rm ~/${site}-build.zip && rm ~/${site}-admin.zip && \
         cd /opt/www/${site} && sudo ./nginx server start"
-    rm ${site}-build.zip ${site}-admin.zip
+    rm -rf ${target}
 }
 
 log() {

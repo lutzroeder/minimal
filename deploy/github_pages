@@ -11,11 +11,10 @@ error() {
 }
 
 deploy() {
-    error=
     source="$1"
     shift
     target=$(basename ${repository})
-    target=build/${target%.*}
+    target=$(mktemp -d)/${target%.*}
     if [ ! -d "${target}" ]; then
         bold "git clone ${repository} ${target}${regular}"
         git clone ${repository} ${target}

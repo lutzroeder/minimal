@@ -31,7 +31,7 @@ client_start() {
         command="node tools/server.js"
     fi
     if [ ! -z "$command" ]; then
-        command="${command} build/${1:-${generator}} --port 8080 --index-page index.html --error-page error.html --redirect-map redirect.map --browse"
+        command="${command} build --port 8080 --index-page index.html --error-page error.html --redirect-map redirect.map --browse"
         ${command} 
     fi
 }
@@ -42,7 +42,7 @@ client_deploy() {
     client_build ${generator}
     bold "deploy"
     if [ ! -z "${deployment}" ]; then
-        deploy/${deployment} deploy build/${generator} $@
+        deploy/${deployment} deploy build $@
     fi
 }
 
@@ -72,12 +72,13 @@ client_watch() {
 }
 
 client_test() {
+    rm -rf build/*
     bold "node"
-    ENVIRONMENT=production node tools/generator.js
+    ENVIRONMENT=production node tools/generator.js build/node
     bold "go"
-    ENVIRONMENT=production go run tools/generator.go
+    ENVIRONMENT=production go run tools/generator.go build/go
     bold "python"
-    ENVIRONMENT=production python tools/generator.py
+    ENVIRONMENT=production python tools/generator.py build/python
     bold "compare"
     diff --brief -r build/node/ build/go/
     diff --brief -r build/node/ build/python/
