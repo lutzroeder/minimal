@@ -14,7 +14,8 @@ deploy() {
     source="$1"
     shift
     target=$(basename ${repository})
-    target=$(mktemp -d)/${target%.*}
+    folder=$(mktemp -d)
+    target=${folder}/${target%.*}
     if [ ! -d "${target}" ]; then
         bold "git clone ${repository} ${target}${regular}"
         git clone ${repository} ${target}
@@ -29,21 +30,30 @@ deploy() {
     pushd "${target}" > /dev/null
     bold "git add *"
     git add --all --verbose *
-    # message=$@
-    #if [ -z "${message}" ]; then # if no description is provided amend last commit and push --force
+    mesasge=""
+    while test $# -gt 0
+    do
+        arg=$1
+        shift
+        if [ "$arg" == "--message" ] && [ $# -gt 0 ]; then
+            message=$@
+            break
+        fi
+    done
+    if [ -z "${message}" ]; then # if no description is provided amend last commit and push --force
         bold "git commit --amend --no-edit"
         git commit --amend --no-edit
         bold "git push --force"
         git push --force
-    #else
-    #    bold "git commit -m '${message}'"
-    #    git commit -m "${message}"
-    #    bold "git push"
-    #    git push
-    #fi
+    else
+        bold "git commit -m '${message}'"
+        git commit -m "${message}"
+        bold "git push"
+        git push
+    fi
     popd > /dev/null
-    bold "rm -rf ${target}"
-    rm -rf "${target}"
+    bold "rm -rf ${folder}"
+    rm -rf "${folder}"
 }
 
 console() {
