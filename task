@@ -28,15 +28,15 @@ client_start() {
     shift
     client_build ${generator} build $@
     if [ ${generator} = "go" ]; then
-        start_command="go run tools/server.go"
+        server="go run tools/server.go"
     elif [ ${generator} = "python" ]; then
-        start_command="python tools/server.py"
+        server="python tools/server.py"
     elif [ ${generator} = "node" ]; then
-        start_command="node tools/server.js"
+        server="node tools/server.js"
     fi
-    if [ ! -z "$start_command" ]; then
-        start_command="${start_command} build --port 8080 --index-page index.html --error-page error.html --redirect-map redirect.map --browse"
-        ${start_command} 
+    if [ ! -z "${server}" ]; then
+        server="${server} build --port 8080 --index-page index.html --error-page error.html --redirect-map redirect.map --browse"
+        ${server} 
     fi
 }
 
@@ -46,7 +46,7 @@ client_deploy() {
     if [ ! -z ${redirect} ]; then
         redirect="--redirect ${redirect}"
     fi
-    client_build ${generator} build ${redirect}
+    client_build ${generator} build ${redirect} $@
     bold "deploy"
     if [ ! -z "${deployment}" ]; then
         deploy/${deployment} deploy build $@
@@ -67,13 +67,13 @@ client_console() {
 
 client_watch() {
     export ENVIRONMENT=development
-    client_build ${1}
+    ./task build
     case "$(uname -s)" in
         Darwin*) 
             if [ -z "$(which fswatch)" ]; then
                 brew install fswatch
             fi
-            fswatch -r -o . -e build | xargs -n1 ./task build
+            fswatch -r -o . -e build | while read; do ./task build; done
             ;;
     esac
 }
