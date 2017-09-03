@@ -46,7 +46,7 @@ client_deploy() {
     if [ ! -z ${redirect} ]; then
         redirect="--redirect ${redirect}"
     fi
-    client_build ${generator} build
+    client_build ${generator} build ${redirect}
     bold "deploy"
     if [ ! -z "${deployment}" ]; then
         deploy/${deployment} deploy build $@
