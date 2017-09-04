@@ -225,11 +225,9 @@ server_deploy() {
 }
 
 deploy() {
-    source="$1"
-    shift
     bold "archive"
     target=$(mktemp -d)
-    pushd ${source} > /dev/null
+    pushd build > /dev/null
     zip ${target}/${site}-build.zip -r *
     popd > /dev/null
     zip --junk-paths ${target}/${site}-admin.zip redirect.map deploy/nginx deploy/nginx.cfg

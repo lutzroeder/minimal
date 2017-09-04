@@ -496,10 +496,7 @@ func main() {
 	for len(args) > 0 {
 		arg := args[0]
 		args = args[1:]
-		if arg == "--redirect" && len(args) > 0 {
-			configuration["redirect"] = args[0]
-			args = args[1:]
-		} else if arg == "--theme" && len(args) > 0 {
+		if arg == "--theme" && len(args) > 0 {
 			configuration["theme"] = args[0]
 			args = args[1:]
 		} else {
@@ -508,7 +505,4 @@ func main() {
 	}
 	cleanDir(destination);
 	renderDir("content/", destination);
-	if (configuration["redirect"] == "netlify") {
-		render("redirect.map", destination + "/_redirects")
-	}
 }

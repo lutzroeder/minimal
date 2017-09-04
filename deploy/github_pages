@@ -11,8 +11,6 @@ error() {
 }
 
 deploy() {
-    source="$1"
-    shift
     target=$(basename ${repository})
     folder=$(mktemp -d)
     target=${folder}/${target%.*}
@@ -25,8 +23,8 @@ deploy() {
     fi
     bold "rm -rf ${target}/*"
     rm -rf "${target}/*"
-    bold "cp -r ${source}/* ${target}/"
-    cp -r "${source}/" "${target}/"
+    bold "cp -r build/* ${target}/"
+    cp -r "build/" "${target}/"
     pushd "${target}" > /dev/null
     bold "git add *"
     git add --all --verbose *

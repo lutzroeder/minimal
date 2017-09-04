@@ -1,0 +1,29 @@
+#!/bin/bash
+
+source "${BASH_SOURCE[0]}.cfg"
+
+bold() {
+    echo "$(tty -s && tput bold)$1$(tty -s && tput sgr0)"
+}
+
+deploy() {
+    bold "cp redirect.map build/_redirects"
+    cp redirect.map build/_redirects
+}
+
+console() {
+    url="https://app.netlify.com/sites/${site}"
+    case "$(uname -s)" in
+        Darwin*) open ${url};;
+        Linux*) xdg-open ${url};;
+        MINGW*) start "" ${url};;
+    esac
+}
+
+command="$1"
+shift
+case "${command}" in
+    "deploy") deploy $@;;
+    "log") echo "Not supported for Nelify.";;
+    "console") console;;
+esac

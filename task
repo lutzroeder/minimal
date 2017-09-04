@@ -14,11 +14,11 @@ client_build() {
     generator=${1:-${generator}}
     shift
     if [ ${generator} = "go" ]; then 
-        go run tools/generator.go $@
+        go run tools/generator.go build $@
     elif [ ${generator} = "python" ]; then
-        python tools/generator.py $@
+        python tools/generator.py build $@
     elif [ ${generator} = "node" ]; then
-        node tools/generator.js $@
+        node tools/generator.js build $@
     fi
 }
 
@@ -26,7 +26,7 @@ client_start() {
     export ENVIRONMENT=development
     generator=${1:-${generator}}
     shift
-    client_build ${generator} build $@
+    client_build ${generator} $@
     if [ ${generator} = "go" ]; then
         server="go run tools/server.go"
     elif [ ${generator} = "python" ]; then
@@ -43,23 +43,26 @@ client_start() {
 client_deploy() {
     export ENVIRONMENT=production
     bold "build"
-    if [ ! -z ${redirect} ]; then
-        redirect="--redirect ${redirect}"
-    fi
-    client_build ${generator} build ${redirect} $@
+    deployment=${1:-${deployment}}
+    shift
+    client_build ${generator} $@
     bold "deploy"
     if [ ! -z "${deployment}" ]; then
-        deploy/${deployment} deploy build $@
+        deploy/${deployment} deploy $@
     fi
 }
 
 client_log() {
+    deployment=${1:-${deployment}}
+    shift
     if [ ! -z "${deployment}" ]; then
         deploy/${deployment} log
     fi
 }
 
 client_console() {
+    deployment=${1:-${deployment}}
+    shift
     if [ ! -z "${deployment}" ]; then
         deploy/${deployment} console
     fi
@@ -97,8 +100,8 @@ case "${command}" in
     "build") client_build $@;;
     "start") client_start $@;;
     "deploy") client_deploy $@;;
-    "log") client_log;;
-    "console") client_console;;
+    "log") client_log $@;;
+    "console") client_console $@;;
     "watch") client_watch $@;;
     "test") client_test;;
     *)

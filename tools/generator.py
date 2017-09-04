@@ -319,13 +319,9 @@ destination = "build"
 args = sys.argv[1:]
 while len(args) > 0:
     arg = args.pop(0)
-    if arg == "--redirect" and len(args) > 0: 
-        configuration["redirect"] = args.pop(0)
-    elif arg == "--profile" and len(args) > 0:
-        configuration["profile"] = args.pop(0)
+    if arg == "--theme" and len(args) > 0:
+        configuration["theme"] = args.pop(0)
     else:
         destination = arg
 clean_directory(destination)
 render_directory("content/", destination + "/") ;
-if "redirect" in configuration and configuration["redirect"] == "netlify":
-    render("redirect.map", destination + "/_redirects")

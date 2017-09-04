@@ -372,10 +372,7 @@ var destination = "build";
 var args = process.argv.slice(2)
 while (args.length > 0) {
     var arg = args.shift();
-    if (arg == "--redirect" && args.length > 0) {
-        configuration["redirect"] = args.shift();
-    }
-    else if (arg == "--theme" && args.length > 0) {
+    if (arg == "--theme" && args.length > 0) {
         configuration["theme"] = args.shift();
     }
     else {
@@ -384,6 +381,3 @@ while (args.length > 0) {
 }
 cleanDirectory(destination);
 renderDirectory("content/", destination + "/");
-if (configuration["redirect"] == "netlify") {
-    render("redirect.map", destination + "/_redirects")
-}

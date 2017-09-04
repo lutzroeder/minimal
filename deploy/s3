@@ -10,12 +10,10 @@ deploy() {
     if [ ! -z "${region}" ]; then
         region="--region ${region}"
     fi
-    source="$1"
-    shift
     bold "aws s3 rm --recursive s3://${bucket} ${region}"
     aws s3 rm --recursive s3://${bucket} ${region}
-    bold "aws s3 cp --recursive ${source} s3://${bucket} ${region}"
-    aws s3 cp --recursive ${source} s3://${bucket} ${region}
+    bold "aws s3 cp --recursive build s3://${bucket} ${region}"
+    aws s3 cp --recursive build s3://${bucket} ${region}
     bold "aws s3 website s3://${bucket} --index-document index.html --error-document 404.html"
     aws s3 website s3://${bucket} --index-document index.html --error-document 404.html
 }
