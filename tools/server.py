@@ -21,7 +21,7 @@ port = 8080
 browse = False
 redirects = []
 index_page = "index.html"
-error_page = ""
+not_found_page = ""
 
 args = sys.argv[1:]
 while len(args) > 0:
@@ -30,8 +30,8 @@ while len(args) > 0:
         port = int(args.pop(0))
     if (arg == "--index-page" or arg == "-i") and len(args) > 0: 
         index_page = args.pop(0)
-    if (arg == "--error-page" or arg == "-e") and len(args) > 0: 
-        error_page = args.pop(0)
+    if (arg == "--not-found-page" or arg == "-e") and len(args) > 0: 
+        not_found_page = args.pop(0)
     elif (arg == "--redirect-map" or arg == "-r") and len(args) > 0:
         with codecs.open(args.pop(0), "r", "utf-8") as open_file:
             data = open_file.read()
@@ -71,7 +71,7 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
                 status_code = 200
             else:
                 status_code = 404
-                location = folder + "/" + error_page
+                location = folder + "/" + not_found_page
             if os.path.exists(location) and not os.path.isdir(location):
                 with open(location, "rb") as binary:
                     buffer = binary.read()

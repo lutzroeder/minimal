@@ -25,7 +25,7 @@ var port = 8080;
 var browse = false;
 var redirects = [];
 var indexPage = "index.html";
-var errorPage = "";
+var notFoundPage = "";
 
 var args = process.argv.slice(2)
 while (args.length > 0) {
@@ -36,8 +36,8 @@ while (args.length > 0) {
     else if ((arg == "--index-page" || arg == "-i") && args.length > 0) {
         indexPage = args.shift();
     }
-    else if ((arg == "--error-page" || arg == "-e") && args.length > 0) {
-        errorPage = args.shift();
+    else if ((arg == "--not-found-page" || arg == "-n") && args.length > 0) {
+        notFoundPage = args.shift();
     }
     else if ((arg == "--redirect-map" || arg == "-r") && args.length > 0) {
         var data = fs.readFileSync(args.shift(), "utf-8");
@@ -91,7 +91,7 @@ var server = http.createServer(function (request, response) {
         }
         else {
             statusCode = 404
-            location = folder + "/" + errorPage;
+            location = folder + "/" + notFoundPage;
         }
         if (fs.existsSync(location) && !fs.statSync(location).isDirectory()) {
             buffer = fs.readFileSync(location, "binary");

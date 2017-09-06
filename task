@@ -35,7 +35,7 @@ client_start() {
         server="node tools/server.js"
     fi
     if [ ! -z "${server}" ]; then
-        server="${server} build --port 8080 --index-page index.html --error-page error.html --redirect-map redirect.map --browse"
+        server="${server} build --port 8080 --index-page index.html --not-found-page 404.html --redirect-map redirect.map --browse"
         ${server} 
     fi
 }

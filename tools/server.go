@@ -26,7 +26,7 @@ var port = ":8080"
 var browse = false
 var redirects = make([]redirect, 0)
 var indexPage = "index.html"
-var errorPage = ""
+var notFoundPage = ""
 
 type httpHandler struct {
 }
@@ -59,7 +59,7 @@ func (handler *httpHandler) ServeHTTP(response http.ResponseWriter, request *htt
 			statusCode = 200
 		} else {
 			statusCode = 404
-			location = folder + "/" + errorPage
+			location = folder + "/" + notFoundPage
 		}
 		if stat, err := os.Stat(location); !os.IsNotExist(err) && !stat.IsDir() {
 			extension := path.Ext(location)
@@ -100,8 +100,8 @@ func main() {
 		} else if (arg == "--index-page" || arg == "-i") && len(args) > 0 {
 			indexPage = args[0]
 			args = args[1:]
-		} else if (arg == "--error-page" || arg == "-i") && len(args) > 0 {
-			errorPage = args[0]
+		} else if (arg == "--not-found-page" || arg == "-i") && len(args) > 0 {
+			notFoundPage = args[0]
 			args = args[1:]
 		} else if (arg == "--browse" || arg == "-b") {
 			browse = true
