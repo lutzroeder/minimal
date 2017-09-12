@@ -1,6 +1,8 @@
 #!/bin/bash
 
-source "${BASH_SOURCE[0]}.cfg"
+if [ -f "${BASH_SOURCE[0]}.cfg" ]; then
+    source "${BASH_SOURCE[0]}.cfg"
+fi
 
 bold() {
     echo "$(tty -s && tput bold)$1$(tty -s && tput sgr0)"
