@@ -283,7 +283,7 @@ def render_file(source, destination):
     shutil.copyfile(source, destination)
 
 def render(source, destination):
-    print destination
+    print(destination)
     extension = os.path.splitext(source)[1]
     if extension == ".rss" or extension == ".atom":
         render_feed(source, destination)
