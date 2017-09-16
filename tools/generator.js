@@ -274,10 +274,6 @@ function renderPost(source, destination) {
                 item["date"] = formatDate(date, "user");
             }
             item["author"] = item["author"] || configuration["name"];
-            item["telemetry"] = item["telemetry"] || "";
-            if ("telemetry" in configuration) {
-                item["telemetry"] = mustache(configuration["telemetry"], item);
-            }
             var view = merge(configuration, item);
             var template = fs.readFileSync(theme() + "/post.html", "utf-8");
             var data = mustache(template, view, function(name) {

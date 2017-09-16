@@ -323,12 +323,6 @@ func renderPost(source string, destination string) bool {
 			if _, ok := item["author"]; !ok {
 				item["author"] = configuration["name"].(string)
 			}
-			if _, ok := item["telemetry"]; !ok {
-				item["telemetry"] = ""
-			}
-			if telemetry, ok := configuration["telemetry"].(string); ok {
-				item["telemetry"] = mustache(telemetry, item, nil)
-			}
 			view := merge(configuration, item)
 			template, err := ioutil.ReadFile(theme() + "/post.html")
 			if err != nil {
