@@ -293,7 +293,33 @@ function renderPage(source, destination) {
     var template = fs.readFileSync(source, "utf-8");
     var view = merge(configuration);
     view["blog"] = function() {
-        return renderBlog(posts(), path.dirname(destination), 0);
+        return renderBlog(posts(), path.dirname(destination), 0) + `<script type='text/javascript'>
+function updateStream() {
+    var element = document.getElementById("stream");
+    if (element) {
+      var rect = element.getBoundingClientRect();
+      var threshold = 0;
+      if (rect.bottom > threshold && (window.innerHeight - rect.top) > threshold) {
+        var url = element.getAttribute("title");
+        var xmlHttp = new XMLHttpRequest();
+        xmlHttp.open("GET", url, true);
+        xmlHttp.onreadystatechange = function () {
+            if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
+                element.insertAdjacentHTML('beforebegin', xmlHttp.responseText);
+                element.parentNode.removeChild(element);
+                updateStream();
+            }
+        };
+        xmlHttp.send(null);
+      }
+    }
+}
+updateStream();
+window.addEventListener('scroll', function(e) {
+    updateStream();
+});
+</script>
+`
     };
     view["pages"] = [];
     configuration["pages"].forEach(function (page) {

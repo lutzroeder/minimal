@@ -2,6 +2,8 @@
 
 import codecs
 import datetime
+import dateutil.parser
+import dateutil.tz
 import json
 import mimetypes
 import os
@@ -9,8 +11,6 @@ import re
 import platform
 import sys
 import shutil
-import dateutil.parser
-import dateutil.tz
 
 if sys.version_info[0] > 2:
     from urllib.parse import urlparse
@@ -77,11 +77,13 @@ def mustache(template, view, partials):
     return template
 
 def read_file(path):
-    with codecs.open(path, "r", "utf-8") as open_file:
+    with codecs.open(path, mode="r", encoding="utf-8") as open_file:
         return open_file.read()
 
 def write_file(path, data):
-    with codecs.open(path, "w", "utf-8") as open_file:
+    if not os.path.exists(os.path.dirname(path)):
+        os.makedirs(os.path.dirname(path))
+    with codecs.open(path, mode="w", encoding="utf-8") as open_file:
         open_file.write(data)
 
 def format_date(date, format):
@@ -274,7 +276,33 @@ def render_page(source, destination):
         return
     template = read_file(os.path.join("./", source))
     view = merge([ configuration ])
-    view["blog"] = lambda: render_blog(posts(), os.path.dirname(destination), 0)
+    view["blog"] = lambda: render_blog(posts(), os.path.dirname(destination), 0) + """<script type='text/javascript'>
+function updateStream() {
+    var element = document.getElementById("stream");
+    if (element) {
+      var rect = element.getBoundingClientRect();
+      var threshold = 0;
+      if (rect.bottom > threshold && (window.innerHeight - rect.top) > threshold) {
+        var url = element.getAttribute("title");
+        var xmlHttp = new XMLHttpRequest();
+        xmlHttp.open("GET", url, true);
+        xmlHttp.onreadystatechange = function () {
+            if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
+                element.insertAdjacentHTML('beforebegin', xmlHttp.responseText);
+                element.parentNode.removeChild(element);
+                updateStream();
+            }
+        };
+        xmlHttp.send(null);
+      }
+    }
+}
+updateStream();
+window.addEventListener('scroll', function(e) {
+    updateStream();
+});
+</script>
+"""
     view["pages"] = []
     for page in configuration["pages"]:
         active = ("content" + page["url"]).rstrip('/') == os.path.dirname(source)

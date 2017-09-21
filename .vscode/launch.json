@@ -6,9 +6,7 @@
             "type": "node",
             "request": "launch",
             "program": "${workspaceRoot}/tools/generator.js",
-            "env": {
-                "NODE_ENV": "development"
-            }
+            "cwd": "${workspaceRoot}"
         },
         {
             "name": "go",
@@ -16,23 +14,19 @@
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceRoot}/tools/generator.go",
-            "env": {
-                "GO_ENV": "development"
-            }
+            "cwd": "${workspaceRoot}"
         },
         {
             "name": "python",
             "type": "python",
             "request": "launch",
             "program": "${workspaceRoot}/tools/generator.py",
+            "cwd": "${workspaceRoot}",
             "debugOptions": [
                 "WaitOnAbnormalExit",
                 "WaitOnNormalExit",
                 "RedirectOutput"
             ],
-            "env": {
-                "PYTHON_ENV": "development"
-            }
         }
     ]
 }
