@@ -17,7 +17,7 @@
     { "name": "RSS",      "symbol": "&#xe271;", "url": "http://feeds.feedburner.com/lutzroeder" }
   ],
   "pages": [
-    { "name": "Blog",     "url": "/" },
-    { "name": "Projects", "url": "/projects" }
+    { "name": "Blog",     "url": "/",         "visible": true },
+    { "name": "Projects", "url": "/projects", "visible": true }
   ]
 }

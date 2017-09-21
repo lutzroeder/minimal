@@ -295,6 +295,13 @@ function renderPage(source, destination) {
     view["blog"] = function() {
         return renderBlog(posts(), path.dirname(destination), 0);
     };
+    view["pages"] = [];
+    configuration["pages"].forEach(function (page) {
+        var active = ("content" + page["url"]).replace(/\/$/, "") == path.dirname(source)
+        if (active || page["visible"]) {
+            view["pages"].push({ "name": page["name"], "url": page["url"], "active": active });
+        }
+    });
     var data = mustache(template, view, function(name) {
         return fs.readFileSync(theme() + "/" + name, "utf-8");
     });    

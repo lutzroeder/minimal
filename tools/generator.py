@@ -274,8 +274,12 @@ def render_page(source, destination):
         return
     template = read_file(os.path.join("./", source))
     view = merge([ configuration ])
-    view["host"] = configuration["host"]
     view["blog"] = lambda: render_blog(posts(), os.path.dirname(destination), 0)
+    view["pages"] = []
+    for page in configuration["pages"]:
+        active = ("content" + page["url"]).rstrip('/') == os.path.dirname(source)
+        if active or ("visible" in page and page["visible"]):
+            view["pages"].append({"name": page["name"], "url": page["url"], "active": active })
     data = mustache(template, view, lambda name: read_file(theme() + "/" + name))
     write_file(destination, data)
 

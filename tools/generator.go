@@ -423,6 +423,15 @@ func renderPage(source string, destination string) {
 		view["blog"] = func() string {
 			return renderBlog(posts(), path.Dir(destination), 0)
 		}
+		pages := make([]interface{}, 0)
+		for _, item := range configuration["pages"].([]interface{}) {
+			page := item.(map[string]interface{})
+			active := strings.TrimSuffix("content" + page["url"].(string), "/") == path.Dir(source)
+			if visible, ok := page["visible"].(bool); (ok && visible) || active{
+				pages = append(pages, map[string]interface{}{ "name": page["name"].(string), "url": page["url"].(string), "active": active })
+			}
+		}
+		view["pages"] = pages
 		data := mustache(string(template), view, func(name string) string {
 			data, err := ioutil.ReadFile(path.Join(theme(), name))
 			if err != nil {
