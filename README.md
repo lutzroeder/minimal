@@ -18,6 +18,6 @@ To build locally and launch a simple web server run **either** of the following:
 
 ## Deployment
 
-To deploy to a production enviroment set the `deployment` method in `./task.cfg` and update the corresponding `.cfg` file in the `./deploy` folder, then run `./task deploy` to initiate the build and deploy.
+To deploy to a production enviroment set the `deployment` method in `./task.cfg` and update the corresponding `.cfg` file in the `./deploy` folder, then run `./task deploy` to build and deploy the site.
 
 To host the repository on [Netlify](http://www.netlify.com) set the build command to `./task deploy netlify` and the publish directory to `build`.

@@ -1,6 +1,12 @@
 #!/bin/bash
 
-source "${BASH_SOURCE[0]}.cfg"
+if [ -f "${BASH_SOURCE[0]}.cfg" ]; then
+    source "${BASH_SOURCE[0]}.cfg"
+fi
+
+if [ -z "${generator}" ]; then
+    generator=node
+fi
 
 bold() {
     echo "$(tty -s && tput bold)$1$(tty -s && tput sgr0)" 
@@ -13,13 +19,11 @@ error() {
 client_build() {
     generator=${1:-${generator}}
     shift
-    if [ ${generator} = "go" ]; then 
-        go run tools/generator.go build $@
-    elif [ ${generator} = "python" ]; then
-        python tools/generator.py build $@
-    elif [ ${generator} = "node" ]; then
-        node tools/generator.js build $@
-    fi
+    case "${generator}" in
+        "go") go run tools/generator.go build $@;;
+        "python") python tools/generator.py build $@;;
+        "node") node tools/generator.js build $@;;
+    esac
 }
 
 client_start() {
@@ -27,13 +31,11 @@ client_start() {
     generator=${1:-${generator}}
     shift
     client_build ${generator} $@
-    if [ ${generator} = "go" ]; then
-        server="go run tools/server.go"
-    elif [ ${generator} = "python" ]; then
-        server="python tools/server.py"
-    elif [ ${generator} = "node" ]; then
-        server="node tools/server.js"
-    fi
+    case "${generator}" in
+        "go") server="go run tools/server.go";;
+        "python") server="python tools/server.py";;
+        "node") server="node tools/server.js";;
+    esac
     if [ ! -z "${server}" ]; then
         server="${server} build --port 8080 --index-page index.html --not-found-page 404.html --redirect-map redirect.map --browse"
         ${server} 
