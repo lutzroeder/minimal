@@ -1,5 +1,5 @@
-/wp-login.php                             /
-/atom.xml                                 /blog/feed.atom
-/rss.xml                                  /blog/feed.rss
-/blog/atom.xml                            /blog/feed.atom
-/blog/rss.xml                             /blog/feed.rss
+/wp-login.php  /               301
+/atom.xml      /blog/feed.atom 301
+/rss.xml       /blog/feed.rss  301
+/blog/atom.xml /blog/feed.atom 301
+/blog/rss.xml  /blog/feed.rss  301

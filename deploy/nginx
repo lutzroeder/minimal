@@ -71,7 +71,15 @@ cat << EOF >> "${site}.conf"
         index index.html;
 EOF
 if [ -f "redirect.map" ]; then
-    sed 's/\([^ ]*\)\( *\)\([^ ]*\)/        rewrite ^\1$ \3 permanent;/g' redirect.map >> "${site}.conf"
+    cat redirect.map | while read line; do
+        read -ra columns <<< "$line"
+        if [ ${columns[2]} == "301" ]; then
+            echo "        rewrite ^${columns[0]}$ ${columns[1]} permanent;" >> "${site}.conf"
+        fi
+        if [ ${columns[2]} == "302" ]; then
+            echo "        rewrite ^${columns[0]}$ ${columns[1]} redirect;" >> "${site}.conf"
+        fi
+    done
 fi
 cat << EOF >> "${site}.conf"
         error_page 404 /404.html;
