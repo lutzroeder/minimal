@@ -7,10 +7,6 @@ var http = require("http");
 var path = require("path");
 var process = require("process");
 
-function theme() {
-    return "themes/" + (configuration["theme"] || "default");
-}
-
 var entityMap = {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;", "/": "&#x2F;", "`": "&#x60;", "=": "&#x3D;"
 };
@@ -213,7 +209,7 @@ function renderBlog(folders, root, page) {
         var data = renderBlog(folders, root, page);
         fs.writeFileSync(destination, data);
     }
-    var template = fs.readFileSync(theme() + "/feed.html", "utf-8");
+    var template = fs.readFileSync("themes/" + theme + "/feed.html", "utf-8");
     return mustache(template, view, null);
 }
 
@@ -275,9 +271,9 @@ function renderPost(source, destination) {
             }
             item["author"] = item["author"] || configuration["name"];
             var view = merge(configuration, item);
-            var template = fs.readFileSync(theme() + "/post.html", "utf-8");
+            var template = fs.readFileSync("themes/" + theme + "/post.html", "utf-8");
             var data = mustache(template, view, function(name) {
-                return fs.readFileSync(theme() + "/" + name, "utf-8");
+                return fs.readFileSync("themes/" + theme + "/" + name, "utf-8");
             });
             fs.writeFileSync(destination, data);
             return true;
@@ -329,7 +325,7 @@ window.addEventListener('scroll', function(e) {
         }
     });
     var data = mustache(template, view, function(name) {
-        return fs.readFileSync(theme() + "/" + name, "utf-8");
+        return fs.readFileSync("themes/" + theme + "/" + name, "utf-8");
     });    
     fs.writeFileSync(destination, data);
 }
@@ -398,11 +394,12 @@ var environment = process.env["ENVIRONMENT"];
 console.log("node " + process.version + " " + environment);
 var configuration = JSON.parse(fs.readFileSync("content.json", "utf-8"));
 var destination = "build";
+var theme = "default";
 var args = process.argv.slice(2)
 while (args.length > 0) {
     var arg = args.shift();
     if (arg == "--theme" && args.length > 0) {
-        configuration["theme"] = args.shift();
+        theme = args.shift();
     }
     else {
         destination = arg;

@@ -19,9 +19,6 @@ else:
     from urlparse import urlparse
     from urlparse import parse_qs
 
-def theme():
-    return "themes/" + (configuration["theme"] if "theme" in configuration else "default");
-
 entity_map = {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;",
     "'": "&#39;", "/": "&#x2F;", "`": "&#x60;", "=": "&#x3D;"
@@ -207,7 +204,7 @@ def render_blog(folders, root, page):
         destination = root + "/" + location
         data = render_blog(folders, root, page)
         write_file(destination, data)
-    template = read_file(theme() + "/feed.html")
+    template = read_file("themes/" + theme + "/feed.html")
     return mustache(template, view, None)
 
 def render_post(source, destination):
@@ -224,8 +221,8 @@ def render_post(source, destination):
             if "telemetry" in configuration:
                 item["telemetry"] = mustache(configuration["telemetry"], item, None)
             view = merge([ configuration, item ])
-            template = read_file(theme() + "/post.html")
-            data = mustache(template, view, lambda name: read_file(theme() + "/" + name))
+            template = read_file("themes/" + theme + "/post.html")
+            data = mustache(template, view, lambda name: read_file("themes/" + theme + "/" + name))
             write_file(destination, data)
             return True
     return False
@@ -308,7 +305,7 @@ window.addEventListener('scroll', function(e) {
         active = ("content" + page["url"]).rstrip('/') == os.path.dirname(source)
         if active or ("visible" in page and page["visible"]):
             view["pages"].append({"name": page["name"], "url": page["url"], "active": active })
-    data = mustache(template, view, lambda name: read_file(theme() + "/" + name))
+    data = mustache(template, view, lambda name: read_file("themes/" + theme + "/" + name))
     write_file(destination, data)
 
 def render_file(source, destination):
@@ -348,11 +345,12 @@ print("python " + platform.python_version() + " " + (environment if environment 
 with open("content.json") as configurationFile:
     configuration = json.load(configurationFile)
 destination = "build"
+theme = "default"
 args = sys.argv[1:]
 while len(args) > 0:
     arg = args.pop(0)
     if arg == "--theme" and len(args) > 0:
-        configuration["theme"] = args.pop(0)
+        theme = args.pop(0)
     else:
         destination = arg
 clean_directory(destination)

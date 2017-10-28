@@ -4,9 +4,22 @@ if [ -f "${BASH_SOURCE[0]}.cfg" ]; then
     source "${BASH_SOURCE[0]}.cfg"
 fi
 
-if [ -z "${generator}" ]; then
-    generator=node
-fi
+command="$1" && shift
+
+while (( "$#" )); do
+    argument="$1" && shift
+    case ${argument} in
+        "--runtime") runtime=$1 && shift;;
+        "--theme") theme=$1 && shift;;
+        "--target") target=$1 && shift;;
+        "--output") output=$1 && shift;;
+        *) output=${argument}
+    esac
+done
+
+runtime=${runtime:-node}
+theme=${theme:-default}
+output=${output:-build}
 
 bold() {
     echo "$(tty -s && tput bold)$1$(tty -s && tput sgr0)" 
@@ -17,56 +30,45 @@ error() {
 }
 
 client_build() {
-    generator=${1:-${generator}}
     shift
-    case "${generator}" in
-        "go") go run tools/generator.go build $@;;
-        "python") python tools/generator.py build $@;;
-        "node") node tools/generator.js build $@;;
+    case "${runtime}" in
+        "go") go run tools/generator.go ${output} --theme ${theme};;
+        "python") python tools/generator.py ${output} --theme ${theme};;
+        "node") node tools/generator.js ${output} --theme ${theme};;
     esac
 }
 
 client_start() {
     export ENVIRONMENT=development
-    generator=${1:-${generator}}
     shift
-    client_build ${generator} $@
-    case "${generator}" in
-        "go") server="go run tools/server.go";;
-        "python") server="python tools/server.py";;
-        "node") server="node tools/server.js";;
+    client_build
+    server="${output} --port 8080 --index-page index.html --not-found-page 404.html --redirect-map redirect.map --browse"
+    case "${runtime}" in
+        "go") go run tools/server.go ${server};;
+        "python") python tools/server.py ${server};;
+        "node") node tools/server.js ${server};;
     esac
-    if [ ! -z "${server}" ]; then
-        server="${server} build --port 8080 --index-page index.html --not-found-page 404.html --redirect-map redirect.map --browse"
-        ${server} 
-    fi
 }
 
 client_deploy() {
     export ENVIRONMENT=production
     bold "build"
-    deployment=${1:-${deployment}}
-    shift
-    client_build ${generator} $@
+    client_build
     bold "deploy"
-    if [ ! -z "${deployment}" ]; then
-        deploy/${deployment} deploy $@
+    if [ ! -z "${target}" ]; then
+        deploy/${target} deploy $@
     fi
 }
 
 client_log() {
-    deployment=${1:-${deployment}}
-    shift
-    if [ ! -z "${deployment}" ]; then
-        deploy/${deployment} log
+    if [ ! -z "${target}" ]; then
+        deploy/${target} log
     fi
 }
 
 client_console() {
-    deployment=${1:-${deployment}}
-    shift
-    if [ ! -z "${deployment}" ]; then
-        deploy/${deployment} console
+    if [ ! -z "${target}" ]; then
+        deploy/${target} console
     fi
 }
 
@@ -78,26 +80,24 @@ client_watch() {
             if [ -z "$(which fswatch)" ]; then
                 brew install fswatch
             fi
-            fswatch -r -o . -e build | while read; do ./task build; done
+            fswatch -r -o . -e "${output}" | while read; do ./task build; done
             ;;
     esac
 }
 
 client_test() {
-    rm -rf build/*
+    rm -rf ${output}/*
     bold "node"
-    ENVIRONMENT=production node tools/generator.js build/node
+    ENVIRONMENT=production node tools/generator.js ${output}/node --theme ${theme}
     bold "go"
-    ENVIRONMENT=production go run tools/generator.go build/go
+    ENVIRONMENT=production go run tools/generator.go ${output}/go --theme ${theme}
     bold "python"
-    ENVIRONMENT=production python tools/generator.py build/python
+    ENVIRONMENT=production python tools/generator.py ${output}/python --theme ${theme}
     bold "compare"
-    diff --brief -r build/node/ build/go/
-    diff --brief -r build/node/ build/python/
+    diff --brief -r ${output}/node/ ${output}/go/
+    diff --brief -r ${output}/node/ ${output}/python/
 }
 
-command="$1"
-shift
 case "${command}" in
     "build") client_build $@;;
     "start") client_start $@;;
@@ -108,7 +108,7 @@ case "${command}" in
     "test") client_test;;
     *)
         echo;
-        echo "Usage: $(tty -s && tput bold)$(basename "$0")$(tty -s && tput sgr0) <command>"
+        echo "Usage: $(tty -s && tput bold)$(basename "$0")$(tty -s && tput sgr0) <command> <options>"
         echo
         echo "    build      Build the website"
         echo "    start      Build and launch simple local web server"

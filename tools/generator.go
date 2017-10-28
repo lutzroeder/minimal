@@ -19,13 +19,8 @@ import (
 
 var configuration map[string]interface{}
 var environment string
-
-func theme() string {
-	if value, ok := configuration["theme"]; ok {
-		return path.Join("themes", value.(string))
-	}
-	return "themes/default"
-}
+var destination = "build"
+var theme = "default"
 
 var entityMap = strings.NewReplacer(
 	`&`, "&amp;", `<`, "&lt;", `>`, "&gt;", `"`, "&quot;", `'`, "&#39;", `/`, "&#x2F;", "`", "&#x60;", `=`, "&#x3D;",
@@ -295,7 +290,7 @@ func renderBlog(folders []string, root string, page int) string {
 		ioutil.WriteFile(destination, []byte(data), os.ModePerm)
 	}
 	view["placeholder"] = placeholder
-	template, err := ioutil.ReadFile(path.Join(theme(), "feed.html"))
+	template, err := ioutil.ReadFile(path.Join("themes/"+theme+"/feed.html"))
 	if err != nil {
 		fmt.Println(err)
 		return ""
@@ -324,12 +319,12 @@ func renderPost(source string, destination string) bool {
 				item["author"] = configuration["name"].(string)
 			}
 			view := merge(configuration, item)
-			template, err := ioutil.ReadFile(theme() + "/post.html")
+			template, err := ioutil.ReadFile("themes/" + theme + "/post.html")
 			if err != nil {
 				fmt.Println(err)
 			} else {
 				data := mustache(string(template), view, func(name string) string {
-					data, err := ioutil.ReadFile(theme() + "/" + name)
+					data, err := ioutil.ReadFile("themes/" + theme + "/" + name)
 					if err != nil {
 						fmt.Println(err)
 						return ""
@@ -460,7 +455,7 @@ window.addEventListener('scroll', function(e) {
 		}
 		view["pages"] = pages
 		data := mustache(string(template), view, func(name string) string {
-			data, err := ioutil.ReadFile(path.Join(theme(), name))
+			data, err := ioutil.ReadFile("themes/" + theme + "/" + name)
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -521,13 +516,12 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	destination := "build"
 	args := os.Args[1:]
 	for len(args) > 0 {
 		arg := args[0]
 		args = args[1:]
 		if arg == "--theme" && len(args) > 0 {
-			configuration["theme"] = args[0]
+			theme = args[0]
 			args = args[1:]
 		} else {
 			destination = arg;
