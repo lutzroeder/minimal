@@ -30,7 +30,6 @@ error() {
 }
 
 client_build() {
-    shift
     case "${runtime}" in
         "go") go run tools/generator.go ${output} --theme ${theme};;
         "python") python tools/generator.py ${output} --theme ${theme};;
@@ -40,13 +39,12 @@ client_build() {
 
 client_start() {
     export ENVIRONMENT=development
-    shift
     client_build
-    server="${output} --port 8080 --index-page index.html --not-found-page 404.html --redirect-map redirect.map --browse"
+    arguments="${output} --port 8080 --index-page index.html --not-found-page 404.html --redirect-map redirect.map --browse"
     case "${runtime}" in
-        "go") go run tools/server.go ${server};;
-        "python") python tools/server.py ${server};;
-        "node") node tools/server.js ${server};;
+        "go") go run tools/server.go ${arguments};;
+        "python") python tools/server.py ${arguments};;
+        "node") node tools/server.js ${arguments};;
     esac
 }
 
@@ -54,8 +52,8 @@ client_deploy() {
     export ENVIRONMENT=production
     bold "build"
     client_build
-    bold "deploy"
     if [ ! -z "${target}" ]; then
+        bold "deploy"
         deploy/${target} deploy $@
     fi
 }
