@@ -68,13 +68,13 @@ client_console() {
 
 client_watch() {
     export ENVIRONMENT=development
-    ./task build
+    client_build
     case "$(uname -s)" in
         Darwin*) 
             if [ -z "$(which fswatch)" ]; then
                 brew install fswatch
             fi
-            fswatch -r -o . -e "${output}" | while read; do ./task build; done
+            fswatch -r -o . -e "${output}" | while read; do client_build; done
             ;;
     esac
 }
