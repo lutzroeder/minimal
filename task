@@ -25,10 +25,6 @@ bold() {
     echo "$(tty -s && tput bold)$1$(tty -s && tput sgr0)" 
 }
 
-error() { 
-    echo "$(tty -s && tput bold)$(tty -s && tput setaf 1)$1$(tty -s && tput sgr0)" 
-}
-
 client_build() {
     case "${runtime}" in
         "go") go run tools/generator.go ${output} --theme ${theme};;
