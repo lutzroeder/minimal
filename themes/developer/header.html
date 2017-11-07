@@ -1,0 +1,19 @@
+<div class='header'>
+<div class='profile'>
+<a class='portrait' href='/'><img src='/portrait.jpg' /></a>
+<div class='name'><a href='/'>{{name}}</a></div>
+<div class='bio'>{{{bio}}}</div>
+<div class='links'>
+{{#links}}
+<a class='icon' target='_blank' href='{{{url}}}' title='{{name}}'><span class='symbol'>{{{symbol}}}</span></a>
+{{/links}}
+</div>
+</div>
+</div>
+<nav class='navigation'>
+<ul class='tabs' id='tabs'>
+{{#pages}}
+<li class='tab'><a {{#active}}class='active'{{/active}} href='{{{url}}}'>{{{name}}}</a></li>
+{{/pages}}
+</ul>
+</nav>

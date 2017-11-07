@@ -1,0 +1,34 @@
+html {
+font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; "Helvetica Neue", sans-serif;
+}
+body { max-width: 980px !important; margin: 80px auto 80px auto; background-color: #fff; }
+.post { margin: 0 auto; box-sizing: border-box; }
+.header { display: block; font-size: 14px; background-color: #f6f8fa; line-height: 20px; border: 1px solid rgba(27, 31, 35, 0.15); border-radius: 3px 3px 0 0; padding: 10px; margin-bottom: -1px; }
+.header .image { display: inline-block !important; text-decoration: none; }
+.header .image .portrait { display: inline-block; border-radius: 2px; width: 20px; height: 20px; vertical-align: middle; margin-top: -2px; }
+.header .author { font-weight: 600; color: #24292e; text-decoration: none; }
+.header .author:hover { text-decoration: underline; }
+.header .date { float: right; font-size: 13px; color: #586069; }
+.article { padding: 45px; border: 1px solid #ddd; border-bottom-right-radius: 3px; border-bottom-left-radius: 3px; border-top: 0px; }
+.post h1 { font-weight: 600; font-size: 2.0em; line-height: 1.25; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; margin-top: 0px; margin-bottom: 16px; }
+.post h2 { font-weight: 600; font-size: 1.5em; line-height: 1.25; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; margin-top: 24px; margin-bottom: 16px; }
+.post h3 { font-weight: 600; font-size: 1.25em; line-height: 1.25; padding-bottom: 0.3em; margin-top: 24px; margin-bottom: 16px; }
+.post .content { font-size: 16px; line-height: 1.5; word-break: break-word; word-wrap: break-word; }
+.post .content p { margin: 10px 0 16px 0; }
+.post .content a, .post p a:visited, .post p a:link, .post p a:active { color: #0366d6; text-decoration: underline; }
+.post .content code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; font-size: 85%; background-color: rgba(27, 31, 35, 0.05); padding: 0.2em 0 0.2em 0; border-radius: 3px; content: "\00a0" }
+.post .content code::before { letter-spacing: -0.2em; content: "\00a0" }
+.post .content code::after { letter-spacing: -0.2em; content: "\00a0" }
+.post .content pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; font-size: 86%; line-height: 1.45; background-color: #f6f8fa; color: #333333; padding: 16px; border-radius: 3px; overflow: auto; word-break: normal; word-wrap: normal; margin: 16px 0 16px 0; }
+@media only screen and (min-device-pixel-ratio:2), only screen and (min-resolution:2dppx), only screen and (-webkit-min-device-pixel-ratio:2) {
+.post .content code a, .post code a:visited, .post code a:link, .post code a:active { background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 25%, rgba(0, 0, 0, 0) 25%); }
+}
+@media all and (max-width: 767px) {
+.post { margin-right: 20px; margin-left: 20px; }
+.post h1 { font-size: 28px; line-height: 1.3; margin-left: -1.75px; margin-bottom: 8px; }
+.post h2 { font-size: 22px; line-height: 1.3; margin-left: -1.75px; margin-bottom: 8px; }
+.post h3 { font-size: 18px; line-height: 1.3; margin-left: -1.75px; margin-bottom: 8px; }
+.post .content { font-size: 16px; line-height: 1.8; }
+.post .content p { margin: 8px 0 14px 0; }
+.post .content code { font-size: 14px; }
+}

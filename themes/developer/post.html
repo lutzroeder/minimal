@@ -1,0 +1,23 @@
+<html>
+<head>
+<title>{{title}}</title>
+{{>meta.html}}
+<style type='text/css'>
+{{>post.css}}
+</style>
+</head>
+<body>
+<div class='post'>
+<div class='header'>
+  <a class='image' href='/'><img class='portrait' src='/portrait.jpg' /></a>
+  <a class='author' href='/'>{{author}}</a><span class='date'>{{date}}</span>
+</div>
+<article class='article'>
+  <h1>{{title}}</h1>
+  <div class='content'>
+  {{{content}}}
+  </div>
+</article>
+</div>
+</body>
+</html>
