@@ -10,8 +10,10 @@ body { max-width: 980px; margin: 96px auto 96px auto; padding: 0 50px 0 50px; ba
 .header a.icon:link, .header a.icon:visited, .header a.icon:active { text-decoration: none; }
 .header a.icon:hover { color: #333333; text-decoration: none; }
 .header .profile { max-width: 230px; box-sizing: border-box; }
-.header .profile .name { font-size: 26px; font-weight: 600; line-height: 30px; color: #24292e; box-sizing: border-box; padding: 16px 0 16px 0; }
+.header .profile .name { font-size: 26px; font-weight: 600; line-height: 30px; color: #24292e; box-sizing: border-box; padding: 246px 0 16px 0; }
 .header .profile .bio { font-size: 14px; color: #6a737d; line-height: 1.5; margin-top: 24px; display: block; }
+.header .profile .portrait { position: absolute; }
+.header .profile .portrait:after { display: block; content: ''; border-radius: 6px; content: ''; border: 1px solid rgba(0, 0, 0, .1); position: absolute; left: 0; right: 0; top: 0; bottom: 0; }
 .header .profile .portrait img { overflow: hidden; border-radius: 6px; width: 229px; height: 230px; }
 .header .profile .links { font-size: 14px; color: #8f8f8f; margin-top: 20px; padding-top: 18px; vertical-align: center; line-height: 25px; height: 26px; border-top: 1px #e1e4e8 solid; }
 .header .symbol { font-family: "Mono Social Icons Font"; font-size: 20px; text-rendering: optimizeLegibility; }
@@ -38,6 +40,16 @@ body { max-width: 980px; margin: 96px auto 96px auto; padding: 0 50px 0 50px; ba
 .placeholder { box-sizing: border-box; max-width: 727px; margin-left: 253px; padding: 24px 24px 24px 24px; }
 .center { box-sizing: border-box; max-width: 727px; margin-left: 253px; padding: 0 24px 24px 24px; }
 .center h1 { font-size: 16px; font-weight: 600; }
+@media all and (max-width: 950px) {
+.header .profile { max-width: 180px; }
+.header .profile .name { padding-top: 196px; }
+.header .profile .bio { margin-top: 14px; }
+.header .profile .portrait img { width: 179px; height: 179px; }
+.navigation { margin-left: 203px; }
+.item { margin-left: 203px; }
+.placeholder { margin-left: 253px; }
+.center { margin-left: 253px; }
+}
 @media all and (max-width: 767px) {
 body { max-width: 100%; width: 100%; margin: 0; padding: 0; }
 .header { float: none; padding: 15px; background-color: #fafbfc; }
@@ -56,6 +68,11 @@ body { max-width: 100%; width: 100%; margin: 0; padding: 0; }
 .card h1 { font-size: 1.17em; line-height: 1.25; }
 .placeholder { width: auto; margin: 15px; }
 .center { width: auto; margin: 15px; padding: 0; }
+}
+@media all and (max-width: 550px) {
+.item .portrait { display: none; } 
+.item .logo { display: none; }
+.item .date { display: none; }
 }
 @font-face {
 font-family: 'Mono Social Icons Font';
