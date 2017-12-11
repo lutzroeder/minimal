@@ -3,9 +3,10 @@
 import codecs
 import mimetypes
 import os
-import platform
 import re
 import sys
+import threading
+import webbrowser
 
 if sys.version_info[0] > 2:
     from urllib.parse import urlparse
@@ -101,13 +102,10 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
 server = HTTPServer(("localhost", port), HTTPRequestHandler)
 url = "http://localhost:" + str(port)
 print("Serving '" + folder + "' at " + url + "...")
-
 if browse:
-    command = "xdg-open";
-    if platform.system() == "Darwin":
-        command = "open"
-    elif platform.system() == "Windows":
-        command = 'start ""'
-    os.system(command + ' "' + url.replace('"', '\"') + '"')
+    threading.Timer(1, webbrowser.open, args=(url,)).start()
 sys.stdout.flush()
-server.serve_forever()
+try:
+    server.serve_forever()
+except (KeyboardInterrupt, SystemExit):
+    server.server_close()
