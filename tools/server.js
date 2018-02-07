@@ -8,16 +8,23 @@ var child_process = require('child_process');
 
 var mimeTypeMap = {
     ".html": "text/html",
-    ".js":   "text/javascript",
-    ".css":  "text/css",
-    ".png":  "image/png",
-    ".gif":  "image/gif",
-    ".jpg":  "image/jpeg",
-    ".ico":  "image/x-icon",
-    ".rss":  "application/rss+xml",
-    ".atom": "application/atom+xml",
-    ".json": "application/json",
-    ".zip":  "application/zip"
+    ".js":    "text/javascript",
+    ".css":   "text/css",
+    ".png":   "image/png",
+    ".gif":   "image/gif",
+    ".jpg":   "image/jpeg",
+    ".ico":   "image/x-icon",
+    ".rss":   "application/rss+xml",
+    ".atom":  "application/atom+xml",
+    ".json":  "application/json",
+    ".zip":   "application/zip",
+    ".svg":   "image/svg+xml",
+    ".ttf":   "font/truetype",
+    ".woff":  "font/woff",
+    ".otf":   "font/opentype",
+    ".eot":   "application/vnd.ms-fontobject",
+    ".woff":  "application/font-woff",
+    ".woff2": "application/font-woff2"
 };
 
 var folder = ".";
