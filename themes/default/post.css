@@ -25,13 +25,9 @@ body { margin: 85px 0 85px 0; }
 .post h3 { font-family: "Merriweather Sans", "Open Sans", "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Geneva, Verdana, sans-serif; font-weight: bold; font-size: 20px; line-height: 34px; letter-spacing: -0.06em; margin: 30px 0 10px -2.25px; }
 .post .content { font-family: "Merriweather", Georgia, Cambria, "Times New Roman", Times, serif; font-size: 18px; line-height: 1.88; letter-spacing: 0.01em; word-break: break-word; word-wrap: break-word; }
 .post .content p { margin: 10px 0 16px 0; }
-.post .content a, .post p a:visited, .post p a:link, .post p a:active { color: inherit; text-decoration: none; background-size: 2px 2px; background-position: 0 22px; background-repeat: repeat-x; background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.6) 50%); }
+.post .content a, .post p a:visited, .post p a:link, .post p a:active { color: inherit; text-decoration: none; background-repeat: repeat-x; background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 50%, #333333 50%); background-position: 0 1.15em; background-size: 2px 2px; }
 .post .content code { font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", Courier, monospace; font-size: 16px; background-color: #f3f3f3; color: #333333; padding: 4px; border-radius: 3px; }
 .post .content pre { font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", Courier, monospace; font-size: 16px; line-height: 1.4; background-color: #f3f3f3; color: #333333; padding: 12px; border-radius: 3px; overflow: auto; word-break: normal; word-wrap: normal; margin: 16px 0 16px 0; }
-@media only screen and (min-device-pixel-ratio:2), only screen and (min-resolution:2dppx), only screen and (-webkit-min-device-pixel-ratio:2) {
-.post .content a, .post p a:visited, .post p a:link, .post p a:active { background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 25%, rgba(0, 0, 0, 0) 25%); }
-.post .content code a, .post code a:visited, .post code a:link, .post code a:active { background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 25%, rgba(0, 0, 0, 0) 25%); }
-}
 @media all and (max-width: 767px) {
 .post { margin-right: 20px; margin-left: 20px; }
 .post h1 { font-size: 28px; line-height: 1.3; margin-left: -1.75px; letter-spacing: -0.05em; margin-bottom: 8px; }
@@ -39,6 +35,20 @@ body { margin: 85px 0 85px 0; }
 .post h3 { font-size: 18px; line-height: 1.3; margin-left: -1.75px; letter-spacing: -0.05em; margin-bottom: 8px; }
 .post .content { font-size: 16px; line-height: 1.8; letter-spacing: -0.004em; }
 .post .content p { margin: 8px 0 14px 0; }
-.post .content p a, .post p a:visited, .post p a:link, .post p a:active { background-position: 0 19px; }
 .post .content code { font-size: 14px; }
+}
+@media (prefers-color-scheme: dark) {
+body { background-color: #2d2d2d; }
+.header .author { color: #aaaaaa; }
+.header .date { color: #666666; }
+.post h1 { color: #dfdfdf; }
+.post h2 { color: #dfdfdf; }
+.post h3 { color: #dfdfdf; }
+.post .content { color: #aaaaaa; }
+.post .content code { background-color: #1e1e1e; color: #aaaaaa; }
+.post .content pre { background-color: #1e1e1e; color: #aaaaaa; }
+.post .content a, .post p a:visited, .post p a:link, .post p a:active { background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 50%, #8f8f8f 50%); }
+}
+@media only screen and (min-device-pixel-ratio:2), only screen and (min-resolution:2dppx), only screen and (-webkit-min-device-pixel-ratio:2) {
+.post .content a, .post p a:visited, .post p a:link, .post p a:active { background-size: 2px 1px; }
 }
