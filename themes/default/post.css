@@ -38,15 +38,15 @@ body { margin: 85px 0 85px 0; }
 .post .content code { font-size: 14px; }
 }
 @media (prefers-color-scheme: dark) {
-body { background-color: #2d2d2d; }
+body { background-color: #1b1b1b; }
 .header .author { color: #aaaaaa; }
 .header .date { color: #666666; }
 .post h1 { color: #dfdfdf; }
 .post h2 { color: #dfdfdf; }
 .post h3 { color: #dfdfdf; }
 .post .content { color: #aaaaaa; }
-.post .content code { background-color: #1e1e1e; color: #aaaaaa; }
-.post .content pre { background-color: #1e1e1e; color: #aaaaaa; }
+.post .content code { background-color: #2d2d2d; color: #aaaaaa; }
+.post .content pre { background-color: #2d2d2d; color: #aaaaaa; }
 .post .content a, .post p a:visited, .post p a:link, .post p a:active { background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 50%, #8f8f8f 50%); }
 }
 @media only screen and (min-device-pixel-ratio:2), only screen and (min-resolution:2dppx), only screen and (-webkit-min-device-pixel-ratio:2) {

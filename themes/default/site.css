@@ -72,15 +72,15 @@ body { margin: 0 0 65px 0; background-color: #f8f8f8; }
 .card .date { display: none; }
 }
 @media (prefers-color-scheme: dark) {
-body { margin: 0 0 65px 0; background-color: #2d2d2d; }
-.header { background-color: #404040; color: #dfdfdf; }
+body { background-color: #111111; }
+.header { background-color: #1b1b1b; color: #dfdfdf; }
 .header a:hover { color: #dfdfdf; }
 .header a.active { color: #aaaaaa; }
 .header a.icon { color: #8c8c8c; }
 .header a.icon:hover { color: #dfdfdf; }
 .header .profile .bio { color: #aaaaaa; }
 .header .profile .links { color: #aaaaaa; }
-.card { border-color: #505050; color: #aaaaaa; background-color: #404040; }
+.card { border-color: #2d2d2d; color: #aaaaaa; background-color: #1b1b1b; }
 .card .date { color: #666666; }
 .card h1 { color: #dfdfdf; }
 .header .navigation .tabs { border-top-color: #505050; }
