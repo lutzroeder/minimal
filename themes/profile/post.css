@@ -2,6 +2,7 @@ html {
 font-family: "SF Optimized", system-ui, -apple-system, BlinkMacSystemFont, ".SFNSText-Regular", sans-serif;
 -ms-text-size-adjust: 100%;
 -webkit-text-size-adjust: 100%;
+text-rendering: optimizeLegibility;
 -webkit-text-rendering: optimizeLegibility;
 -moz-text-rendering: optimizeLegibility;
 -ms-text-rendering: optimizeLegibility;
@@ -10,7 +11,6 @@ font-family: "SF Optimized", system-ui, -apple-system, BlinkMacSystemFont, ".SFN
 -moz-font-smoothing: antialiased;
 -ms-font-smoothing: antialiased;
 -o-font-smoothing: antialiased;
-font-smoothing: antialiased;
 }
 body { margin: 35px 0 35px 0; color: #24292e; background-color: #e9ebee; }
 .post { display: block; max-width: 700px !important; background-color: #fff; color: #1d2129; box-sizing: border-box; margin: 0 auto 17px auto; border-radius: 3px; background-clip: border-box; border: 1px solid #dddfe2; color: #333333; border-color: #e5e6e9 #dfe0e4 #d0d1d5; padding: 16px; }

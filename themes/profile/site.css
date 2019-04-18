@@ -2,6 +2,7 @@ html {
 font-family: "SF Optimized", system-ui, -apple-system, BlinkMacSystemFont, ".SFNSText-Regular", sans-serif;
 -ms-text-size-adjust: 100%;
 -webkit-text-size-adjust: 100%;
+text-rendering: optimizeLegibility;
 -webkit-text-rendering: optimizeLegibility;
 -moz-text-rendering: optimizeLegibility;
 -ms-text-rendering: optimizeLegibility;
@@ -10,7 +11,6 @@ font-family: "SF Optimized", system-ui, -apple-system, BlinkMacSystemFont, ".SFN
 -moz-font-smoothing: antialiased;
 -ms-font-smoothing: antialiased;
 -o-font-smoothing: antialiased;
-font-smoothing: antialiased;
 }
 body { margin: 0 0 65px 0; background-color: #e9ebee; }
 .header { color: #333333; padding-top: 0; margin-bottom: 16px; -webkit-font-smoothing: antialiased; }
