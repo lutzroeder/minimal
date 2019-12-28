@@ -1,6 +1,6 @@
 # Minimal
 
-Minimal is a static personal website and blog generator for Go, Node.js and Python. It has no external dependencies and requires only a few hundred lines of code to run. Everything is minimal, easy to take appart and rewrite.
+Minimal is a static personal website and blog generator for Go, Node.js and Python. It has no external dependencies and requires only a few hundred lines of code to run.
 
 Example blogs are hosted on Netlify using the [default](https://minimal-default.netlify.com), [profile](https://minimal-profile.netlify.com) and [developer](https://minimal-developer.netlify.com) themes.
 
