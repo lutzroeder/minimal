@@ -28,6 +28,10 @@ body { margin: 85px 0 85px 0; }
 .post .content a, .post p a:visited, .post p a:link, .post p a:active { color: inherit; text-decoration: none; background-repeat: repeat-x; background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 50%, #333333 50%); background-position: 0 1.15em; background-size: 2px 2px; }
 .post .content code { font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", Courier, monospace; font-size: 16px; background-color: #f3f3f3; color: #333333; padding: 4px; border-radius: 3px; }
 .post .content pre { font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", Courier, monospace; font-size: 16px; line-height: 1.4; background-color: #f3f3f3; color: #333333; padding: 12px; border-radius: 3px; overflow: auto; word-break: normal; word-wrap: normal; margin: 16px 0 16px 0; }
+.post .content table { border-collapse: collapse; margin-bottom: 24px; }
+.post .content th, td { border: 1px solid #333333; padding: 8px 16px 8px 12px; }
+.post .content th { background-color: #333333; color: #ffffff; text-align: left; }
+}
 @media all and (max-width: 767px) {
 .post { margin-right: 20px; margin-left: 20px; }
 .post h1 { font-size: 28px; line-height: 1.3; margin-left: -1.75px; letter-spacing: -0.05em; margin-bottom: 8px; }
@@ -48,6 +52,8 @@ body { background-color: #1b1b1b; }
 .post .content code { background-color: #2d2d2d; color: #aaaaaa; }
 .post .content pre { background-color: #2d2d2d; color: #aaaaaa; }
 .post .content a, .post p a:visited, .post p a:link, .post p a:active { background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 50%, #8f8f8f 50%); }
+.post .content table, th, td { border-color: 1px solid #aaaaaa; color: #aaaaaa; }
+.post .content th { background-color: #aaaaaa; color: #1b1b1b; border-color: #1b1b1b; }
 }
 @media only screen and (min-device-pixel-ratio:2), only screen and (min-resolution:2dppx), only screen and (-webkit-min-device-pixel-ratio:2) {
 .post .content a, .post p a:visited, .post p a:link, .post p a:active { background-size: 2px 1px; }

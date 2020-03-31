@@ -417,7 +417,7 @@ func renderPage(source string, destination string) {
 		view := merge(configuration)
 		view["blog"] = func() string {
 			return renderBlog(posts(), path.Dir(destination), 0) +
-`<script type='text/javascript'>
+`<script type="text/javascript">
 function updateStream() {
     var element = document.getElementById("stream");
     if (element) {

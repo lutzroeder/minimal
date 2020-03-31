@@ -289,7 +289,7 @@ function renderPage(source, destination) {
     var template = fs.readFileSync(source, "utf-8");
     var view = merge(configuration);
     view["blog"] = function() {
-        return renderBlog(posts(), path.dirname(destination), 0) + `<script type='text/javascript'>
+        return renderBlog(posts(), path.dirname(destination), 0) + `<script type="text/javascript">
 function updateStream() {
     var element = document.getElementById("stream");
     if (element) {
@@ -326,7 +326,7 @@ window.addEventListener('scroll', function(e) {
     });
     var data = mustache(template, view, function(name) {
         return fs.readFileSync("themes/" + theme + "/" + name, "utf-8");
-    });    
+    });
     fs.writeFileSync(destination, data);
 }
 

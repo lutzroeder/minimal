@@ -1,12 +1,12 @@
-<?xml version='1.0' encoding='UTF-8'?>
-<feed xmlns='http://www.w3.org/2005/Atom'>
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
 <title>{{name}}</title>
 <id>{{{host}}}/</id>
 <icon>{{{host}}}/favicon.ico</icon>
 <updated>{{updated}}</updated>
 <author><name>{{name}}</name></author>
-<link rel='alternate' type='text/html' href='{{{host}}}/' />
-<link rel='self' type='application/atom+xml' href='{{{url}}}' />
+<link rel="alternate" type="text/html" href="{{{host}}}/" />
+<link rel="self" type="application/atom+xml" href="{{{url}}}" />
 {{#items}}
 <entry>
 <id>{{{url}}}</id>
@@ -15,9 +15,9 @@
 {{/author}}
 <published>{{date}}</published>
 <updated>{{updated}}</updated>
-<title type='text'>{{title}}</title>
-<content type='html'>{{{content}}}</content>
-<link rel='alternate' type='text/html' href='{{{url}}}' title='{{title}}' />
+<title type="text">{{title}}</title>
+<content type="html">{{{content}}}</content>
+<link rel="alternate" type="text/html" href="{{{url}}}" title="{{title}}" />
 </entry>
 {{/items}}
 </feed>
