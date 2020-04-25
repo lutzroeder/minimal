@@ -61,7 +61,7 @@ body { margin: 0 0 65px 0; background-color: #f8f8f8; }
 .card { padding-left: 20px; padding-right: 20px; }
 }
 @media all and (max-width: 680px) {
-.item { max-width: none; width: auto; border-top: 1px solid rgba(0, 0, 0, .09); box-shadow: 0 1px 4px 0 rgba(0, 0, 0, .04); background-color: #ffffff; }
+.item { max-width: none; width: auto; border-top: 1px solid rgba(0, 0, 0, .09); box-shadow: 0 1px 4px 0 rgba(0, 0, 0, .04); }
 .card { max-width: 640px; width: 100%; padding-left: 20px; padding-right: 20px; margin: 0 auto 0 auto; border-radius: 0; border: 0; box-shadow: none; }
 }
 @media all and (max-width: 640px) {

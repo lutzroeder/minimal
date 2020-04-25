@@ -31,9 +31,8 @@ body { margin: 85px 0 85px 0; }
 .post .content table { border-collapse: collapse; margin-bottom: 24px; }
 .post .content th, td { border: 1px solid #333333; padding: 8px 16px 8px 12px; }
 .post .content th { background-color: #333333; color: #ffffff; text-align: left; }
-}
-@media all and (max-width: 767px) {
-.post { margin-right: 20px; margin-left: 20px; }
+@media all and (max-width: 728px) {
+.post { margin-right: 24px; margin-left: 24px; }
 .post h1 { font-size: 28px; line-height: 1.3; margin-left: -1.75px; letter-spacing: -0.05em; margin-bottom: 8px; }
 .post h2 { font-size: 22px; line-height: 1.3; margin-left: -1.75px; letter-spacing: -0.05em; margin-bottom: 8px; }
 .post h3 { font-size: 18px; line-height: 1.3; margin-left: -1.75px; letter-spacing: -0.05em; margin-bottom: 8px; }
