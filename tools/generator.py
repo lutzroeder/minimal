@@ -184,6 +184,8 @@ def render_blog(folders, root, page):
     while count > 0 and len(folders) > 0:
         folder = folders.pop(0)
         item = load_post("content/blog/" + folder + "/index.html")
+        if "listed" in item and item["listed"] == "false":
+            continue
         if item and (item["state"] == "post" or environment != "production"):
             item["url"] = "blog/" + folder + "/"
             if "date" in item:
@@ -238,7 +240,7 @@ def render_feed(source, destination):
         "author": configuration["name"],
         "host": host,
         "url": url,
-        "items": [] 
+        "items": []
     }
     recent_found = False
     recent = datetime.datetime.now()
