@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+<title>John Smith</title>
+<id>https://lutzroeder.github.io/minimal/default/</id>
+<icon>https://lutzroeder.github.io/minimal/default/favicon.ico</icon>
+<updated>2017-01-01T20:00:00Z</updated>
+<author><name>John Smith</name></author>
+<link rel="alternate" type="text/html" href="https://lutzroeder.github.io/minimal/default/" />
+<link rel="self" type="application/atom+xml" href="https://lutzroeder.github.io/minimal/default/blog/feed.atom" />
+<entry>
+<id>https://lutzroeder.github.io/minimal/default/blog/2017-01-01-welcome/</id>
+<published>2017-01-01T20:00:00Z</published>
+<updated>2017-01-01T20:00:00Z</updated>
+<title type="text">Welcome</title>
+<content type="html">
+&lt;p&gt;
+This is an example blog post.
+&lt;&#x2F;p&gt;
+
+&lt;p&gt;
+This is a block of code.
+&lt;&#x2F;p&gt;</content>
+<link rel="alternate" type="text/html" href="https://lutzroeder.github.io/minimal/default/blog/2017-01-01-welcome/" title="Welcome" />
+</entry>
+</feed>
