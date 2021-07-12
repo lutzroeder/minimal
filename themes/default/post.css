@@ -47,12 +47,12 @@ body { background-color: #1b1b1b; }
 .post h1 { color: #dfdfdf; }
 .post h2 { color: #dfdfdf; }
 .post h3 { color: #dfdfdf; }
-.post .content { color: #aaaaaa; }
-.post .content code { background-color: #2d2d2d; color: #aaaaaa; }
-.post .content pre { background-color: #2d2d2d; color: #aaaaaa; }
+.post .content { color: #cccccc; }
+.post .content code { background-color: #2d2d2d; color: #cccccc; }
+.post .content pre { background-color: #2d2d2d; color: #cccccc; }
 .post .content a, .post p a:visited, .post p a:link, .post p a:active { background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 50%, #8f8f8f 50%); }
-.post .content table, th, td { border-color: 1px solid #aaaaaa; color: #aaaaaa; }
-.post .content th { background-color: #aaaaaa; color: #1b1b1b; border-color: #1b1b1b; }
+.post .content table, th, td { border-color: 1px solid #cccccc; color: #cccccc; }
+.post .content th { background-color: #cccccc; color: #1b1b1b; border-color: #1b1b1b; }
 }
 @media only screen and (min-device-pixel-ratio:2), only screen and (min-resolution:2dppx), only screen and (-webkit-min-device-pixel-ratio:2) {
 .post .content a, .post p a:visited, .post p a:link, .post p a:active { background-size: 2px 1px; }

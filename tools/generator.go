@@ -255,7 +255,7 @@ func loadPost(path string) map[string]interface{} {
 	return nil
 }
 
-func renderBlog(folders []string, root string, page int) string {
+func renderBlog(folders []string, destination string, root string, page int) string {
 	items := make([]interface{}, 0)
 	view := make(map[string]interface{})
 	count := 10
@@ -276,7 +276,7 @@ func renderBlog(folders []string, root string, page int) string {
 			item["content"] = truncated
 			item["more"] = truncated != content
 			items = append(items, item)
-			count--;
+			count--
 		}
 	}
 	view["items"] = items
@@ -284,13 +284,14 @@ func renderBlog(folders []string, root string, page int) string {
 	if len(folders) > 0 {
 		page++
 		location := "blog/page" + strconv.Itoa(page) + ".html"
-		placeholder = append(placeholder, map[string]interface{}{"url": "/" + location })
-		destination := root + "/" + location
-		data := renderBlog(folders, root, page)
-		ioutil.WriteFile(destination, []byte(data), os.ModePerm)
+		placeholder = append(placeholder, map[string]interface{}{"url": root + location})
+		file := destination + "/" + location
+		data := renderBlog(folders, destination, root, page)
+		ioutil.WriteFile(file, []byte(data), os.ModePerm)
 	}
 	view["placeholder"] = placeholder
-	template, err := ioutil.ReadFile(path.Join("themes/"+theme+"/feed.html"))
+	view["root"] = root
+	template, err := ioutil.ReadFile(path.Join("themes/" + theme + "/feed.html"))
 	if err != nil {
 		fmt.Println(err)
 		return ""
@@ -306,7 +307,7 @@ func writeString(response http.ResponseWriter, request *http.Request, contentTyp
 	}
 }
 
-func renderPost(source string, destination string) bool {
+func renderPost(source string, destination string, root string) bool {
 	if strings.HasPrefix(source, "content/blog/") && strings.HasSuffix(source, "/index.html") {
 		item := loadPost(source)
 		if item != nil {
@@ -319,6 +320,7 @@ func renderPost(source string, destination string) bool {
 				item["author"] = configuration["name"].(string)
 			}
 			view := merge(configuration, item)
+			view["root"] = root
 			template, err := ioutil.ReadFile("themes/" + theme + "/post.html")
 			if err != nil {
 				fmt.Println(err)
@@ -336,11 +338,11 @@ func renderPost(source string, destination string) bool {
 			}
 		}
 	}
-	return false;
+	return false
 }
 
 func renderFile(source string, destination string) {
-	data, err := ioutil.ReadFile(source);
+	data, err := ioutil.ReadFile(source)
 	if err == nil {
 		err = ioutil.WriteFile(destination, data, os.ModePerm)
 	}
@@ -386,7 +388,7 @@ func renderFeed(source string, destination string) {
 					item["updated"] = formatDate(updated, format)
 					if !recentFound || recent.Before(updated) {
 						recent = updated
-						recentFound = true;
+						recentFound = true
 					}
 				}
 			}
@@ -406,8 +408,8 @@ func renderFeed(source string, destination string) {
 	}
 }
 
-func renderPage(source string, destination string) {
-	if renderPost(source, destination) {
+func renderPage(source string, destination string, root string) {
+	if renderPost(source, destination, root) {
 		return
 	}
 	template, err := ioutil.ReadFile(source)
@@ -415,9 +417,10 @@ func renderPage(source string, destination string) {
 		fmt.Println(err)
 	} else {
 		view := merge(configuration)
+		view["root"] = root
 		view["blog"] = func() string {
-			return renderBlog(posts(), path.Dir(destination), 0) +
-`<script type="text/javascript">
+			return renderBlog(posts(), path.Dir(destination), root+"../", 0) +
+				`<script type="text/javascript">
 function updateStream() {
     var element = document.getElementById("stream");
     if (element) {
@@ -448,9 +451,11 @@ window.addEventListener('scroll', function(e) {
 		pages := make([]interface{}, 0)
 		for _, item := range configuration["pages"].([]interface{}) {
 			page := item.(map[string]interface{})
-			active := strings.TrimSuffix("content" + page["url"].(string), "/") == path.Dir(source)
-			if visible, ok := page["visible"].(bool); (ok && visible) || active{
-				pages = append(pages, map[string]interface{}{ "name": page["name"].(string), "url": page["url"].(string), "active": active })
+			location := path.Dir(source)
+			target := mustache(page["url"].(string), view, nil)
+			active := path.Join(location, target) == location
+			if visible, ok := page["visible"].(bool); (ok && visible) || active {
+				pages = append(pages, map[string]interface{}{"name": page["name"].(string), "url": page["url"].(string), "active": active})
 			}
 		}
 		view["pages"] = pages
@@ -465,20 +470,20 @@ window.addEventListener('scroll', function(e) {
 	}
 }
 
-func render(source string, destination string) {
+func render(source string, destination string, root string) {
 	fmt.Println(destination)
-	extension := path.Ext(source);
-	switch (extension) {
-		case ".html":
-			renderPage(source, destination);
-		case ".rss", ".atom":
-			renderFeed(source, destination);
-		default:
-			renderFile(source, destination);
+	extension := path.Ext(source)
+	switch extension {
+	case ".rss", ".atom":
+		renderFeed(source, destination)
+	case ".html":
+		renderPage(source, destination, root)
+	default:
+		renderFile(source, destination)
 	}
 }
 
-func renderDir(source string, destination string) { 
+func renderDir(source string, destination string, root string) {
 	os.MkdirAll(destination, os.ModePerm)
 	location := source
 	if items, err := ioutil.ReadDir(location); err == nil {
@@ -486,9 +491,9 @@ func renderDir(source string, destination string) {
 			name := item.Name()
 			if !strings.HasPrefix(name, ".") {
 				if item.IsDir() {
-					renderDir(source + name + "/", destination + "/" + name)
+					renderDir(source+name+"/", destination+"/"+name, root+"../")
 				} else {
-					render(source + name, destination + "/" + name)
+					render(source+name, destination+"/"+name, root)
 				}
 			}
 		}
@@ -524,9 +529,9 @@ func main() {
 			theme = args[0]
 			args = args[1:]
 		} else {
-			destination = arg;
+			destination = arg
 		}
 	}
-	cleanDir(destination);
-	renderDir("content/", destination);
+	cleanDir(destination)
+	renderDir("content/", destination, "")
 }

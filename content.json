@@ -3,20 +3,19 @@
   "name":        "John Smith",
   "bio":         "I explore, I work, and I have hobbies.",
   "description": "Detailed description for search engines.",
-  "host":        "https://minimal-default.netlify.com",
+  "host":        "https://lutzroeder.github.io/minimal/default",
   "analytics":   "<script type=\"text/javascript\"></script>",
   "feeds": [
-    { "type": "application/atom+xml", "url": "{{{host}}}/blog/feed.atom"},
-    { "type": "application/rss+xml",  "url": "{{{host}}}/blog/feed.rss"}
+    { "type": "application/atom+xml", "url": "{{{root}}}blog/feed.atom"},
+    { "type": "application/rss+xml",  "url": "{{{root}}}blog/feed.rss"}
   ],
   "links": [
-    { "name": "Twitter",  "symbol": "&#xe286;", "url": "http://www.twitter.com/lutzroeder" },
-    { "name": "LinkedIn", "symbol": "&#xe252;", "url": "https://www.linkedin.com/in/lutzroeder" },
-    { "name": "GitHub",   "symbol": "&#xe237;", "url": "http://www.github.com/lutzroeder" },
-    { "name": "RSS",      "symbol": "&#xe271;", "url": "http://feeds.feedburner.com/lutzroeder" }
+    { "name": "Twitter", "symbol": "&#xe286;", "url": "https://www.twitter.com/lutzroeder" },
+    { "name": "GitHub",  "symbol": "&#xe237;", "url": "https://github.com/lutzroeder" },
+    { "name": "RSS",     "symbol": "&#xe271;", "url": "{{{root}}}blog/feed.atom" }
   ],
   "pages": [
-    { "name": "Blog",     "url": "/",         "visible": true },
-    { "name": "Projects", "url": "/projects", "visible": true }
+    { "name": "Blog",     "url": "{{{root}}}",         "visible": true },
+    { "name": "Projects", "url": "{{{root}}}projects", "visible": true }
   ]
 }

@@ -1,7 +1,7 @@
 <div class="header">
 <div class="profile">
-<div class="portrait"><a href="/"><img src="/portrait.jpg" /></a></div>
-<div class="name"><a href="/">{{name}}</a></div>
+<div class="portrait"><a href="{{{root}}}"><img src="{{{root}}}portrait.jpg" /></a></div>
+<div class="name"><a href="{{{root}}}">{{name}}</a></div>
 <div class="bio">{{{bio}}}</div>
 <div class="links">
 {{#links}}
@@ -12,7 +12,7 @@
 <nav class="navigation">
 <ul class="tabs" id="tabs">
 {{#pages}}
-<li class="tab"><a {{#active}}class="active"{{/active}} href="{{{url}}}">{{{name}}}</a></li>
+<li class="tab"><a {{#active}}class="active" {{/active}}href="{{{url}}}">{{{name}}}</a></li>
 {{/pages}}
 </ul>
 </nav>

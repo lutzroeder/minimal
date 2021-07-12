@@ -92,6 +92,25 @@ client_test() {
     diff --brief -r ${output}/node/ ${output}/python/
 }
 
+client_demo() {
+    rm -rf ./dist
+    git clone --depth=1 https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_USER}/minimal.git --branch gh-pages ./dist/gh-pages 2>&1 > /dev/null
+    runtime=node
+    output=./dist/gh-pages/default
+    theme=default
+    client_build
+    output=./dist/gh-pages/developer
+    theme=developer
+    client_build
+    output=./dist/gh-pages/profile
+    theme=profile
+    client_build
+    git -C ./dist/gh-pages add --all
+    git -C ./dist/gh-pages commit --amend --no-edit
+    git -C ./dist/gh-pages push --force origin gh-pages
+    # rm -rf ./dist
+}
+
 case "${command}" in
     "build") client_build $@;;
     "start") client_start $@;;
@@ -100,6 +119,7 @@ case "${command}" in
     "console") client_console $@;;
     "watch") client_watch $@;;
     "test") client_test;;
+    "demo") client_demo;;
     *)
         echo;
         echo "Usage: $(tty -s && tput bold)$(basename "$0")$(tty -s && tput sgr0) <command> <options>"

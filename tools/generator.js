@@ -179,8 +179,8 @@ function posts() {
     return fs.readdirSync("content/blog/").filter(post => fs.statSync("content/blog/" + post).isDirectory() && fs.existsSync("content/blog/" + post + "/index.html")).sort().reverse();
 }
 
-function renderBlog(folders, root, page) {
-    var view = { "items": [] }
+function renderBlog(folders, destination, root, page) {
+    var view = { "items": [] };
     var count = 10;
     while (count > 0 && folders.length > 0) {
         var folder = folders.shift();
@@ -201,13 +201,14 @@ function renderBlog(folders, root, page) {
         }
     }
     view["placeholder"] = [];
+    view["root"] = root;
     if (folders.length > 0) {
         page++;
         var location = "blog/page" + page.toString() + ".html";
-        view["placeholder"].push({ "url": "/" + location });
-        var destination = root + "/" + location;
-        var data = renderBlog(folders, root, page);
-        fs.writeFileSync(destination, data);
+        view["placeholder"].push({ "url": root + location });
+        var file = destination + '/' + location;
+        var data = renderBlog(folders, destination, root, page);
+        fs.writeFileSync(file, data);
     }
     var template = fs.readFileSync("themes/" + theme + "/feed.html", "utf-8");
     return mustache(template, view, null);
@@ -261,7 +262,7 @@ function renderFeed(source, destination) {
     fs.writeFileSync(destination, data);
 }
 
-function renderPost(source, destination) {
+function renderPost(source, destination, root) {
     if (source.startsWith("content/blog/") && source.endsWith("/index.html")) {
         var item = loadPost(source);
         if (item) {
@@ -271,6 +272,7 @@ function renderPost(source, destination) {
             }
             item["author"] = item["author"] || configuration["name"];
             var view = merge(configuration, item);
+            view["root"] = root;
             var template = fs.readFileSync("themes/" + theme + "/post.html", "utf-8");
             var data = mustache(template, view, function(name) {
                 return fs.readFileSync("themes/" + theme + "/" + name, "utf-8");
@@ -282,14 +284,15 @@ function renderPost(source, destination) {
     return false;
 }
 
-function renderPage(source, destination) {
-    if (renderPost(source, destination)) {
+function renderPage(source, destination, root) {
+    if (renderPost(source, destination, root)) {
         return;
     }
     var template = fs.readFileSync(source, "utf-8");
     var view = merge(configuration);
+    view["root"] = root;
     view["blog"] = function() {
-        return renderBlog(posts(), path.dirname(destination), 0) + `<script type="text/javascript">
+        return renderBlog(posts(), path.dirname(destination), root + '../', 0) + `<script type="text/javascript">
 function updateStream() {
     var element = document.getElementById("stream");
     if (element) {
@@ -319,7 +322,9 @@ window.addEventListener('scroll', function(e) {
     };
     view["pages"] = [];
     configuration["pages"].forEach(function (page) {
-        var active = ("content" + page["url"]).replace(/\/$/, "") == path.dirname(source)
+        const location = path.dirname(source);
+        const target = mustache(page["url"], view);
+        const active = path.join(location, target) == location;
         if (active || page["visible"]) {
             view["pages"].push({ "name": page["name"], "url": page["url"], "active": active });
         }
@@ -334,7 +339,7 @@ function renderFile(source, destination) {
     fs.createReadStream(source).pipe(fs.createWriteStream(destination));
 }
 
-function render(source, destination) {
+function render(source, destination, root) {
     console.log(destination);
     var extension = path.extname(source);
     switch (extension) {
@@ -343,7 +348,7 @@ function render(source, destination) {
             renderFeed(source, destination);
             break;
         case ".html":
-            renderPage(source, destination);
+            renderPage(source, destination, root);
             break;
         default:
             renderFile(source, destination);
@@ -361,15 +366,15 @@ function makeDirectory(directory) {
     }, '');
 }
 
-function renderDirectory(source, destination) {
+function renderDirectory(source, destination, root) {
     makeDirectory(destination);
     fs.readdirSync(source).forEach(function(item) {
         if (!item.startsWith(".")) {
             if (fs.statSync(source + item).isDirectory()) {
-                renderDirectory(source + item + "/", destination + item + "/");
+                renderDirectory(source + item + "/", destination + item + "/", root + '../');
             }
             else {
-                render(source + item, destination + item);
+                render(source + item, destination + item, root);
             }
         }
     });
@@ -406,4 +411,4 @@ while (args.length > 0) {
     }
 }
 cleanDirectory(destination);
-renderDirectory("content/", destination + "/");
+renderDirectory("content/", destination + '/', '');

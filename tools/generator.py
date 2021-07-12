@@ -5,7 +5,6 @@ import datetime
 import dateutil.parser
 import dateutil.tz
 import json
-import mimetypes
 import os
 import re
 import platform
@@ -178,7 +177,7 @@ def load_post(path):
         return item
     return None
 
-def render_blog(folders, root, page):
+def render_blog(folders, desitination, root, page):
     view = { "items": [] }
     count = 10
     while count > 0 and len(folders) > 0:
@@ -197,17 +196,18 @@ def render_blog(folders, root, page):
             view["items"].append(item)
             count -= 1
     view["placeholder"] = []
+    view["root"] = root
     if len(folders) > 0:
         page += 1
         location = "blog/page" + str(page) + ".html";
-        view["placeholder"].append({ "url": "/" + location })
-        destination = root + "/" + location
-        data = render_blog(folders, root, page)
-        write_file(destination, data)
+        view["placeholder"].append({ "url": root + location })
+        file = destination + "/" + location
+        data = render_blog(folders, destination, root, page)
+        write_file(file, data)
     template = read_file("themes/" + theme + "/feed.html")
     return mustache(template, view, None)
 
-def render_post(source, destination):
+def render_post(source, destination, root):
     if source.startswith("content/blog/") and source.endswith("/index.html"):
         item = load_post(source)
         if item:
@@ -221,6 +221,7 @@ def render_post(source, destination):
             if "telemetry" in configuration:
                 item["telemetry"] = mustache(configuration["telemetry"], item, None)
             view = merge([ configuration, item ])
+            view["root"] = root
             template = read_file("themes/" + theme + "/post.html")
             data = mustache(template, view, lambda name: read_file("themes/" + theme + "/" + name))
             write_file(destination, data)
@@ -260,7 +261,7 @@ def render_feed(source, destination):
                 if not recent_found or recent < updated:
                     recent = updated
                     recent_found = True
-            item["content"] = escape_html(truncate(item["content"], 10000));
+            item["content"] = escape_html(truncate(item["content"], 10000))
             feed["items"].append(item)
             count -= 1
     feed["updated"] = format_date(recent, format)
@@ -268,12 +269,13 @@ def render_feed(source, destination):
     data = mustache(template, feed, None)
     write_file(destination, data)
 
-def render_page(source, destination):
-    if render_post(source, destination):
+def render_page(source, destination, root):
+    if render_post(source, destination, root):
         return
     template = read_file(os.path.join("./", source))
     view = merge([ configuration ])
-    view["blog"] = lambda: render_blog(posts(), os.path.dirname(destination), 0) + """<script type=\"text/javascript\">
+    view["root"] = root
+    view["blog"] = lambda: render_blog(posts(), os.path.dirname(destination), root + "../", 0) + """<script type=\"text/javascript\">
 function updateStream() {
     var element = document.getElementById("stream");
     if (element) {
@@ -302,7 +304,9 @@ window.addEventListener('scroll', function(e) {
 """
     view["pages"] = []
     for page in configuration["pages"]:
-        active = ("content" + page["url"]).rstrip('/') == os.path.dirname(source)
+        location = os.path.dirname(source)
+        target = mustache(page["url"], view, None)
+        active = os.path.normpath(os.path.join(location, target)) == location
         if active or ("visible" in page and page["visible"]):
             view["pages"].append({"name": page["name"], "url": page["url"], "active": active })
     data = mustache(template, view, lambda name: read_file("themes/" + theme + "/" + name))
@@ -311,25 +315,25 @@ window.addEventListener('scroll', function(e) {
 def render_file(source, destination):
     shutil.copyfile(source, destination)
 
-def render(source, destination):
+def render(source, destination, root):
     print(destination)
     extension = os.path.splitext(source)[1]
     if extension == ".rss" or extension == ".atom":
         render_feed(source, destination)
     elif extension == ".html":
-        render_page(source, destination)
+        render_page(source, destination, root)
     else:
         render_file(source, destination)
 
-def render_directory(source, destination):
+def render_directory(source, destination, root):
     if not os.path.exists(destination):
         os.makedirs(destination)
     for item in os.listdir(source):
         if not item.startswith("."):
             if os.path.isdir(source + item):
-                render_directory(source + item + "/", destination + item + "/")
+                render_directory(source + item + "/", destination + item + "/", root + "../")
             else:
-                render(source + item, destination + item)
+                render(source + item, destination + item, root)
 
 def clean_directory(directory):
     if os.path.exists(directory) and os.path.isdir(directory):
@@ -354,4 +358,4 @@ while len(args) > 0:
     else:
         destination = arg
 clean_directory(destination)
-render_directory("content/", destination + "/") ;
+render_directory("content/", destination + "/", "")
