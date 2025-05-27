@@ -2,21 +2,15 @@
 
 import codecs
 import datetime
-import dateutil.parser
-import dateutil.tz
 import json
 import os
-import re
 import platform
-import sys
+import re
 import shutil
+import sys
 
-if sys.version_info[0] > 2:
-    from urllib.parse import urlparse
-    from urllib.parse import parse_qs
-else:
-    from urlparse import urlparse
-    from urlparse import parse_qs
+import dateutil.parser
+import dateutil.tz
 
 entity_map = {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;",
@@ -39,11 +33,14 @@ def mustache(template, view, partials):
         if name in view:
             section = view[name]
             if isinstance(section, list) and len(section) > 0:
-                return "".join(mustache(content, merge([ view, item ]), partials) for item in section);
-            if isinstance(section, bool) and section:
+                def render(item):
+                    return mustache(content, merge([view, item]), partials)
+                return "".join(render(item) for item in section)
+            if (isinstance(section, bool) or isinstance(section, str)) and section:
                 return mustache(content, view, partials)
         return ""
-    template = re.sub(r"{{#\s*([-_\/\.\w]+)\s*}}\s?([\s\S]*){{\/\1}}\s?", replace_section, template)
+    block_regex = r"{{#\s*([-_\/\.\w]+)\s*}}\s?([\s\S]*){{\/\1}}\s?"
+    template = re.sub(block_regex, replace_section, template)
     def replace_partial(match):
         name = match.group(1)
         if callable(partials):
@@ -84,9 +81,11 @@ def write_file(path, data):
 
 def format_date(date, format):
     if format == "atom":
-        return date.astimezone(dateutil.tz.gettz("UTC")).isoformat("T").split("+")[0] + "Z"
+        utc = date.astimezone(dateutil.tz.gettz("UTC"))
+        return utc.isoformat("T").split("+")[0] + "Z"
     if format == "rss":
-        return date.astimezone(dateutil.tz.gettz("UTC")).strftime("%a, %d %b %Y %H:%M:%S %z")
+        utc = date.astimezone(dateutil.tz.gettz("UTC"))
+        return utc.strftime("%a, %d %b %Y %H:%M:%S %z")
     if format == "user":
         return date.strftime("%b %d, %Y").replace(" 0", " ")
     return ""
@@ -94,14 +93,15 @@ def format_date(date, format):
 def posts():
     folders = []
     for post in sorted(os.listdir("content/blog"), reverse=True):
-        if os.path.isdir("content/blog/" + post) and os.path.exists("content/blog/" + post + "/index.html"):
+        dir = f"content/blog/{post}"
+        if os.path.isdir(f"{dir}") and os.path.exists(f"{dir}/index.html"):
             folders.append(post)
     return folders
 
 tag_regexp = re.compile(r"<(\w+)[^>]*>")
 entity_regexp = re.compile(r"(#?[A-Za-z0-9]+;)")
 break_regexp = re.compile(r" |<|&")
-truncate_map = { "pre": True, "code": True, "img": True, "table": True, "style": True, "script": True, "h2": True, "h3": True }
+truncate_map = { "pre", "code", "img", "table", "style", "script", "h2", "h3" }
 
 def truncate(text, length):
     close_tags = {}
@@ -116,12 +116,12 @@ def truncate(text, length):
                 match = tag_regexp.match(text[index:])
                 if match:
                     tag = match.groups()[0].lower()
-                    if tag in truncate_map and truncate_map[tag]:
+                    if tag in truncate_map:
                         break
                     index += match.end()
-                    match = re.search("(</" + tag + "\\s*>)", text[index:], re.IGNORECASE)
+                    match = re.search(f"(</{tag}\\s*>)", text[index:], re.IGNORECASE)
                     if match:
-                        close_tags[index + match.start()] = "</" + tag + ">"
+                        close_tags[index + match.start()] = f"</{tag}>"
                 else:
                     index += 1
                     count += 1
@@ -184,7 +184,7 @@ def render_blog(folders, desitination, root, page):
         folder = folders.pop(0)
         item = load_post("content/blog/" + folder + "/index.html")
         if item and (item["state"] == "post" or environment != "production"):
-            item["url"] = "blog/" + folder + "/"
+            item["url"] = f"blog/{folder}/"
             if "date" in item:
                 date = dateutil.parser.parse(item["date"])
                 item["date"] = format_date(date, "user")
@@ -199,31 +199,38 @@ def render_blog(folders, desitination, root, page):
     view["root"] = root
     if len(folders) > 0:
         page += 1
-        location = "blog/page" + str(page) + ".html";
-        view["placeholder"].append({ "url": root + location })
-        file = destination + "/" + location
+        location = f"blog/page{str(page)}.html"
+        view["placeholder"].append({ "url": f"{root}../{location}" })
+        file = f"{destination}/{location}"
         data = render_blog(folders, destination, root, page)
         write_file(file, data)
-    template = read_file("themes/" + theme + "/feed.html")
+    template = read_file(f"themes/{theme}/feed.html")
     return mustache(template, view, None)
 
 def render_post(source, destination, root):
     if source.startswith("content/blog/") and source.endswith("/index.html"):
         item = load_post(source)
         if item:
-            if not "author" in item:
+            if "author" not in item:
                 item["author"] = configuration["name"]
+            if "updated" in item:
+                if item["updated"] == item["date"]:
+                    del item["updated"]
+                else:
+                    date = dateutil.parser.parse(item["updated"])
+                    item["updated"] = format_date(date, "user")
             if "date" in item:
                 date = dateutil.parser.parse(item["date"])
                 item["date"] = format_date(date, "user")
-            if not "telemetry" in item:
+            if "telemetry" not in item:
                 item["telemetry"] = ""
             if "telemetry" in configuration:
                 item["telemetry"] = mustache(configuration["telemetry"], item, None)
             view = merge([ configuration, item ])
             view["root"] = root
-            template = read_file("themes/" + theme + "/post.html")
-            data = mustache(template, view, lambda name: read_file("themes/" + theme + "/" + name))
+            dir = f"themes/{theme}/"
+            template = read_file(f"{dir}/post.html")
+            data = mustache(template, view, lambda name: read_file(f"{dir}/{name}"))
             write_file(destination, data)
             return True
     return False
@@ -239,7 +246,7 @@ def render_feed(source, destination):
         "author": configuration["name"],
         "host": host,
         "url": url,
-        "items": [] 
+        "items": []
     }
     recent_found = False
     recent = datetime.datetime.now()
@@ -249,7 +256,7 @@ def render_feed(source, destination):
         item = load_post("content/blog/" + folder + "/index.html")
         if item and (item["state"] == "post" or environment != "production"):
             item["url"] = host + "/blog/" + folder + "/"
-            if not "author" in item or item["author"] == configuration["name"]:
+            if "author" not in item or item["author"] == configuration["name"]:
                 item["author"] = False
             if "date" in item:
                 date = dateutil.parser.parse(item["date"])
@@ -273,9 +280,7 @@ def render_page(source, destination, root):
     if render_post(source, destination, root):
         return
     template = read_file(os.path.join("./", source))
-    view = merge([ configuration ])
-    view["root"] = root
-    view["blog"] = lambda: render_blog(posts(), os.path.dirname(destination), root + "../", 0) + """<script type=\"text/javascript\">
+    script = """<script type=\"text/javascript\">
 function updateStream() {
     var element = document.getElementById("stream");
     if (element) {
@@ -302,14 +307,19 @@ window.addEventListener('scroll', function(e) {
 });
 </script>
 """
+    dir = os.path.dirname(destination)
+    view = merge([configuration])
+    view["root"] = root
+    view["blog"] = lambda: render_blog(posts(), dir, root, 0) + script
     view["pages"] = []
     for page in configuration["pages"]:
         location = os.path.dirname(source)
         target = mustache(page["url"], view, None)
         active = os.path.normpath(os.path.join(location, target)) == location
         if active or ("visible" in page and page["visible"]):
-            view["pages"].append({"name": page["name"], "url": page["url"], "active": active })
-    data = mustache(template, view, lambda name: read_file("themes/" + theme + "/" + name))
+            entry = {"name": page["name"], "url": page["url"], "active": active }
+            view["pages"].append(entry)
+    data = mustache(template, view, lambda name: read_file(f"themes/{theme}/{name}"))
     write_file(destination, data)
 
 def render_file(source, destination):
@@ -330,10 +340,11 @@ def render_directory(source, destination, root):
         os.makedirs(destination)
     for item in os.listdir(source):
         if not item.startswith("."):
-            if os.path.isdir(source + item):
-                render_directory(source + item + "/", destination + item + "/", root + "../")
+            location = f"{source}{item}"
+            if os.path.isdir(location):
+                render_directory(f"{location}/", f"{destination}{item}/", f"{root}../")
             else:
-                render(source + item, destination + item, root)
+                render(location, f"{destination}{item}", root)
 
 def clean_directory(directory):
     if os.path.exists(directory) and os.path.isdir(directory):
@@ -344,8 +355,8 @@ def clean_directory(directory):
             else:
                 os.remove(item)
 
-environment = os.getenv("ENVIRONMENT")
-print("python " + platform.python_version() + " " + (environment if environment else ""))
+environment = os.environ.get("ENVIRONMENT", "")
+print(f"python {platform.python_version()} {environment}")
 with open("content.json") as configurationFile:
     configuration = json.load(configurationFile)
 destination = "build"

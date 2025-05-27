@@ -61,7 +61,7 @@ body { margin: 0 0 65px 0; background-color: #f8f8f8; }
 .card { padding-left: 20px; padding-right: 20px; }
 }
 @media all and (max-width: 680px) {
-.item { max-width: none; width: auto; border-top: 1px solid rgba(0, 0, 0, .09); box-shadow: 0 1px 4px 0 rgba(0, 0, 0, .04); }
+.item { max-width: 680px; width: 100%; border-top: 1px solid rgba(0, 0, 0, .09); box-shadow: 0 1px 4px 0 rgba(0, 0, 0, .04); background-color: #ffffff; }
 .card { max-width: 640px; width: 100%; padding-left: 20px; padding-right: 20px; margin: 0 auto 0 auto; border-radius: 0; border: 0; box-shadow: none; }
 }
 @media all and (max-width: 640px) {
@@ -90,7 +90,7 @@ body { background-color: #111111; }
 .card .content p a { background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 50%, #8f8f8f 50%); }
 }
 @media all and (max-width: 680px) and (prefers-color-scheme: dark) {
-.item { border-top-color: rgba(32, 32, 32, 1); }
+.item { border-top-color: rgba(32, 32, 32, 1); background-color: #1b1b1b; }
 }
 @media only screen and (min-device-pixel-ratio:2), only screen and (min-resolution:2dppx), only screen and (-webkit-min-device-pixel-ratio:2) {
 .card .content p a { background-size: 2px 1px; }

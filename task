@@ -25,7 +25,7 @@ bold() {
     echo "$(tty -s && tput bold)$1$(tty -s && tput sgr0)" 
 }
 
-client_build() {
+build() {
     case "${runtime}" in
         "go") go run tools/generator.go ${output} --theme ${theme};;
         "python") python tools/generator.py ${output} --theme ${theme};;
@@ -33,53 +33,60 @@ client_build() {
     esac
 }
 
-client_start() {
+start() {
     export ENVIRONMENT=development
-    client_build
+    build
     arguments="${output} --port 8080 --index-page index.html --not-found-page 404.html --redirect-map redirect.map --browse"
     case "${runtime}" in
-        "go") go run tools/server.go ${arguments};;
-        "python") python tools/server.py ${arguments};;
-        "node") node tools/server.js ${arguments};;
+        "go") go run tools/server.go ${arguments} & server_pid=$!;;
+        "python") python tools/server.py ${arguments} & server_pid=$!;;
+        "node") node tools/server.js ${arguments} & server_pid=$!;;
     esac
 }
 
-client_deploy() {
+deploy() {
     export ENVIRONMENT=production
     bold "build"
-    client_build
+    build
     if [ ! -z "${target}" ]; then
         bold "deploy"
         deploy/${target} deploy $@
     fi
 }
 
-client_log() {
+log() {
     if [ ! -z "${target}" ]; then
         deploy/${target} log
     fi
 }
 
-client_console() {
+console() {
     if [ ! -z "${target}" ]; then
         deploy/${target} console
     fi
 }
 
-client_watch() {
+watch() {
     export ENVIRONMENT=development
-    client_build
-    case "$(uname -s)" in
-        Darwin*) 
-            if [ -z "$(which fswatch)" ]; then
-                brew install fswatch
-            fi
-            fswatch -r -o . -e "${output}" | while read; do client_build; done
-            ;;
-    esac
+    start
+    echo "SERVER: ${server_pid}"
+    trap "echo Stopping server...; kill $server_pid; exit" INT TERM
+    checksum=""
+    while true; do
+        if stat --version >/dev/null 2>&1; then
+            new_checksum=$(find . -type f -exec stat --format='%Y.%N %n' {} + | sort -nr | sha1sum)
+        else
+            new_checksum=$(find . -type f -exec stat -f '%m %N' {} + | sort -nr | sha1sum)
+        fi
+        if [[ "$new_checksum" != "$checksum" ]]; then
+            build
+            checksum="${new_checksum}"
+        fi
+        sleep 1
+    done
 }
 
-client_test() {
+test() {
     rm -rf ${output}/*
     bold "node"
     ENVIRONMENT=production node tools/generator.js ${output}/node --theme ${theme}
@@ -92,34 +99,14 @@ client_test() {
     diff --brief -r ${output}/node/ ${output}/python/
 }
 
-client_demo() {
-    rm -rf ./dist
-    git clone --depth=1 https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_USER}/minimal.git --branch gh-pages ./dist/gh-pages 2>&1 > /dev/null
-    runtime=node
-    output=./dist/gh-pages/default
-    theme=default
-    client_build
-    output=./dist/gh-pages/developer
-    theme=developer
-    client_build
-    output=./dist/gh-pages/profile
-    theme=profile
-    client_build
-    git -C ./dist/gh-pages add --all
-    git -C ./dist/gh-pages commit --amend --no-edit
-    git -C ./dist/gh-pages push --force origin gh-pages
-    # rm -rf ./dist
-}
-
 case "${command}" in
-    "build") client_build $@;;
-    "start") client_start $@;;
-    "deploy") client_deploy $@;;
-    "log") client_log $@;;
-    "console") client_console $@;;
-    "watch") client_watch $@;;
-    "test") client_test;;
-    "demo") client_demo;;
+    "build") build $@;;
+    "start") start $@;;
+    "deploy") deploy $@;;
+    "log") log $@;;
+    "console") console $@;;
+    "watch") watch $@;;
+    "test") test;;
     *)
         echo;
         echo "Usage: $(tty -s && tput bold)$(basename "$0")$(tty -s && tput sgr0) <command> <options>"

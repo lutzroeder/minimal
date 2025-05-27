@@ -1,21 +1,12 @@
-#!/usr/bin/env python
-
 import codecs
+import http.server
 import mimetypes
 import os
 import re
 import sys
 import threading
+import urllib.parse
 import webbrowser
-
-if sys.version_info[0] > 2:
-    from urllib.parse import urlparse
-    from http.server import HTTPServer
-    from http.server import BaseHTTPRequestHandler
-else:
-    from urlparse import urlparse
-    from BaseHTTPServer import HTTPServer
-    from BaseHTTPServer import BaseHTTPRequestHandler
 
 folder = "."
 port = 8080
@@ -27,11 +18,11 @@ not_found_page = ""
 args = sys.argv[1:]
 while len(args) > 0:
     arg = args.pop(0)
-    if (arg == "--port" or arg == "-p") and len(args) > 0 and args[0].isdigit(): 
+    if (arg == "--port" or arg == "-p") and len(args) > 0 and args[0].isdigit():
         port = int(args.pop(0))
-    if (arg == "--index-page" or arg == "-i") and len(args) > 0: 
+    if (arg == "--index-page" or arg == "-i") and len(args) > 0:
         index_page = args.pop(0)
-    if (arg == "--not-found-page" or arg == "-e") and len(args) > 0: 
+    if (arg == "--not-found-page" or arg == "-e") and len(args) > 0:
         not_found_page = args.pop(0)
     elif (arg == "--redirect-map" or arg == "-r") and len(args) > 0:
         with codecs.open(args.pop(0), "r", "utf-8") as open_file:
@@ -41,18 +32,18 @@ while len(args) > 0:
                 line = lines.pop(0)
                 match = re.compile("([^ ]*) *([^ ]*)").match(line)
                 if match and len(match.groups()[0]) > 0 and len(match.groups()[1]) > 0:
-                    redirects.append({ 
-                        "source": match.groups()[0], 
+                    redirects.append({
+                        "source": match.groups()[0],
                         "target": match.groups()[1] })
     elif arg == "--browse" or arg == "-b":
         browse = True
     elif not arg.startswith("-"):
         folder = arg
 
-class HTTPRequestHandler(BaseHTTPRequestHandler):
+class HTTPRequestHandler(http.server.BaseHTTPRequestHandler):
     def handler(self):
-        pathname = urlparse(self.path).path
-        location = folder + pathname;
+        pathname = urllib.parse.urlparse(self.path).path
+        location = folder + pathname
         status_code = 0
         headers = {}
         buffer = None
@@ -88,20 +79,20 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_header(key, headers[key])
         self.end_headers()
         if self.command != "HEAD":
-            if status_code == 404 and buffer == None:
+            if status_code == 404 and buffer is None:
                 self.wfile.write(str(status_code))
-            elif (status_code == 200 or status_code == 404) and buffer != None:
+            elif (status_code == 200 or status_code == 404) and buffer is not None:
                 self.wfile.write(buffer)
     def do_GET(self):
-        self.handler();
+        self.handler()
     def do_HEAD(self):
-        self.handler();
+        self.handler()
     def log_message(self, format, *args):
         return
 
-server = HTTPServer(("localhost", port), HTTPRequestHandler)
-url = "http://localhost:" + str(port)
-print("Serving '" + folder + "' at " + url + "...")
+server = http.server.HTTPServer(("localhost", port), HTTPRequestHandler)
+url = f"http://localhost:{str(port)}"
+print(f"Serving '{folder}' at {url}...")
 if browse:
     threading.Timer(1, webbrowser.open, args=(url,)).start()
 sys.stdout.flush()

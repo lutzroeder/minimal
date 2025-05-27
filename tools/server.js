@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
-var fs = require("fs");
-var http = require("http");
-var path = require("path");
-var url = require("url");
-var child_process = require('child_process');
+import * as child_process from 'child_process';
+import * as fs from 'fs';
+import * as http from 'http';
+import * as path from 'path';
+import * as process from 'process';
+import * as url from 'url';
 
-var mimeTypeMap = {
+const mimeTypeMap = {
     ".html": "text/html",
     ".js":    "text/javascript",
     ".css":   "text/css",
@@ -20,38 +21,34 @@ var mimeTypeMap = {
     ".zip":   "application/zip",
     ".svg":   "image/svg+xml",
     ".ttf":   "font/truetype",
-    ".woff":  "font/woff",
     ".otf":   "font/opentype",
     ".eot":   "application/vnd.ms-fontobject",
     ".woff":  "application/font-woff",
     ".woff2": "application/font-woff2"
 };
 
-var folder = ".";
-var port = 8080;
-var browse = false;
-var redirects = [];
-var indexPage = "index.html";
-var notFoundPage = "";
+let folder = ".";
+let port = 8080;
+let browse = false;
+const redirects = [];
+let indexPage = "index.html";
+let notFoundPage = "";
 
-var args = process.argv.slice(2)
+const args = process.argv.slice(2);
 while (args.length > 0) {
-    var arg = args.shift();
-    if ((arg == "--port" || arg == "-p") && args.length > 0 && !isNaN(args[0])) {
+    const arg = args.shift();
+    if ((arg === "--port" || arg === "-p") && args.length > 0 && !isNaN(args[0])) {
         port = Number(args.shift());
-    }
-    else if ((arg == "--index-page" || arg == "-i") && args.length > 0) {
+    } else if ((arg === "--index-page" || arg === "-i") && args.length > 0) {
         indexPage = args.shift();
-    }
-    else if ((arg == "--not-found-page" || arg == "-n") && args.length > 0) {
+    } else if ((arg === "--not-found-page" || arg === "-n") && args.length > 0) {
         notFoundPage = args.shift();
-    }
-    else if ((arg == "--redirect-map" || arg == "-r") && args.length > 0) {
-        var data = fs.readFileSync(args.shift(), "utf-8");
-        var lines = data.split(/\r\n?|\n/g);
+    } else if ((arg === "--redirect-map" || arg === "-r") && args.length > 0) {
+        const data = fs.readFileSync(args.shift(), "utf-8");
+        const lines = data.split(/\r\n?|\n/g);
         while (lines.length > 0) {
-            var line = lines.shift();
-            match = line.match("([^ ]*) *([^ ]*)");
+            const line = lines.shift();
+            const match = line.match("([^ ]*) *([^ ]*)");
             if (match && match[1] && match[2]) {
                 redirects.push({
                     source: match[1],
@@ -59,83 +56,79 @@ while (args.length > 0) {
                 });
             }
         }
-    }
-    else if (arg == "--browse" || arg == "-b") { 
+    } else if (arg === "--browse" || arg === "-b") {
         browse = true;
-    }
-    else if (!arg.startsWith("-")) {
+    } else if (!arg.startsWith("-")) {
         folder = arg;
     }
 }
 
-var server = http.createServer(function (request, response) {
-    var pathname = url.parse(request.url, true).pathname;
-    var location = folder + pathname;
-    var statusCode = 0;
-    var headers = {};
-    var buffer = null;
-    for (var i = 0; i < redirects.length; i++) {
-        if (redirects[i].source == pathname) {
+const server = http.createServer((request, response) => {
+    const pathname = url.parse(request.url, true).pathname;
+    let location = folder + pathname;
+    let statusCode = 0;
+    let headers = {};
+    let buffer = null;
+    for (let i = 0; i < redirects.length; i++) {
+        if (redirects[i].source === pathname) {
             statusCode = 301;
             headers = { "Location": redirects[i].target };
             break;
-        }        
+        }
     }
-    if (statusCode == 0) {
+    if (statusCode === 0) {
         if (fs.existsSync(location) && fs.statSync(location).isDirectory()) {
             if (location.endsWith("/")) {
                 location += indexPage;
-            }
-            else {
+            } else {
                 statusCode = 302;
-                headers = { "Location": pathname + "/" };
+                headers = { "Location": `${pathname}/` };
             }
         }
     }
-    if (statusCode == 0) {
+    if (statusCode === 0) {
         if (fs.existsSync(location) && !fs.statSync(location).isDirectory()) {
             statusCode = 200;
-        }
-        else {
-            statusCode = 404
-            location = folder + "/" + notFoundPage;
+        } else {
+            statusCode = 404;
+            location = `${folder}/${notFoundPage}`;
         }
         if (fs.existsSync(location) && !fs.statSync(location).isDirectory()) {
             buffer = fs.readFileSync(location, "binary");
             headers["Content-Length"] = buffer.length;
-            var extension = path.extname(location);
-            var contentType = mimeTypeMap[extension];
+            const extension = path.extname(location);
+            const contentType = mimeTypeMap[extension];
             if (contentType) {
                 headers["Content-Type"] = contentType;
             }
         }
     }
-    console.log(statusCode + " " + request.method + " " + request.url);
+    console.log(`${statusCode} ${request.method} ${request.url}`);
     response.writeHead(statusCode, headers);
     if (request.method !== "HEAD") {
-        if (statusCode == 404 && buffer == null) {
+        if (statusCode === 404 && buffer === null) {
             response.write(statusCode.toString());
-        }
-        else if ((statusCode == 200 || statusCode == 404) && buffer != null) {
+        } else if ((statusCode === 200 || statusCode === 404) && buffer !== null) {
             response.write(buffer, "binary");
         }
     }
     response.end();
-})
+});
 
-server.listen(port, function(error) {  
+server.listen(port, (error) => {
     if (error) {
         console.log("ERROR: ", error);
         return;
     }
-    var url = "http://localhost:" + port;
-    console.log("Serving '" + folder + "' at " + url + "...");
+    const url = `http://localhost:${port}`;
+    console.log(`Serving '${folder}' at ${url}...`);
     if (browse) {
-        var command = "xdg-open";
+        let command = "xdg-open";
         switch (process.platform) {
             case "darwin": command = "open"; break;
             case "win32": command = 'start ""'; break;
+            default: throw new Error(`Unsupported platform '${process.platform}.`);
         }
-        child_process.exec(command + ' "' + url.replace(/"/g, '\\\"') + '"');
+        child_process.exec(`${command} "${url.replace(/"/g, '\\"')}"`);
     }
-})
+});

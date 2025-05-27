@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -64,6 +63,10 @@ func mustache(template string, view map[string]interface{}, partials func(string
 						content = strings.Join(output, "")
 					case bool:
 						if !value {
+							content = ""
+						}
+					case string:
+						if value == "" {
 							content = ""
 						}
 					}
@@ -209,7 +212,7 @@ func truncate(text string, length int) string {
 
 func posts() []string {
 	folders := []string{}
-	items, _ := ioutil.ReadDir("content/blog/")
+	items, _ := os.ReadDir("content/blog/")
 	for i := len(items) - 1; i >= 0; i-- {
 		item := items[i]
 		if item.IsDir() {
@@ -224,7 +227,7 @@ func posts() []string {
 
 func loadPost(path string) map[string]interface{} {
 	if stat, err := os.Stat(path); !os.IsNotExist(err) && !stat.IsDir() {
-		data, err := ioutil.ReadFile(path)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			fmt.Println(err)
 		} else {
@@ -284,14 +287,14 @@ func renderBlog(folders []string, destination string, root string, page int) str
 	if len(folders) > 0 {
 		page++
 		location := "blog/page" + strconv.Itoa(page) + ".html"
-		placeholder = append(placeholder, map[string]interface{}{"url": root + location})
+		placeholder = append(placeholder, map[string]interface{}{"url": root + "../" + location})
 		file := destination + "/" + location
 		data := renderBlog(folders, destination, root, page)
-		ioutil.WriteFile(file, []byte(data), os.ModePerm)
+		os.WriteFile(file, []byte(data), os.ModePerm)
 	}
 	view["placeholder"] = placeholder
 	view["root"] = root
-	template, err := ioutil.ReadFile(path.Join("themes/" + theme + "/feed.html"))
+	template, err := os.ReadFile(path.Join("themes/" + theme + "/feed.html"))
 	if err != nil {
 		fmt.Println(err)
 		return ""
@@ -311,6 +314,13 @@ func renderPost(source string, destination string, root string) bool {
 	if strings.HasPrefix(source, "content/blog/") && strings.HasSuffix(source, "/index.html") {
 		item := loadPost(source)
 		if item != nil {
+			if updated, ok := item["updated"]; ok {
+				if date, ok := item["date"]; !ok || date == updated {
+					delete(item, "updated")
+				} else if date, e := time.Parse("2006-01-02 15:04:05 -07:00", updated.(string)); e == nil {
+					item["updated"] = formatDate(date, "user")
+				}
+			}
 			if _, ok := item["date"]; ok {
 				if date, e := time.Parse("2006-01-02 15:04:05 -07:00", item["date"].(string)); e == nil {
 					item["date"] = formatDate(date, "user")
@@ -321,19 +331,19 @@ func renderPost(source string, destination string, root string) bool {
 			}
 			view := merge(configuration, item)
 			view["root"] = root
-			template, err := ioutil.ReadFile("themes/" + theme + "/post.html")
+			template, err := os.ReadFile("themes/" + theme + "/post.html")
 			if err != nil {
 				fmt.Println(err)
 			} else {
 				data := mustache(string(template), view, func(name string) string {
-					data, err := ioutil.ReadFile("themes/" + theme + "/" + name)
+					data, err := os.ReadFile("themes/" + theme + "/" + name)
 					if err != nil {
 						fmt.Println(err)
 						return ""
 					}
 					return string(data)
 				})
-				ioutil.WriteFile(destination, []byte(data), os.ModePerm)
+				os.WriteFile(destination, []byte(data), os.ModePerm)
 				return true
 			}
 		}
@@ -342,9 +352,9 @@ func renderPost(source string, destination string, root string) bool {
 }
 
 func renderFile(source string, destination string) {
-	data, err := ioutil.ReadFile(source)
+	data, err := os.ReadFile(source)
 	if err == nil {
-		err = ioutil.WriteFile(destination, data, os.ModePerm)
+		err = os.WriteFile(destination, data, os.ModePerm)
 	}
 	if err != nil {
 		fmt.Println(err)
@@ -399,12 +409,12 @@ func renderFeed(source string, destination string) {
 	}
 	feed["updated"] = formatDate(recent, format)
 	feed["items"] = items
-	template, err := ioutil.ReadFile("content/blog/feed." + format)
+	template, err := os.ReadFile("content/blog/feed." + format)
 	if err != nil {
 		fmt.Println(err)
 	} else {
 		data := mustache(string(template), feed, nil)
-		ioutil.WriteFile(destination, []byte(data), os.ModePerm)
+		os.WriteFile(destination, []byte(data), os.ModePerm)
 	}
 }
 
@@ -412,14 +422,14 @@ func renderPage(source string, destination string, root string) {
 	if renderPost(source, destination, root) {
 		return
 	}
-	template, err := ioutil.ReadFile(source)
+	template, err := os.ReadFile(source)
 	if err != nil {
 		fmt.Println(err)
 	} else {
 		view := merge(configuration)
 		view["root"] = root
 		view["blog"] = func() string {
-			return renderBlog(posts(), path.Dir(destination), root+"../", 0) +
+			return renderBlog(posts(), path.Dir(destination), root, 0) +
 				`<script type="text/javascript">
 function updateStream() {
     var element = document.getElementById("stream");
@@ -460,13 +470,13 @@ window.addEventListener('scroll', function(e) {
 		}
 		view["pages"] = pages
 		data := mustache(string(template), view, func(name string) string {
-			data, err := ioutil.ReadFile("themes/" + theme + "/" + name)
+			data, err := os.ReadFile("themes/" + theme + "/" + name)
 			if err != nil {
 				fmt.Println(err)
 			}
 			return string(data)
 		})
-		ioutil.WriteFile(destination, []byte(data), os.ModePerm)
+		os.WriteFile(destination, []byte(data), os.ModePerm)
 	}
 }
 
@@ -486,7 +496,7 @@ func render(source string, destination string, root string) {
 func renderDir(source string, destination string, root string) {
 	os.MkdirAll(destination, os.ModePerm)
 	location := source
-	if items, err := ioutil.ReadDir(location); err == nil {
+	if items, err := os.ReadDir(location); err == nil {
 		for _, item := range items {
 			name := item.Name()
 			if !strings.HasPrefix(name, ".") {
@@ -501,7 +511,7 @@ func renderDir(source string, destination string, root string) {
 }
 
 func cleanDir(directory string) {
-	if items, err := ioutil.ReadDir(directory); err == nil {
+	if items, err := os.ReadDir(directory); err == nil {
 		for _, item := range items {
 			os.RemoveAll(directory + "/" + item.Name())
 		}
@@ -511,7 +521,7 @@ func cleanDir(directory string) {
 func main() {
 	environment = os.Getenv("ENVIRONMENT")
 	fmt.Println("go " + strings.TrimPrefix(runtime.Version(), "go") + " " + environment)
-	file, err := ioutil.ReadFile("content.json")
+	file, err := os.ReadFile("content.json")
 	if err != nil {
 		fmt.Println(err)
 		return
