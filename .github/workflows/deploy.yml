@@ -1,0 +1,34 @@
+name: Publish
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: |
+          ENVIRONMENT=production node tools/generator.js build/default --theme default
+          ENVIRONMENT=production node tools/generator.js build/profile --theme profile
+          ENVIRONMENT=production node tools/generator.js build/developer --theme developer
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build
+      - uses: actions/deploy-pages@v4
+        id: deployment
