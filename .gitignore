@@ -2,6 +2,9 @@
 /dist/
 /app
 /debug
+/deploy/*.cfg
+/node_modules
+/package-lock.json
 *.pyc
 .DS_Store
 .DS_Store?

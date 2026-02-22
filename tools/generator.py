@@ -94,7 +94,7 @@ def posts():
     folders = []
     for post in sorted(os.listdir("content/blog"), reverse=True):
         dir = f"content/blog/{post}"
-        if os.path.isdir(f"{dir}") and os.path.exists(f"{dir}/index.html"):
+        if os.path.isdir(f"{dir}") and os.path.exists(f"{dir}/index.md"):
             folders.append(post)
     return folders
 
@@ -139,7 +139,7 @@ def truncate(text, length):
             match = break_regexp.search(text[index:])
             if match:
                 skip = match.start()
-            if count + skip > length:
+            if count + skip >= length:
                 ellipsis = "&hellip;"
             if count + skip - 15 > length:
                 skip = length - count
@@ -151,6 +151,68 @@ def truncate(text, length):
     for k in sorted(close_tags.keys()):
         output.append(close_tags[k])
     return "".join(output)
+
+html_block_tags = ['style', 'script', 'svg', 'p']
+
+def markdown(text):
+    lines = re.split(r"\r\n?|\n", text)
+    output = []
+    i = 0
+    in_html = ""
+    while i < len(lines):
+        line = lines[i]
+        if in_html:
+            output.append(line)
+            if f"</{in_html}>" in line or f"<{in_html}/>" in line or f"<{in_html} />" in line:
+                in_html = ""
+            i += 1
+            continue
+        if line.startswith("```"):
+            code = []
+            i += 1
+            while i < len(lines) and not lines[i].startswith("```"):
+                code.append(lines[i])
+                i += 1
+            content = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", "\n".join(code))
+            output.append("<pre>" + content + "</pre>")
+            i += 1
+            continue
+        if line.lstrip().startswith("<"):
+            for tag in html_block_tags:
+                if line.lstrip().lower().startswith(f"<{tag}"):
+                    if f"</{tag}>" not in line and f"<{tag}/>" not in line and f"<{tag} />" not in line:
+                        in_html = tag
+                    break
+            output.append(line)
+            i += 1
+            continue
+        match = re.match(r"^(#{2,6})\s+(.*)", line)
+        if match:
+            level = len(match.group(1))
+            content = match.group(2)
+            output.append(f"<h{level}>{content}</h{level}>")
+            i += 1
+            continue
+        match = re.match(r"^!\[([^\]]*)\]\(([^)]+)\)$", line)
+        if match:
+            output.append(f'<img alt="{match.group(1)}" src="{match.group(2)}">')
+            i += 1
+            continue
+        if line.strip() == "":
+            i += 1
+            continue
+        para = []
+        while i < len(lines) and lines[i].strip() != "" and not lines[i].startswith("```") and not lines[i].lstrip().startswith("<") and not re.match(r"^#{2,6}\s+", lines[i]) and not re.match(r"^!\[", lines[i]):
+            para.append(lines[i])
+            i += 1
+        text = "\n".join(para)
+        text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
+        text = re.sub(r"\*\*([^*]+)\*\*", r"<b>\1</b>", text)
+        text = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<i>\1</i>", text)
+        text = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", r'<img alt="\1" src="\2">', text)
+        text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', text)
+        output.append(f"<p>{text}</p>")
+    return "\n".join(output)
 
 def load_post(path):
     if os.path.exists(path) and not os.path.isdir(path):
@@ -173,7 +235,10 @@ def load_post(path):
                     item[name] = value
             else:
                 content.append(line)
-        item["content"] = "\n".join(content)
+        content = "\n".join(content)
+        if path.endswith(".md"):
+            content = markdown(content)
+        item["content"] = content
         return item
     return None
 
@@ -182,7 +247,7 @@ def render_blog(folders, desitination, root, page):
     count = 10
     while count > 0 and len(folders) > 0:
         folder = folders.pop(0)
-        item = load_post("content/blog/" + folder + "/index.html")
+        item = load_post("content/blog/" + folder + "/index.md")
         if item and (item["state"] == "post" or environment != "production"):
             item["url"] = f"blog/{folder}/"
             if "date" in item:
@@ -208,7 +273,7 @@ def render_blog(folders, desitination, root, page):
     return mustache(template, view, None)
 
 def render_post(source, destination, root):
-    if source.startswith("content/blog/") and source.endswith("/index.html"):
+    if source.startswith("content/blog/") and (source.endswith("/index.html") or source.endswith("/index.md")):
         item = load_post(source)
         if item:
             if "author" not in item:
@@ -238,14 +303,13 @@ def render_post(source, destination, root):
 def render_feed(source, destination):
     host = configuration["host"]
     format = os.path.splitext(source)[1].replace(".", "")
-    url = host + "/blog/feed." + format
     count = 10
     feed = {
         "name": configuration["name"],
         "description": configuration["description"],
         "author": configuration["name"],
+        "url": configuration["feeds"][0]["url"],
         "host": host,
-        "url": url,
         "items": []
     }
     recent_found = False
@@ -253,7 +317,7 @@ def render_feed(source, destination):
     folders = posts()
     while len(folders) > 0 and count > 0:
         folder = folders.pop(0)
-        item = load_post("content/blog/" + folder + "/index.html")
+        item = load_post("content/blog/" + folder + "/index.md")
         if item and (item["state"] == "post" or environment != "production"):
             item["url"] = host + "/blog/" + folder + "/"
             if "author" not in item or item["author"] == configuration["name"]:
@@ -268,7 +332,7 @@ def render_feed(source, destination):
                 if not recent_found or recent < updated:
                     recent = updated
                     recent_found = True
-            item["content"] = escape_html(truncate(item["content"], 10000))
+            item["content"] = escape_html(item["content"])
             feed["items"].append(item)
             count -= 1
     feed["updated"] = format_date(recent, format)
@@ -326,11 +390,13 @@ def render_file(source, destination):
     shutil.copyfile(source, destination)
 
 def render(source, destination, root):
-    print(destination)
     extension = os.path.splitext(source)[1]
+    if extension == ".md":
+        destination = re.sub(r"\.md$", ".html", destination)
+    print(destination)
     if extension == ".rss" or extension == ".atom":
         render_feed(source, destination)
-    elif extension == ".html":
+    elif extension == ".html" or extension == ".md":
         render_page(source, destination, root)
     else:
         render_file(source, destination)

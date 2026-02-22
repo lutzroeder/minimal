@@ -70,9 +70,11 @@ func mustache(template string, view map[string]interface{}, partials func(string
 							content = ""
 						}
 					}
-					template = template[0:start] + content + template[index+match[1]:]
-					index = start
+				} else {
+					content = ""
 				}
+				template = template[0:start] + content + template[index+match[1]:]
+				index = start
 			}
 		} else {
 			index = len(template)
@@ -182,7 +184,7 @@ func truncate(text string, length int) string {
 			if skip == -1 {
 				skip = len(text) - index
 			}
-			if count+skip > length {
+			if count+skip >= length {
 				ellipsis = "&hellip;"
 			}
 			if count+skip-15 > length {
@@ -217,12 +219,127 @@ func posts() []string {
 		item := items[i]
 		if item.IsDir() {
 			post := item.Name()
-			if _, err := os.Stat("content/blog/" + post + "/index.html"); !os.IsNotExist(err) {
+			if _, err := os.Stat("content/blog/" + post + "/index.md"); !os.IsNotExist(err) {
 				folders = append(folders, post)
 			}
 		}
 	}
 	return folders
+}
+
+var htmlBlockTags = []string{"<style", "<script", "<svg", "<p"}
+
+func markdown(s string) string {
+	lines := strings.Split(s, "\n")
+	var out []string
+	var para []string
+	var codeLines []string
+	inCode := false
+	inHTML := ""
+	flushPara := func() {
+		if len(para) == 0 {
+			return
+		}
+		text := strings.Join(para, "\n")
+		text = inlineMarkdown(text)
+		out = append(out, "<p>"+text+"</p>")
+		para = nil
+	}
+	for _, line := range lines {
+		if inHTML != "" {
+			out = append(out, line)
+			if strings.Contains(line, "</"+inHTML+">") || strings.Contains(line, "<"+inHTML+"/>") || strings.Contains(line, "<"+inHTML+" />") {
+				inHTML = ""
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "```") {
+			if !inCode {
+				flushPara()
+				inCode = true
+				codeLines = nil
+			} else {
+				inCode = false
+				code := strings.Join(codeLines, "\n")
+				code = mdBold.ReplaceAllString(code, `<b>$1</b>`)
+				out = append(out, "<pre>"+code+"</pre>")
+			}
+			continue
+		}
+		if inCode {
+			codeLines = append(codeLines, line)
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			flushPara()
+			continue
+		}
+		if strings.HasPrefix(trimmed, "<") {
+			flushPara()
+			for _, tag := range htmlBlockTags {
+				if strings.HasPrefix(strings.ToLower(trimmed), tag) {
+					name := tag[1:]
+					if !strings.Contains(line, "</"+name+">") && !strings.Contains(line, "<"+name+"/>") && !strings.Contains(line, "<"+name+" />") {
+						inHTML = name
+					}
+					break
+				}
+			}
+			out = append(out, line)
+			continue
+		}
+		if strings.HasPrefix(trimmed, "### ") {
+			flushPara()
+			out = append(out, "<h3>"+inlineMarkdown(strings.TrimPrefix(trimmed, "### "))+"</h3>")
+			continue
+		}
+		if strings.HasPrefix(trimmed, "## ") {
+			flushPara()
+			out = append(out, "<h2>"+inlineMarkdown(strings.TrimPrefix(trimmed, "## "))+"</h2>")
+			continue
+		}
+		para = append(para, line)
+	}
+	flushPara()
+	return strings.Join(out, "\n")
+}
+
+var mdImage = regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
+var mdLink = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+var mdBold = regexp.MustCompile(`\*\*(.+?)\*\*`)
+var mdItalic = regexp.MustCompile(`(?:^|[^*])\*([^*]+?)\*(?:[^*]|$)`)
+var mdCode = regexp.MustCompile("`([^`]+)`")
+
+func inlineMarkdown(s string) string {
+	// Code first to protect from other replacements
+	var codes []string
+	s = mdCode.ReplaceAllStringFunc(s, func(m string) string {
+		code := mdCode.FindStringSubmatch(m)[1]
+		placeholder := fmt.Sprintf("\x00CODE%d\x00", len(codes))
+		codes = append(codes, "<code>"+escapeHTML(code)+"</code>")
+		return placeholder
+	})
+	s = mdImage.ReplaceAllString(s, `<img alt="$1" src="$2">`)
+	s = mdLink.ReplaceAllString(s, `<a href="$2">$1</a>`)
+	s = mdBold.ReplaceAllString(s, `<b>$1</b>`)
+	s = mdItalic.ReplaceAllStringFunc(s, func(m string) string {
+		sub := mdItalic.FindStringSubmatch(m)
+		prefix := ""
+		suffix := ""
+		if len(m) > 0 && m[0] != '*' {
+			prefix = string(m[0])
+		}
+		if len(m) > 0 && m[len(m)-1] != '*' {
+			suffix = string(m[len(m)-1])
+		}
+		return prefix + "<i>" + sub[1] + "</i>" + suffix
+	})
+	// Restore code placeholders
+	for i, code := range codes {
+		s = strings.Replace(s, fmt.Sprintf("\x00CODE%d\x00", i), code, 1)
+	}
+	return s
 }
 
 func loadPost(path string) map[string]interface{} {
@@ -251,7 +368,11 @@ func loadPost(path string) map[string]interface{} {
 					content = append(content, line)
 				}
 			}
-			item["content"] = strings.Join(content, "\n")
+			body := strings.Join(content, "\n")
+			if strings.HasSuffix(path, ".md") {
+				body = markdown(body)
+			}
+			item["content"] = body
 			return item
 		}
 	}
@@ -265,7 +386,7 @@ func renderBlog(folders []string, destination string, root string, page int) str
 	for count > 0 && len(folders) > 0 {
 		folder := folders[0]
 		folders = folders[1:]
-		item := loadPost("content/blog/" + folder + "/index.html")
+		item := loadPost("content/blog/" + folder + "/index.md")
 		if item != nil && (item["state"] == "post" || environment != "production") {
 			item["url"] = "blog/" + folder + "/"
 			if _, ok := item["date"]; ok {
@@ -311,7 +432,7 @@ func writeString(response http.ResponseWriter, request *http.Request, contentTyp
 }
 
 func renderPost(source string, destination string, root string) bool {
-	if strings.HasPrefix(source, "content/blog/") && strings.HasSuffix(source, "/index.html") {
+	if strings.HasPrefix(source, "content/blog/") && strings.HasSuffix(source, "/index.md") {
 		item := loadPost(source)
 		if item != nil {
 			if updated, ok := item["updated"]; ok {
@@ -364,15 +485,14 @@ func renderFile(source string, destination string) {
 func renderFeed(source string, destination string) {
 	host := configuration["host"].(string)
 	format := strings.TrimPrefix(path.Ext(source), ".")
-	url := host + "/blog/feed." + format
 	count := 10
 	items := make([]interface{}, 0)
 	feed := map[string]interface{}{
 		"name":        configuration["name"],
 		"description": configuration["description"],
 		"author":      configuration["name"],
+		"url":         configuration["feeds"].([]interface{})[0].(map[string]interface{})["url"].(string),
 		"host":        host,
-		"url":         url,
 	}
 	recentFound := false
 	recent := time.Now()
@@ -380,8 +500,8 @@ func renderFeed(source string, destination string) {
 	for len(folders) > 0 && count > 0 {
 		folder := folders[0]
 		folders = folders[1:]
-		item := loadPost("content/blog/" + folder + "/index.html")
-		if item != nil && item["state"] == "post" {
+		item := loadPost("content/blog/" + folder + "/index.md")
+		if item != nil && (item["state"] == "post" || environment != "production") {
 			item["url"] = host + "/blog/" + folder + "/"
 			if author, ok := item["author"]; !ok || author.(string) == configuration["name"].(string) {
 				item["author"] = false
@@ -402,14 +522,14 @@ func renderFeed(source string, destination string) {
 					}
 				}
 			}
-			item["content"] = escapeHTML(truncate(item["content"].(string), 4000))
+			item["content"] = escapeHTML(item["content"].(string))
 			items = append(items, item)
 			count--
 		}
 	}
 	feed["updated"] = formatDate(recent, format)
 	feed["items"] = items
-	template, err := os.ReadFile("content/blog/feed." + format)
+	template, err := os.ReadFile(source)
 	if err != nil {
 		fmt.Println(err)
 	} else {
@@ -481,12 +601,17 @@ window.addEventListener('scroll', function(e) {
 }
 
 func render(source string, destination string, root string) {
-	fmt.Println(destination)
 	extension := path.Ext(source)
 	switch extension {
 	case ".rss", ".atom":
+		fmt.Println(destination)
 		renderFeed(source, destination)
 	case ".html":
+		fmt.Println(destination)
+		renderPage(source, destination, root)
+	case ".md":
+		destination = strings.TrimSuffix(destination, ".md") + ".html"
+		fmt.Println(destination)
 		renderPage(source, destination, root)
 	default:
 		renderFile(source, destination)

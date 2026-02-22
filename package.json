@@ -1,7 +1,4 @@
 {
     "name": "minimal",
-    "type": "module",
-    "devDependencies": {
-        "eslint": "9.27.0"
-    }
+    "type": "module"
 }

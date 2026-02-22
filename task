@@ -68,18 +68,20 @@ console() {
 
 watch() {
     export ENVIRONMENT=development
-    start
-    echo "SERVER: ${server_pid}"
-    trap "echo Stopping server...; kill $server_pid; exit" INT TERM
     checksum=""
     while true; do
         if stat --version >/dev/null 2>&1; then
-            new_checksum=$(find . -type f -exec stat --format='%Y.%N %n' {} + | sort -nr | sha1sum)
+            new_checksum=$(find *.* task content deploy themes tools -type f -exec stat --format='%Y.%N %n' {} + | sort -nr | sha1sum)
         else
-            new_checksum=$(find . -type f -exec stat -f '%m %N' {} + | sort -nr | sha1sum)
+            new_checksum=$(find *.* task content deploy themes tools -type f -exec stat -f '%m %N' {} + | sort -nr | sha1sum)
         fi
         if [[ "$new_checksum" != "$checksum" ]]; then
-            build
+            if [[ "$checksum" == "" ]]; then
+                start
+                trap "echo Stopping server...; kill $server_pid; exit" INT TERM
+            else
+                build
+            fi
             checksum="${new_checksum}"
         fi
         sleep 1

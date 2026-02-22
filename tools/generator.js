@@ -52,12 +52,18 @@ const mustache = (template, view, partials) => {
         return mustache(typeof partials === "function" ? partials(name) : partials[name], view, partials);
     });
     template = template.replace(/{{{\s*([-_/.\w]+)\s*}}}/gm, (match, name) => {
-        const value = view[name];
-        return mustache(typeof value === "function" ? value() : value, view, partials);
+        if (name in view) {
+            const value = view[name];
+            return mustache(typeof value === "function" ? value() : value, view, partials);
+        }
+        return match;
     });
     template = template.replace(/{{\s*([-_/.\w]+)\s*}}/gm, (match, name) => {
-        const value = view[name];
-        return escapeHtml(typeof value === "function" ? value() : value);
+        if (name in view) {
+            const value = view[name];
+            return escapeHtml(typeof value === "function" ? value() : value);
+        }
+        return match;
     });
     return template;
 };
@@ -90,8 +96,9 @@ const truncate = (text, length) => {
     while (count < length && index < text.length) {
         if (text[index] === '<') {
             if (closeTags.has(index)) {
+                const closeTag = closeTags.get(index);
                 closeTags.delete(index);
-                index += closeTags.get(index).length;
+                index += closeTag.length;
             } else {
                 const match = text.substring(index).match("<(\\w+)[^>]*>");
                 if (match) {
@@ -100,7 +107,7 @@ const truncate = (text, length) => {
                         break;
                     }
                     index += match[0].length;
-                    const closeTagRegExp = new RegExp(`(</"${tag}"\\s*>)`, "i");
+                    const closeTagRegExp = new RegExp(`(</${tag}\\s*>)`, "i");
                     const end = text.substring(index).search(closeTagRegExp);
                     if (end !== -1) {
                         closeTags.set(index + end, `</${tag}>`);
@@ -126,7 +133,7 @@ const truncate = (text, length) => {
             if (skip === -1) {
                 skip = text.length - index;
             }
-            if (count + skip > length) {
+            if (count + skip >= length) {
                 ellipsis = "&hellip;";
             }
             if (count + skip - 15 > length) {
@@ -145,6 +152,72 @@ const truncate = (text, length) => {
         output.push(closeTags.get(key));
     }
     return output.join("");
+};
+
+const htmlBlockTags = ['style', 'script', 'svg', 'p'];
+
+const markdown = (text) => {
+    const lines = text.split(/\n/);
+    const output = [];
+    let i = 0;
+    let inHTML = '';
+    while (i < lines.length) {
+        const line = lines[i];
+        if (inHTML) {
+            output.push(line);
+            if (line.includes(`</${inHTML}>`) || line.includes(`<${inHTML}/>`) || line.includes(`<${inHTML} />`)) {
+                inHTML = '';
+            }
+            i++;
+            continue;
+        }
+        if (line.startsWith('```')) {
+            const code = [];
+            i++;
+            while (i < lines.length && !lines[i].startsWith('```')) {
+                code.push(lines[i]);
+                i++;
+            }
+            i++;
+            output.push(`<pre>${code.join('\n').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</pre>`);
+        } else if (line.startsWith('#')) {
+            const match = line.match(/^(#{1,6})\s+(.*)/);
+            if (match) {
+                const level = match[1].length;
+                output.push(`<h${level}>${inline(match[2])}</h${level}>`);
+            }
+            i++;
+        } else if (line.trimStart().startsWith('<')) {
+            for (const tag of htmlBlockTags) {
+                if (line.trimStart().toLowerCase().startsWith(`<${tag}`)) {
+                    if (!line.includes(`</${tag}>`) && !line.includes(`<${tag}/>`) && !line.includes(`<${tag} />`)) {
+                        inHTML = tag;
+                    }
+                    break;
+                }
+            }
+            output.push(line);
+            i++;
+        } else if (line.trim() === '') {
+            i++;
+        } else {
+            const block = [];
+            while (i < lines.length && lines[i].trim() !== '' && !lines[i].startsWith('#') && !lines[i].startsWith('```') && !lines[i].trimStart().startsWith('<')) {
+                block.push(lines[i]);
+                i++;
+            }
+            output.push(`<p>${inline(block.join('\n'))}</p>`);
+        }
+    }
+    function inline(text) {
+        text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2">');
+        text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+        text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+        text = text.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+        text = text.replace(/\*([^*]+)\*/g, '<i>$1</i>');
+        return text;
+    }
+    return output.join('\n');
 };
 
 const loadPost = (file) => {
@@ -174,6 +247,9 @@ const loadPost = (file) => {
                 }
             }
             item.content = content.join("\n");
+            if (file.endsWith('.md')) {
+                item.content = markdown(item.content);
+            }
             return item;
         }
     }
@@ -182,7 +258,7 @@ const loadPost = (file) => {
 
 const posts = () => {
     const files = fs.readdirSync("content/blog/");
-    return files.filter((post) => fs.statSync(`content/blog/${post}`).isDirectory() && fs.existsSync(`content/blog/${post}/index.html`)).sort().reverse();
+    return files.filter((post) => fs.statSync(`content/blog/${post}`).isDirectory() && fs.existsSync(`content/blog/${post}/index.md`)).sort().reverse();
 };
 
 const renderBlog = (folders, destination, root, page) => {
@@ -190,7 +266,7 @@ const renderBlog = (folders, destination, root, page) => {
     let count = 10;
     while (count > 0 && folders.length > 0) {
         const folder = folders.shift();
-        const item = loadPost(`content/blog/${folder}/index.html`);
+        const item = loadPost(`content/blog/${folder}/index.md`);
         if (item && (item.state === "post" || environment !== "production")) {
             item.url = `blog/${folder}/`;
             if ("date" in item) {
@@ -222,14 +298,13 @@ const renderBlog = (folders, destination, root, page) => {
 const renderFeed = (source, destination) => {
     const host = configuration.host;
     const format = path.extname(source).replace(".", "");
-    const url = `${host}/blog/feed.${format}`;
     let count = 10;
     const feed = {
         name: configuration.name,
         description: configuration.description,
         author: configuration.name,
+        url: configuration.feeds[0].url,
         host,
-        url,
         items: []
     };
     const folders = posts();
@@ -237,7 +312,7 @@ const renderFeed = (source, destination) => {
     let recent = new Date();
     while (folders.length > 0 && count > 0) {
         const folder = folders.shift();
-        const item = loadPost(`content/blog/${folder}/index.html`);
+        const item = loadPost(`content/blog/${folder}/index.md`);
         if (item && (item.state === "post" || environment !== "production")) {
             item.url = `${host}/blog/${folder}/`;
             if (!item.author || item.author === configuration.name) {
@@ -256,7 +331,7 @@ const renderFeed = (source, destination) => {
                     recentFound = true;
                 }
             }
-            item.content = escapeHtml(truncate(item.content, 10000));
+            item.content = escapeHtml(item.content);
             feed.items.push(item);
             count--;
         }
@@ -268,7 +343,7 @@ const renderFeed = (source, destination) => {
 };
 
 const renderPost = (source, destination, root) => {
-    if (source.startsWith("content/blog/") && source.endsWith("/index.html")) {
+    if (source.startsWith("content/blog/") && source.endsWith("/index.md")) {
         const item = loadPost(source);
         if (item) {
             if (item.updated && item.updated !== item.date) {
@@ -361,6 +436,7 @@ const render = (source, destination, root) => {
             renderFeed(source, destination);
             break;
         case ".html":
+        case ".md":
             renderPage(source, destination, root);
             break;
         default:
@@ -387,7 +463,8 @@ const renderDirectory = (source, destination, root) => {
             if (fs.statSync(source + item).isDirectory()) {
                 renderDirectory(`${source}${item}/`, `${destination}${item}/`, `${root}../`);
             } else {
-                render(source + item, destination + item, root);
+                const dest = item.endsWith('.md') ? destination + item.replace(/\.md$/, '.html') : destination + item;
+                render(source + item, dest, root);
             }
         }
     }

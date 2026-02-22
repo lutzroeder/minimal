@@ -5,7 +5,6 @@ import * as fs from 'fs';
 import * as http from 'http';
 import * as path from 'path';
 import * as process from 'process';
-import * as url from 'url';
 
 const mimeTypeMap = {
     ".html": "text/html",
@@ -64,33 +63,34 @@ while (args.length > 0) {
 }
 
 const server = http.createServer((request, response) => {
-    const pathname = url.parse(request.url, true).pathname;
-    let location = folder + pathname;
-    let statusCode = 0;
+    const url = new URL(request.url, `http://${request.headers.host}`);
+    const pathname = url.pathname;
+    let location = `${folder}${pathname}`;
+    let status = 0;
     let headers = {};
     let buffer = null;
     for (let i = 0; i < redirects.length; i++) {
         if (redirects[i].source === pathname) {
-            statusCode = 301;
-            headers = { "Location": redirects[i].target };
+            status = 301;
+            headers = { Location: redirects[i].target };
             break;
         }
     }
-    if (statusCode === 0) {
+    if (status === 0) {
         if (fs.existsSync(location) && fs.statSync(location).isDirectory()) {
             if (location.endsWith("/")) {
                 location += indexPage;
             } else {
-                statusCode = 302;
-                headers = { "Location": `${pathname}/` };
+                status = 302;
+                headers = { Location: `${pathname}/` };
             }
         }
     }
-    if (statusCode === 0) {
+    if (status === 0) {
         if (fs.existsSync(location) && !fs.statSync(location).isDirectory()) {
-            statusCode = 200;
+            status = 200;
         } else {
-            statusCode = 404;
+            status = 404;
             location = `${folder}/${notFoundPage}`;
         }
         if (fs.existsSync(location) && !fs.statSync(location).isDirectory()) {
@@ -103,12 +103,12 @@ const server = http.createServer((request, response) => {
             }
         }
     }
-    console.log(`${statusCode} ${request.method} ${request.url}`);
-    response.writeHead(statusCode, headers);
+    console.log(`${status} ${request.method} ${request.url}`);
+    response.writeHead(status, headers);
     if (request.method !== "HEAD") {
-        if (statusCode === 404 && buffer === null) {
-            response.write(statusCode.toString());
-        } else if ((statusCode === 200 || statusCode === 404) && buffer !== null) {
+        if (status === 404 && buffer === null) {
+            response.write(status.toString());
+        } else if ((status === 200 || status === 404) && buffer !== null) {
             response.write(buffer, "binary");
         }
     }

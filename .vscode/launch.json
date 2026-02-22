@@ -18,15 +18,10 @@
         },
         {
             "name": "python",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceRoot}/tools/generator.py",
-            "cwd": "${workspaceRoot}",
-            "debugOptions": [
-                "WaitOnAbnormalExit",
-                "WaitOnNormalExit",
-                "RedirectOutput"
-            ],
+            "cwd": "${workspaceRoot}"
         }
     ]
 }
